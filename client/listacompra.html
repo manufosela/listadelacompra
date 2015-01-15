@@ -1,0 +1,161 @@
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="lista de la compra - shopping list">
+  <meta name="author" content="manufosela">
+  <title>Lista de la compra</title>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+        <h1 class="title">Lista de la compra</h1>
+        {{> loginButtons}}
+        {{> marketListItems}}
+        {{> marketListItemsBtn}}
+        {{> addItemList }}
+    </header>
+
+    <div class="panel-body limitheight">
+        {{> listItems}}
+    </div>
+
+    <footer>
+      by @manufosela
+    </footer>
+  </div>
+
+</body>
+
+
+<template name="addItemList">
+  <div class="row">
+    {{#if currentUser }}
+    <input size="40" maxlength="40" class="col-xs-offset-1 col-xs-7 col-md-7 col-sm-7" type="text" name="listItemName" id="listItemName" placeholder="Añade un elemento..." />
+    <input type="button" class="col-xs-3 col-md-3 col-sm-3 btn btn-success btn-sm addListItem-btn" value="Añadir" />
+    {{/if }}
+  </div>
+</template>
+
+<template name="listItems">
+  {{#if currentUser }}
+  <ul class="listitems" id="listItems">
+  {{#each items}}
+    {{> listItem marketSelectedHelper }}
+  {{/each}}
+  </ul>
+  <div class="alertBox"></div>
+  {{/if }}
+  {{#unless currentUser }}
+    <h4>Inicia sesión</h4>
+  {{/unless }}
+</template>
+
+<template name="listItem">
+  <li id="elem_{{_id}}" class="container-fluid" data-id="{{_id}}">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-sm-5 cols-xs-12 margin-0">
+          <div class="row">
+            <span class="col-xs-1 col-sm-1 col-md-1 badge pull-left amount">{{amount}}</span>
+            <span class="col-xs-8 col-sm-8 col-md-8 listitemname {{btnmode}}_doit" contenteditable="true" data-action="editinline:ID={{_id}}" id="listItemName_{{_id}}">
+            {{listItemName}}
+            </span>
+            <span class="col-xs-1 col-sm-1 col-md-1"><a data-id='doit_btn' id="doit_{{_id}}" class="btn btn-xs {{btnmode}} doit" href="#" title="Comprado"><i class="glyphicon glyphicon-ok"></i> </a></span>
+          </div>
+        </div>
+        <div class="row">
+          {{> buttonsGroupItem }}
+          {{> marketLogo}}
+        </div>
+      </div>
+    </div>
+  </li>
+</template>
+
+<template name="marketLogo">
+  <div class="col-xs-3 col-md-3 col-sm-3">
+  {{#if marketSelectedVble}}
+    <img src="/img/logo_{{market}}.png" alt="{{market}}" />
+  {{/if}}
+  </div>
+</template>
+
+<template name="buttonsGroupItem">
+  <div id="buttonsGroupItem" class="col-xs-9 col-md-3 col-sm-3"> 
+    <ul>
+      <li class="dropdown blackBG" data-parentid="{{listItemIdVble}}">{{> marketListItemsDropdown }}</li>
+      <li><a class="btn btn-xs btn-success inc" href="#" title="Incrementar"><i class="glyphicon glyphicon-plus"></i> </a></li>
+      <li><a class="btn btn-xs btn-success dec" href="#" title="Decrementar"><i class="glyphicon glyphicon-minus"></i> </a></li>
+      <!--<li><a class="btn btn-xs btn-primary archive" href="#" title="Archivar"><i class="glyphicon glyphicon-save"></i> </a></li>-->
+      <li><a class="btn btn-xs btn-danger delete" href="#" title="Borrar"><i class="glyphicon glyphicon-trash"></i> </a></li>
+    </ul>
+  </div>
+</template>
+
+<template name="marketListItems">
+  {{#if currentUser }}
+    <div class="row" id="marketListItems">
+      <ul>
+      {{#each marketItems}}
+        {{> marketListItem }}
+      {{/each}}
+      <!--li class='mas-icon'>
+        <button title="Añadir Mercado" class="btn btn-xs btn-success addmarket"><i class="glyphicon glyphicon-plus"></i></button>
+      </li-->
+      </ul>
+    </div>
+  {{/if }}
+</template>
+
+<template name="marketListItemsBtn">
+  <div class="row" id="marketListItemsBtn">
+    <div class="col-xs-5 cols-sm-5 col-md-5"></div>
+    <div class="btn-group">
+      <button title="Lista de Mercados" class="btn btn-xs btn-success dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+        <i class="glyphicon glyphicon-th-list"></i> Selecciona Mercado <span class="caret"></span>
+      </button>
+    </div>
+  </div>
+</template>
+
+<template name="marketListItem">
+  <li>
+    <button title="{{marketName}}" id="marketElem_{{_id}}" class="btn btn-info btn-xs market {{css_class}}">
+      {{marketName}}
+    </button>
+  </li>
+</template>
+
+<template name="marketListItemsDropdown">
+  <a data-toggle="dropdown" href="#"><i class="glyphicon glyphicon-list"></i></a>
+  <ul class="dropdown-menu tree whiteBG" role="menu" aria-labelledby="dLabel">
+  {{#each marketItems}}
+    {{> marketListItemLI}}
+  {{/each}}
+  </ul>
+</template>
+
+<template name="marketListItemLI">
+  <li>
+    <button data-marketid="{{_id}}" class="btn {{btnSel}} btn-xs market">
+      {{marketName}}
+    </button>
+  </li>
+</template>
+
+<template name="alertBox">
+  <div id="alertBlock">
+    <div class="container-fluid alert alert-info fade in" role="alert">
+      <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">×</span><span class="sr-only">Close</span></button>
+      <h4><strong>Vas a borrar <span class="blue">{{elemName}}</span></strong></h4>
+      <p>¿Estas seguro de que quieres borrar definitivamente este elemento?</p>
+      <p class="row">
+        <div class="col-md-4"></div>
+        <button type="button" class="col-md-3 btn btn-danger btn-xs borrar">Borrar</button>
+        <div class="col-md-2"></div>
+        <button type="button" class="col-md-3 btn btn-default btn-xs cancelar">Cancelar</button>
+      </p>
+    </div>
+  </div>
+</template>
