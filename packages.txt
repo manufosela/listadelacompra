@@ -1,8 +1,0 @@
-accounts-password   1.0.5  Password support for accounts
-accounts-ui         1.1.4  Simple templates to add login widgets to an app
-jquery              1.0.2  Manipulate the DOM using CSS selectors
-less                1.0.12  The dynamic stylesheet language
-meteor-platform     1.2.1  Include a standard set of Meteor packages in your app
-mizzao:bootstrap-3  3.3.1_1  HTML, CSS, and JS framework for developing respo...
-
-meteor add accounts-password accounts-ui jquery less meteor-platform mizzao:bootstrap-3
