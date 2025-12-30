@@ -31,8 +31,35 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         </div>
       </div>
 
-      <!-- Tipo de gasto -->
+      <!-- Tipo de lista -->
       <div class="form-group">
+        <label>Tipo de lista</label>
+        <div class="list-type-options">
+          <label class="list-type-option">
+            <input type="radio" name="listType" value="shopping" checked />
+            <div class="list-type-card">
+              <span class="list-type-icon">🛒</span>
+              <div class="list-type-info">
+                <strong>Lista de Compra</strong>
+                <small>Productos con cantidades, unidades y precios</small>
+              </div>
+            </div>
+          </label>
+          <label class="list-type-option">
+            <input type="radio" name="listType" value="agnostic" />
+            <div class="list-type-card">
+              <span class="list-type-icon">📝</span>
+              <div class="list-type-info">
+                <strong>Lista General</strong>
+                <small>Items con notas y prioridad, sin costes</small>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Tipo de gasto (solo para listas de compra) -->
+      <div class="form-group" id="expense-type-group">
         <label>Tipo de gasto</label>
         <div class="expense-type-options">
           <label class="expense-option">
@@ -67,8 +94,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         <small class="form-help">Selecciona los grupos que podrán ver y editar esta lista</small>
       </div>
 
-      <!-- Tienda (opcional) -->
-      <div class="form-group">
+      <!-- Tienda (opcional, solo para listas de compra) -->
+      <div class="form-group" id="store-group">
         <label for="store">Tienda (opcional)</label>
         <input type="text" id="store" placeholder="Ej: Mercadona, Carrefour..." />
       </div>
@@ -117,14 +144,21 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { db } from '/js/firebase-config.js';
   import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
-  // Iconos disponibles para listas
-  const LIST_ICONS = [
+  // Iconos disponibles según tipo de lista
+  const SHOPPING_ICONS = [
     '🛒', '🛍️', '🏪', '🏬', '🛵', '📦',
     '🥗', '🍎', '🥩', '🧀', '🥖', '🍪',
-    '🧹', '🧴', '💊', '🐕', '🎁', '🎄',
-    '🏠', '🔧', '📚', '✏️', '💻', '📱',
-    '👶', '👗', '👟', '⚽', '🎮', '🎨'
+    '🧹', '🧴', '💊', '🐕', '🎁', '🎄'
   ];
+
+  const GENERAL_ICONS = [
+    '📝', '✅', '📋', '🎯', '💡', '⭐',
+    '✈️', '⛺', '🏕️', '🎒', '🧳', '🗺️',
+    '💻', '📱', '🎮', '⚽', '🏃', '🚴',
+    '🏠', '🔧', '📚', '✏️', '💼', '📄'
+  ];
+
+  let currentListType = 'shopping';
 
   let userGroups = [];
   let selectedGroups = [];
@@ -135,22 +169,42 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   const iconSelectorBtn = document.getElementById('icon-selector-btn');
   const selectedIconSpan = document.getElementById('selected-icon');
   const iconInput = document.getElementById('icon');
+  const nameInput = document.getElementById('name');
 
-  LIST_ICONS.forEach(icon => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'icon-option';
-    btn.textContent = icon;
-    btn.addEventListener('click', () => {
-      selectedIconSpan.textContent = icon;
-      iconInput.value = icon;
-      iconPicker.hidden = true;
-      document.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
+  // Función para actualizar el grid de iconos según el tipo de lista
+  function updateIconGrid(listType) {
+    const icons = listType === 'shopping' ? SHOPPING_ICONS : GENERAL_ICONS;
+    const defaultIcon = listType === 'shopping' ? '🛒' : '📝';
+
+    iconGrid.innerHTML = '';
+    icons.forEach(icon => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'icon-option';
+      btn.textContent = icon;
+      btn.addEventListener('click', () => {
+        selectedIconSpan.textContent = icon;
+        iconInput.value = icon;
+        iconPicker.hidden = true;
+        document.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+      if (icon === defaultIcon) btn.classList.add('selected');
+      iconGrid.appendChild(btn);
     });
-    if (icon === '🛒') btn.classList.add('selected');
-    iconGrid.appendChild(btn);
-  });
+
+    // Actualizar icono seleccionado por defecto
+    selectedIconSpan.textContent = defaultIcon;
+    iconInput.value = defaultIcon;
+
+    // Actualizar placeholder del nombre
+    nameInput.placeholder = listType === 'shopping'
+      ? 'Ej: Compra semanal'
+      : 'Ej: Cosas para el viaje';
+  }
+
+  // Inicializar con tipo shopping
+  updateIconGrid('shopping');
 
   iconSelectorBtn.addEventListener('click', () => {
     iconPicker.hidden = !iconPicker.hidden;
@@ -161,6 +215,25 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     if (!iconPicker.contains(e.target) && e.target !== iconSelectorBtn && !iconSelectorBtn.contains(e.target)) {
       iconPicker.hidden = true;
     }
+  });
+
+  // Manejar cambio de tipo de lista
+  const expenseTypeGroup = document.getElementById('expense-type-group');
+  const storeGroup = document.getElementById('store-group');
+  const listTypeRadios = document.querySelectorAll('input[name="listType"]');
+
+  listTypeRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      currentListType = e.target.value;
+      const isShopping = currentListType === 'shopping';
+
+      // Mostrar/ocultar campos específicos de listas de compra
+      expenseTypeGroup.hidden = !isShopping;
+      storeGroup.hidden = !isShopping;
+
+      // Actualizar iconos disponibles
+      updateIconGrid(currentListType);
+    });
   });
 
   // Cargar grupos del usuario
@@ -249,7 +322,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     const date = document.getElementById('date').value;
     const isRecurring = recurringCheckbox.checked;
     const frequency = document.getElementById('frequency').value;
-    const expenseType = document.querySelector('input[name="expenseType"]:checked').value;
+    const listType = document.querySelector('input[name="listType"]:checked').value;
+
+    // expenseType solo aplica a listas de compra
+    const expenseType = listType === 'shopping'
+      ? document.querySelector('input[name="expenseType"]:checked').value
+      : null;
 
     try {
       // Crear lista en la colección del usuario
@@ -257,8 +335,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       const docRef = await addDoc(listsRef, {
         name,
         icon,
-        store: store || null,
-        expenseType, // 'common' o 'shared'
+        listType, // 'shopping' o 'agnostic'
+        store: listType === 'shopping' ? (store || null) : null,
+        expenseType, // 'common', 'shared' o null
         groupIds: selectedGroups,
         scheduledDate: date || null,
         isRecurring,
@@ -379,6 +458,61 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   .icon-option.selected {
     border-color: var(--color-primary);
     background: rgba(37, 99, 235, 0.1);
+  }
+
+  /* Tipo de lista */
+  .list-type-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
+
+  .list-type-option {
+    cursor: pointer;
+  }
+
+  .list-type-option input {
+    display: none;
+  }
+
+  .list-type-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-lg) var(--space-md);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    text-align: center;
+  }
+
+  .list-type-option input:checked + .list-type-card {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.05);
+  }
+
+  .list-type-card:hover {
+    border-color: var(--color-primary);
+  }
+
+  .list-type-icon {
+    font-size: 2rem;
+  }
+
+  .list-type-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .list-type-info strong {
+    font-size: var(--font-size-base);
+  }
+
+  .list-type-info small {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
   }
 
   /* Tipo de gasto */

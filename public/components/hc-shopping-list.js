@@ -16,13 +16,14 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { getCurrentUser } from '/js/auth.js';
 import { getCurrentGroupId } from '/js/group.js';
-import { searchProducts, UNITS, PRODUCT_CATEGORIES } from '/js/db.js';
+import { searchProducts, UNITS, PRODUCT_CATEGORIES, GENERAL_CATEGORIES, PRIORITIES } from '/js/db.js';
 import './hc-list-item.js';
 
 export class HcShoppingList extends LitElement {
   static properties = {
     listId: { type: String, attribute: 'list-id' },
     userId: { type: String, attribute: 'user-id' },
+    listType: { type: String, attribute: 'list-type' }, // 'shopping' or 'agnostic'
     items: { type: Array, state: true },
     members: { type: Array, state: true },
     groupByCategory: { type: Boolean, state: true },
@@ -32,10 +33,19 @@ export class HcShoppingList extends LitElement {
     newItemName: { type: String, state: true },
     newItemQuantity: { type: Number, state: true },
     newItemUnit: { type: String, state: true },
+    newItemNotes: { type: String, state: true }, // Para listas agnósticas
+    newItemPriority: { type: String, state: true }, // Para listas agnósticas
     suggestions: { type: Array, state: true },
     showSuggestions: { type: Boolean, state: true },
     selectedSuggestionIndex: { type: Number, state: true },
-    mode: { type: String, state: true } // 'shopping' or 'edit'
+    mode: { type: String, state: true }, // 'shopping' or 'edit'
+    // Estado para edición de items
+    editingItem: { type: Object, state: true },
+    editItemName: { type: String, state: true },
+    editItemQuantity: { type: Number, state: true },
+    editItemUnit: { type: String, state: true },
+    editItemNotes: { type: String, state: true },
+    editItemPriority: { type: String, state: true }
   };
 
   static styles = css`
@@ -326,6 +336,145 @@ export class HcShoppingList extends LitElement {
       padding: 2rem;
       color: #dc2626;
     }
+
+    /* Estilos para formulario agnóstico */
+    .notes-input {
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .notes-input textarea {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      resize: none;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+
+    .notes-input textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .priority-select {
+      width: 120px;
+    }
+
+    .priority-select select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      background: white;
+      cursor: pointer;
+    }
+
+    .priority-select select:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    /* Modal de edición */
+    .edit-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .edit-modal {
+      background: white;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .edit-modal h3 {
+      margin: 0 0 1rem 0;
+      font-size: 1.125rem;
+    }
+
+    .edit-modal .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .edit-modal label {
+      display: block;
+      font-size: 0.875rem;
+      color: #64748b;
+      margin-bottom: 0.25rem;
+    }
+
+    .edit-modal input,
+    .edit-modal select,
+    .edit-modal textarea {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.375rem;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+
+    .edit-modal input:focus,
+    .edit-modal select:focus,
+    .edit-modal textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .edit-modal textarea {
+      resize: vertical;
+      min-height: 60px;
+      font-family: inherit;
+    }
+
+    .edit-modal-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 1.5rem;
+    }
+
+    .edit-modal-actions button {
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-cancel {
+      background: transparent;
+      border: 1px solid #e2e8f0;
+      color: #64748b;
+    }
+
+    .btn-cancel:hover {
+      background: #f8fafc;
+    }
+
+    .btn-save {
+      background: #2563eb;
+      border: none;
+      color: white;
+    }
+
+    .btn-save:hover {
+      background: #1d4ed8;
+    }
   `;
 
   constructor() {
@@ -333,6 +482,7 @@ export class HcShoppingList extends LitElement {
     this._componentId = `shopping-list-${Math.random().toString(36).substr(2, 9)}`;
     this.items = [];
     this.members = [];
+    this.listType = 'shopping';
     this.groupByCategory = true;
     this.showCompleted = true;
     this.filterByAssignee = '';
@@ -340,12 +490,21 @@ export class HcShoppingList extends LitElement {
     this.newItemName = '';
     this.newItemQuantity = 1;
     this.newItemUnit = 'unidad';
+    this.newItemNotes = '';
+    this.newItemPriority = '';
     this.suggestions = [];
     this.showSuggestions = false;
     this.selectedSuggestionIndex = -1;
     this.mode = 'shopping'; // Default to shopping mode
     this._searchTimeout = null;
     this._unsubscribers = [];
+    // Estado de edición
+    this.editingItem = null;
+    this.editItemName = '';
+    this.editItemQuantity = 1;
+    this.editItemUnit = 'unidad';
+    this.editItemNotes = '';
+    this.editItemPriority = '';
   }
 
   connectedCallback() {
@@ -486,27 +645,40 @@ export class HcShoppingList extends LitElement {
   async _handleAddItem(e) {
     e.preventDefault();
 
-    const name = this.newItemName.trim().toLowerCase();
+    const name = this.newItemName.trim();
     if (!name || !this.userId || !this.listId) return;
+
+    const isAgnostic = this.listType === 'agnostic';
 
     try {
       const itemsRef = collection(db, 'users', this.userId, 'lists', this.listId, 'items');
 
       // Encontrar la categoría si hay un producto sugerido seleccionado
-      let category = 'otros';
+      let category = isAgnostic ? 'general_otros' : 'otros';
       if (this._selectedProduct?.category) {
         category = this._selectedProduct.category;
       }
 
-      await addDoc(itemsRef, {
+      // Datos base del item
+      const itemData = {
         name,
-        quantity: this.newItemQuantity || 1,
-        unit: this.newItemUnit || 'unidad',
         category,
         checked: false,
         createdAt: serverTimestamp(),
-        createdBy: this.userId
-      });
+        createdBy: this.userId,
+        itemType: isAgnostic ? 'general' : 'shopping'
+      };
+
+      // Añadir campos específicos según el tipo de lista
+      if (isAgnostic) {
+        itemData.notes = this.newItemNotes || null;
+        itemData.priority = this.newItemPriority || null;
+      } else {
+        itemData.quantity = this.newItemQuantity || 1;
+        itemData.unit = this.newItemUnit || 'unidad';
+      }
+
+      await addDoc(itemsRef, itemData);
 
       // Actualizar contador de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
@@ -515,17 +687,20 @@ export class HcShoppingList extends LitElement {
         updatedAt: serverTimestamp()
       });
 
-      // Sincronizar con el catálogo de productos del grupo (si no existe)
-      const groupId = getCurrentGroupId();
-      if (groupId && !this._selectedProduct) {
-        // Solo añadir si no vino de una sugerencia (ya existe)
-        this._addToProductCatalog(groupId, name, category);
+      // Sincronizar con el catálogo de productos del grupo (solo para listas de compra)
+      if (!isAgnostic) {
+        const groupId = getCurrentGroupId();
+        if (groupId && !this._selectedProduct) {
+          this._addToProductCatalog(groupId, name.toLowerCase(), category);
+        }
       }
 
       // Resetear formulario
       this.newItemName = '';
       this.newItemQuantity = 1;
       this.newItemUnit = 'unidad';
+      this.newItemNotes = '';
+      this.newItemPriority = '';
       this.suggestions = [];
       this.showSuggestions = false;
       this._selectedProduct = null;
@@ -621,25 +796,94 @@ export class HcShoppingList extends LitElement {
     }
   }
 
+  _handleEditItem(e) {
+    const { item } = e.detail;
+    this.editingItem = item;
+    this.editItemName = item.name;
+    this.editItemQuantity = item.quantity || 1;
+    this.editItemUnit = item.unit || 'unidad';
+    this.editItemNotes = item.notes || '';
+    this.editItemPriority = item.priority || '';
+  }
+
+  _handleCancelEdit() {
+    this.editingItem = null;
+    this.editItemName = '';
+    this.editItemQuantity = 1;
+    this.editItemUnit = 'unidad';
+    this.editItemNotes = '';
+    this.editItemPriority = '';
+  }
+
+  async _handleSaveEdit(e) {
+    e.preventDefault();
+
+    if (!this.editingItem || !this.userId || !this.listId) return;
+
+    const isAgnostic = this.listType === 'agnostic';
+
+    try {
+      const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', this.editingItem.id);
+
+      const updates = {
+        name: this.editItemName.trim(),
+        updatedAt: serverTimestamp()
+      };
+
+      if (isAgnostic) {
+        updates.notes = this.editItemNotes || null;
+        updates.priority = this.editItemPriority || null;
+      } else {
+        updates.quantity = this.editItemQuantity || 1;
+        updates.unit = this.editItemUnit || 'unidad';
+      }
+
+      await updateDoc(itemRef, updates);
+
+      // Actualizar timestamp de la lista
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+
+      this._handleCancelEdit();
+    } catch (error) {
+      console.error('Error updating item:', error);
+    }
+  }
+
   _handleFilterChange(e) {
     this.filterByAssignee = e.target.value;
   }
 
   _getCategoryIcon(category) {
-    const icons = {
-      'frutas': '🍎',
-      'verduras': '🥬',
-      'carnes': '🥩',
-      'pescados': '🐟',
-      'lacteos': '🥛',
-      'panaderia': '🍞',
-      'bebidas': '🥤',
-      'limpieza': '🧹',
-      'higiene': '🧴',
-      'congelados': '❄️',
-      'otros': '📦'
-    };
-    return icons[category] || '📦';
+    // Buscar en categorías de producto
+    const productCat = PRODUCT_CATEGORIES.find(c => c.id === category);
+    if (productCat) return productCat.icon;
+
+    // Buscar en categorías generales
+    const generalCat = GENERAL_CATEGORIES.find(c => c.id === category);
+    if (generalCat) return generalCat.icon;
+
+    return '📦';
+  }
+
+  _getCategoryName(category) {
+    // Buscar en categorías de producto
+    const productCat = PRODUCT_CATEGORIES.find(c => c.id === category);
+    if (productCat) return productCat.name;
+
+    // Buscar en categorías generales
+    const generalCat = GENERAL_CATEGORIES.find(c => c.id === category);
+    if (generalCat) return generalCat.name;
+
+    return category;
+  }
+
+  _handleNotesChange(e) {
+    this.newItemNotes = e.target.value;
+  }
+
+  _handlePriorityChange(e) {
+    this.newItemPriority = e.target.value;
   }
 
   async _handleInputChange(e) {
@@ -745,6 +989,8 @@ export class HcShoppingList extends LitElement {
       return html`<div class="loading">Cargando items...</div>`;
     }
 
+    const isAgnostic = this.listType === 'agnostic';
+
     return html`
       <!-- Mode Toggle -->
       <div class="mode-toggle">
@@ -752,7 +998,7 @@ export class HcShoppingList extends LitElement {
           class="mode-btn ${this.mode === 'shopping' ? 'active' : ''}"
           @click=${() => this._setMode('shopping')}
         >
-          🛒 Comprar
+          ${isAgnostic ? '✅ Usar' : '🛒 Comprar'}
         </button>
         <button
           class="mode-btn ${this.mode === 'edit' ? 'active' : ''}"
@@ -784,7 +1030,7 @@ export class HcShoppingList extends LitElement {
             class="control-btn ${this.showCompleted ? 'active' : ''}"
             @click=${() => this.showCompleted = !this.showCompleted}
           >
-            ✓ Mostrar comprados
+            ✓ Mostrar completados
           </button>
           ${this.members.length > 0 ? html`
             <select
@@ -809,11 +1055,11 @@ export class HcShoppingList extends LitElement {
         <div class="add-item-section">
         <form class="add-item-form" @submit=${this._handleAddItem}>
           <div class="input-group">
-            <label>Producto</label>
+            <label>${isAgnostic ? 'Item' : 'Producto'}</label>
             <input
               type="text"
               class="add-item-input"
-              placeholder="Buscar o añadir producto..."
+              placeholder="${isAgnostic ? 'Añadir item...' : 'Buscar o añadir producto...'}"
               .value=${this.newItemName}
               @input=${this._handleInputChange}
               @keydown=${this._handleKeyDown}
@@ -821,7 +1067,7 @@ export class HcShoppingList extends LitElement {
               @focus=${this._handleInputFocus}
               autocomplete="off"
             />
-            ${this.showSuggestions && this.suggestions.length > 0 ? html`
+            ${!isAgnostic && this.showSuggestions && this.suggestions.length > 0 ? html`
               <div class="suggestions-dropdown">
                 ${this.suggestions.map((product, index) => {
                   const cat = PRODUCT_CATEGORIES.find(c => c.id === product.category);
@@ -839,25 +1085,48 @@ export class HcShoppingList extends LitElement {
               </div>
             ` : ''}
           </div>
-          <div class="quantity-input">
-            <label>Cant.</label>
-            <input
-              type="number"
-              min="1"
-              .value=${this.newItemQuantity}
-              @input=${this._handleQuantityChange}
-            />
-          </div>
-          <div class="unit-select">
-            <label>Unidad</label>
-            <select .value=${this.newItemUnit} @change=${this._handleUnitChange}>
-              ${UNITS.map(unit => html`
-                <option value="${unit.id}" ?selected=${unit.id === this.newItemUnit}>
-                  ${unit.name}
-                </option>
-              `)}
-            </select>
-          </div>
+          ${isAgnostic ? html`
+            <!-- Campos para listas agnósticas -->
+            <div class="notes-input">
+              <label>Notas (opcional)</label>
+              <textarea
+                rows="1"
+                placeholder="Notas..."
+                .value=${this.newItemNotes}
+                @input=${this._handleNotesChange}
+              ></textarea>
+            </div>
+            <div class="priority-select">
+              <label>Prioridad</label>
+              <select .value=${this.newItemPriority} @change=${this._handlePriorityChange}>
+                <option value="">Sin prioridad</option>
+                ${PRIORITIES.map(p => html`
+                  <option value="${p.id}">${p.icon} ${p.name}</option>
+                `)}
+              </select>
+            </div>
+          ` : html`
+            <!-- Campos para listas de compra -->
+            <div class="quantity-input">
+              <label>Cant.</label>
+              <input
+                type="number"
+                min="1"
+                .value=${this.newItemQuantity}
+                @input=${this._handleQuantityChange}
+              />
+            </div>
+            <div class="unit-select">
+              <label>Unidad</label>
+              <select .value=${this.newItemUnit} @change=${this._handleUnitChange}>
+                ${UNITS.map(unit => html`
+                  <option value="${unit.id}" ?selected=${unit.id === this.newItemUnit}>
+                    ${unit.name}
+                  </option>
+                `)}
+              </select>
+            </div>
+          `}
           <button type="submit" class="add-btn" ?disabled=${!this.newItemName.trim()}>
             + Añadir
           </button>
@@ -867,8 +1136,8 @@ export class HcShoppingList extends LitElement {
 
       ${this.items.length === 0 ? html`
         <div class="empty-state">
-          <div class="empty-state-icon">${this.mode === 'edit' ? '📝' : '🛒'}</div>
-          <p>${this.mode === 'edit' ? '¡Añade productos a la lista!' : 'La lista está vacía.'}</p>
+          <div class="empty-state-icon">${this.mode === 'edit' ? '📝' : (isAgnostic ? '✅' : '🛒')}</div>
+          <p>${this.mode === 'edit' ? (isAgnostic ? '¡Añade items a la lista!' : '¡Añade productos a la lista!') : 'La lista está vacía.'}</p>
         </div>
       ` : html`
         ${Object.entries(this._groupedItems).map(([category, items]) => html`
@@ -876,7 +1145,7 @@ export class HcShoppingList extends LitElement {
             ${this.groupByCategory && category !== 'todos' ? html`
               <div class="category-header">
                 <span>${this._getCategoryIcon(category)}</span>
-                <span>${category}</span>
+                <span>${this._getCategoryName(category)}</span>
                 <span class="category-count">${items.length}</span>
               </div>
             ` : ''}
@@ -886,15 +1155,88 @@ export class HcShoppingList extends LitElement {
                   .item=${item}
                   .members=${this.members}
                   .mode=${this.mode}
+                  .listType=${this.listType}
                   @toggle=${this._handleToggleItem}
                   @remove=${this._handleRemoveItem}
                   @assign=${this._handleAssignItem}
+                  @edit=${this._handleEditItem}
                 ></hc-list-item>
               `)}
             </div>
           </div>
         `)}
       `}
+
+      <!-- Modal de edición -->
+      ${this.editingItem ? html`
+        <div class="edit-modal-overlay" @click=${this._handleCancelEdit}>
+          <div class="edit-modal" @click=${(e) => e.stopPropagation()}>
+            <h3>Editar item</h3>
+            <form @submit=${this._handleSaveEdit}>
+              <div class="form-group">
+                <label>Nombre</label>
+                <input
+                  type="text"
+                  .value=${this.editItemName}
+                  @input=${(e) => this.editItemName = e.target.value}
+                  required
+                />
+              </div>
+              ${isAgnostic ? html`
+                <div class="form-group">
+                  <label>Notas</label>
+                  <textarea
+                    .value=${this.editItemNotes}
+                    @input=${(e) => this.editItemNotes = e.target.value}
+                    placeholder="Notas opcionales..."
+                  ></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Prioridad</label>
+                  <select
+                    .value=${this.editItemPriority}
+                    @change=${(e) => this.editItemPriority = e.target.value}
+                  >
+                    <option value="">Sin prioridad</option>
+                    ${PRIORITIES.map(p => html`
+                      <option value="${p.id}">${p.icon} ${p.name}</option>
+                    `)}
+                  </select>
+                </div>
+              ` : html`
+                <div class="form-group">
+                  <label>Cantidad</label>
+                  <input
+                    type="number"
+                    min="1"
+                    .value=${this.editItemQuantity}
+                    @input=${(e) => this.editItemQuantity = parseInt(e.target.value) || 1}
+                  />
+                </div>
+                <div class="form-group">
+                  <label>Unidad</label>
+                  <select
+                    .value=${this.editItemUnit}
+                    @change=${(e) => this.editItemUnit = e.target.value}
+                  >
+                    ${UNITS.map(unit => html`
+                      <option value="${unit.id}">${unit.name}</option>
+                    `)}
+                  </select>
+                </div>
+              `}
+              <div class="edit-modal-actions">
+                <button type="button" class="btn-cancel" @click=${this._handleCancelEdit}>
+                  Cancelar
+                </button>
+                <button type="submit" class="btn-save">
+                  Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ` : ''}
     `;
   }
 }

@@ -66,16 +66,27 @@ import AppLayout from '../../layouts/AppLayout.astro';
       }
 
       const list = { id: snapshot.id, ...snapshot.data() };
+      const isAgnostic = list.listType === 'agnostic';
+
+      // Generar badge de tipo según listType
+      let typeBadgeHtml = '';
+      if (!isAgnostic && list.expenseType) {
+        typeBadgeHtml = `
+          <span class="type-badge ${list.expenseType === 'shared' ? 'shared' : 'common'}">
+            ${list.expenseType === 'shared' ? '➗ Gasto a dividir' : '🏠 Gasto común'}
+          </span>
+        `;
+      } else if (isAgnostic) {
+        typeBadgeHtml = `<span class="type-badge agnostic">📝 Lista general</span>`;
+      }
 
       headerEl.innerHTML = `
         <div class="list-title-row">
-          <span class="list-icon">${list.icon || '🛒'}</span>
+          <span class="list-icon">${list.icon || (isAgnostic ? '📝' : '🛒')}</span>
           <div class="list-title-info">
             <h1>${list.name}</h1>
             <div class="list-meta">
-              <span class="type-badge ${list.expenseType === 'shared' ? 'shared' : 'common'}">
-                ${list.expenseType === 'shared' ? '➗ Gasto a dividir' : '🏠 Gasto común'}
-              </span>
+              ${typeBadgeHtml}
               ${list.store ? `<span class="store-badge">📍 ${list.store}</span>` : ''}
               <span class="status-badge ${list.closed ? 'closed' : 'open'}">
                 ${list.closed ? 'Cerrada' : 'Abierta'}
@@ -111,6 +122,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
         const listComponent = document.createElement('hc-shopping-list');
         listComponent.setAttribute('list-id', listId);
         listComponent.setAttribute('user-id', user.uid);
+        listComponent.setAttribute('list-type', list.listType || 'shopping');
         container.appendChild(listComponent);
       }
     }, (error) => {
@@ -208,6 +220,11 @@ import AppLayout from '../../layouts/AppLayout.astro';
   .type-badge.shared {
     background: #fef3c7;
     color: #92400e;
+  }
+
+  .type-badge.agnostic {
+    background: #f3e8ff;
+    color: #7c3aed;
   }
 
   .store-badge {

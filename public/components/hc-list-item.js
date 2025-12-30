@@ -5,6 +5,7 @@ export class HcListItem extends LitElement {
     item: { type: Object },
     members: { type: Array },
     mode: { type: String }, // 'shopping' or 'edit'
+    listType: { type: String }, // 'shopping' or 'agnostic'
     expanded: { type: Boolean, state: true },
     showAssignMenu: { type: Boolean, state: true }
   };
@@ -238,6 +239,75 @@ export class HcListItem extends LitElement {
       color: #dc2626;
       border-top: 1px solid #e2e8f0;
     }
+
+    /* Estilos para listas agnósticas */
+    .item.priority-high {
+      border-left: 3px solid #dc2626;
+    }
+
+    .item.priority-medium {
+      border-left: 3px solid #f59e0b;
+    }
+
+    .item.priority-low {
+      border-left: 3px solid #10b981;
+    }
+
+    .checkbox-square {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #cbd5e1;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+      font-size: 0.75rem;
+    }
+
+    .checkbox-square:hover {
+      border-color: #2563eb;
+    }
+
+    .checkbox-square.checked {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: white;
+    }
+
+    .priority-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .priority-badge.high {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    .priority-badge.medium {
+      background: #fffbeb;
+      color: #d97706;
+    }
+
+    .priority-badge.low {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .item-notes-inline {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 0.25rem;
+    }
   `;
 
   constructor() {
@@ -246,6 +316,7 @@ export class HcListItem extends LitElement {
     this.showAssignMenu = false;
     this.members = [];
     this.mode = 'shopping';
+    this.listType = 'shopping';
     this._boundCloseMenu = this._closeMenuOnClickOutside.bind(this);
   }
 
@@ -284,6 +355,14 @@ export class HcListItem extends LitElement {
     }));
   }
 
+  _handleEdit() {
+    this.dispatchEvent(new CustomEvent('edit', {
+      detail: { item: this.item },
+      bubbles: true,
+      composed: true
+    }));
+  }
+
   _toggleExpanded() {
     this.expanded = !this.expanded;
   }
@@ -317,6 +396,11 @@ export class HcListItem extends LitElement {
     return this.members.find(m => m.id === this.item.assignedTo);
   }
 
+  _getPriorityLabel(priority) {
+    const labels = { high: 'Alta', medium: 'Media', low: 'Baja' };
+    return labels[priority] || '';
+  }
+
   render() {
     const { item } = this;
     if (!item) return null;
@@ -325,7 +409,101 @@ export class HcListItem extends LitElement {
     const hasMembers = this.members && this.members.length > 0;
     const isShoppingMode = this.mode === 'shopping';
     const isEditMode = this.mode === 'edit';
+    const isAgnosticList = this.listType === 'agnostic';
 
+    // Render para listas agnósticas
+    if (isAgnosticList) {
+      const priorityClass = item.priority ? `priority-${item.priority}` : '';
+      return html`
+        <div class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass}">
+          <!-- Checkbox solo en modo usar, no en modo edición -->
+          ${isShoppingMode ? html`
+            <div
+              class="checkbox-square ${item.checked ? 'checked' : ''}"
+              @click=${this._handleToggle}
+              role="checkbox"
+              aria-checked="${item.checked}"
+              tabindex="0"
+              @keydown=${(e) => e.key === 'Enter' && this._handleToggle()}
+            >
+              ${item.checked ? '✓' : ''}
+            </div>
+          ` : ''}
+
+          <div class="item-content">
+            <div class="item-main">
+              <span class="item-name">${item.name}</span>
+              ${item.priority ? html`
+                <span class="priority-badge ${item.priority}">
+                  ${this._getPriorityLabel(item.priority)}
+                </span>
+              ` : ''}
+              ${assignee && isShoppingMode ? html`
+                <span class="assignee">
+                  <span class="assignee-avatar">
+                    ${assignee.photoURL
+                      ? html`<img src="${assignee.photoURL}" alt="">`
+                      : this._getInitials(assignee.displayName)}
+                  </span>
+                  ${assignee.displayName?.split(' ')[0] || 'Asignado'}
+                </span>
+              ` : ''}
+            </div>
+
+            ${item.notes ? html`
+              <div class="item-notes-inline">📝 ${item.notes}</div>
+            ` : ''}
+          </div>
+
+          <div class="item-actions" style="${isEditMode || (hasMembers && isShoppingMode) ? 'opacity: 1;' : ''}">
+            <!-- Botón asignar en modo usar si hay miembros -->
+            ${hasMembers && isShoppingMode ? html`
+              <div class="assign-wrapper">
+                <button class="action-btn" @click=${this._toggleAssignMenu} title="Asignar">
+                  👤
+                </button>
+                ${this.showAssignMenu ? html`
+                  <div class="assign-menu">
+                    <div class="assign-menu-header">Asignar a</div>
+                    ${this.members.map(member => html`
+                      <button
+                        class="assign-option ${item.assignedTo === member.id ? 'selected' : ''}"
+                        @click=${(e) => this._handleAssign(member.id, e)}
+                      >
+                        <span class="avatar">
+                          ${member.photoURL
+                            ? html`<img src="${member.photoURL}" alt="">`
+                            : this._getInitials(member.displayName)}
+                        </span>
+                        <span>${member.displayName || member.email}</span>
+                      </button>
+                    `)}
+                    ${item.assignedTo ? html`
+                      <button
+                        class="assign-option unassign"
+                        @click=${(e) => this._handleAssign(null, e)}
+                      >
+                        Quitar asignación
+                      </button>
+                    ` : ''}
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+            ${isEditMode ? html`
+              <button class="action-btn" @click=${this._handleEdit} title="Editar">
+                ✏️
+              </button>
+              <button class="action-btn danger" @click=${this._handleRemove} title="Eliminar">
+                🗑️
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    // Render para listas de compra (comportamiento original)
     return html`
       <div class="item ${item.checked && isShoppingMode ? 'checked' : ''}">
         <!-- Checkbox only in shopping mode -->
@@ -333,6 +511,10 @@ export class HcListItem extends LitElement {
           <div
             class="checkbox ${item.checked ? 'checked' : ''}"
             @click=${this._handleToggle}
+            role="checkbox"
+            aria-checked="${item.checked}"
+            tabindex="0"
+            @keydown=${(e) => e.key === 'Enter' && this._handleToggle()}
           >
             ${item.checked ? '✓' : ''}
           </div>
@@ -407,9 +589,12 @@ export class HcListItem extends LitElement {
               ${this.expanded ? '▲' : '▼'}
             </button>
           ` : ''}
-          <!-- Delete button only in edit mode -->
+          <!-- Edit and Delete buttons only in edit mode -->
           ${isEditMode ? html`
-            <button class="action-btn danger" @click=${this._handleRemove}>
+            <button class="action-btn" @click=${this._handleEdit} title="Editar">
+              ✏️
+            </button>
+            <button class="action-btn danger" @click=${this._handleRemove} title="Eliminar">
               🗑️
             </button>
           ` : ''}

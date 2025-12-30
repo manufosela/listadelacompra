@@ -24,6 +24,7 @@ import {
 // CATEGORÍAS Y UNIDADES
 // ============================================
 
+// Categorías para listas de compra
 export const PRODUCT_CATEGORIES = [
   { id: 'frutas', name: 'Frutas', icon: '🍎' },
   { id: 'verduras', name: 'Verduras', icon: '🥬' },
@@ -40,6 +41,40 @@ export const PRODUCT_CATEGORIES = [
   { id: 'mascotas', name: 'Mascotas', icon: '🐕' },
   { id: 'otros', name: 'Otros', icon: '📦' }
 ];
+
+// Categorías para listas agnósticas (generales)
+export const GENERAL_CATEGORIES = [
+  { id: 'tareas', name: 'Tareas', icon: '📋' },
+  { id: 'viaje', name: 'Viaje', icon: '✈️' },
+  { id: 'camping', name: 'Camping', icon: '⛺' },
+  { id: 'tecnologia', name: 'Tecnología', icon: '💻' },
+  { id: 'deporte', name: 'Deporte', icon: '⚽' },
+  { id: 'hogar', name: 'Hogar', icon: '🏠' },
+  { id: 'trabajo', name: 'Trabajo', icon: '💼' },
+  { id: 'salud', name: 'Salud', icon: '🏥' },
+  { id: 'documentos', name: 'Documentos', icon: '📄' },
+  { id: 'general_otros', name: 'Otros', icon: '📌' }
+];
+
+// Prioridades para items de listas agnósticas
+export const PRIORITIES = [
+  { id: 'high', name: 'Alta', icon: '🔴', color: '#dc2626' },
+  { id: 'medium', name: 'Media', icon: '🟡', color: '#f59e0b' },
+  { id: 'low', name: 'Baja', icon: '🟢', color: '#10b981' }
+];
+
+/**
+ * Obtiene las categorías según el tipo de lista
+ * @param {string} listType - 'shopping' o 'agnostic'
+ * @param {Array} customCategories - Categorías personalizadas del usuario
+ * @returns {Array} Lista de categorías
+ */
+export function getCategoriesForListType(listType, customCategories = []) {
+  if (listType === 'shopping') {
+    return PRODUCT_CATEGORIES;
+  }
+  return [...GENERAL_CATEGORIES, ...customCategories];
+}
 
 export const UNITS = [
   { id: 'unidad', name: 'Unidad(es)' },
@@ -197,4 +232,59 @@ export async function findOrCreateProduct(groupId, name, defaults = {}) {
 
   const productId = await createProduct(groupId, { name, ...defaults });
   return getProduct(groupId, productId);
+}
+
+// ============================================
+// CATEGORÍAS PERSONALIZADAS
+// ============================================
+
+/**
+ * Obtiene las categorías personalizadas de un usuario
+ */
+export async function getUserCustomCategories(userId) {
+  const categoriesRef = collection(db, 'users', userId, 'customCategories');
+  const q = query(categoriesRef, orderBy('order', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Crea una categoría personalizada
+ */
+export async function createCustomCategory(userId, categoryData) {
+  const categoriesRef = collection(db, 'users', userId, 'customCategories');
+
+  // Obtener el orden máximo actual
+  const existingCategories = await getUserCustomCategories(userId);
+  const maxOrder = existingCategories.reduce((max, cat) => Math.max(max, cat.order || 0), 0);
+
+  const docRef = await addDoc(categoriesRef, {
+    name: categoryData.name.trim(),
+    icon: categoryData.icon || '📌',
+    order: maxOrder + 1,
+    createdAt: serverTimestamp()
+  });
+
+  return docRef.id;
+}
+
+/**
+ * Actualiza una categoría personalizada
+ */
+export async function updateCustomCategory(userId, categoryId, updates) {
+  const categoryRef = doc(db, 'users', userId, 'customCategories', categoryId);
+
+  if (updates.name) {
+    updates.name = updates.name.trim();
+  }
+
+  await updateDoc(categoryRef, updates);
+}
+
+/**
+ * Elimina una categoría personalizada
+ */
+export async function deleteCustomCategory(userId, categoryId) {
+  const categoryRef = doc(db, 'users', userId, 'customCategories', categoryId);
+  await deleteDoc(categoryRef);
 }
