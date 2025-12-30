@@ -54,10 +54,30 @@ pnpm deploy               # Build y deploy a Firebase Hosting
 
 ## Arquitectura
 
+### SSG (Static Site Generation)
+Esta aplicación es **100% SSG** (output estático), **NO hay SSR**:
+- Todas las páginas se generan en build time como HTML estático
+- **NO se pueden usar rutas dinámicas** como `[id].astro` o `[...slug].astro`
+- Para parámetros dinámicos, usar **query params**: `/app/list?id=xxx` en lugar de `/app/list/xxx`
+- La lógica dinámica se ejecuta en el cliente con JavaScript
+
+### View Transitions
+Astro View Transitions están habilitadas para navegación SPA-like:
+- Las páginas usan `<ViewTransitions />` en el layout
+- Al navegar, escuchar `astro:page-load` para re-inicializar scripts:
+  ```javascript
+  document.addEventListener('astro:page-load', tryInit);
+  ```
+- Para limpiar suscripciones al salir, usar `astro:before-swap`:
+  ```javascript
+  document.addEventListener('astro:before-swap', cleanup);
+  ```
+
 ### Frontend
 - **Páginas Astro** (`src/pages/`): HTML estático con file-based routing
   - `src/pages/app/` - Páginas autenticadas usando `AppLayout.astro`
   - `src/pages/login.astro`, `src/pages/index.astro` - Páginas públicas
+  - Para IDs dinámicos usar query params: `list.astro` con `?id=xxx`
 - **Componentes Lit** (`public/components/hc-*.js`): Componentes interactivos client-side con prefijo `hc-`
   - Importar Lit desde bundle: `import { LitElement, html, css } from '/js/vendor/lit.bundle.js'`
 - **Layouts**: `BaseLayout.astro` (base) → `AppLayout.astro` (con AuthGuard, Header, Navigation)
