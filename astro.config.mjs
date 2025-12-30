@@ -3,7 +3,7 @@ import { defineConfig } from 'astro/config';
 
 export default defineConfig({
   output: 'static',
-  site: 'https://lista-de-mi-compra.web.app',
+  site: 'https://myhomec.art',
 
   vite: {
     build: {

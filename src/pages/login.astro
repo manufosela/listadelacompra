@@ -6,7 +6,32 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   <main class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <h1>Bienvenido a HomeCart</h1>
+        <div class="login-logo">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="loginLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#3b82f6"/>
+                <stop offset="100%" style="stop-color:#1d4ed8"/>
+              </linearGradient>
+            </defs>
+            <rect width="64" height="64" rx="14" fill="url(#loginLogoGrad)"/>
+            <g transform="translate(8, 8)">
+              <path d="M4 10 L10 10 L13 18" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <path d="M24 12 L38 22 L10 22 Z" fill="#fbbf24"/>
+              <path d="M24 8 L42 24 L40 24 L24 11 L8 24 L6 24 Z" fill="#ffffff"/>
+              <path d="M10 24 L10 38 L38 38 L38 24 Z" fill="#ffffff"/>
+              <rect x="20" y="28" width="8" height="10" rx="1" fill="#3b82f6"/>
+              <circle cx="26" cy="33" r="1" fill="#1d4ed8"/>
+              <rect x="12" y="26" width="6" height="6" rx="1" fill="#bfdbfe"/>
+              <rect x="30" y="26" width="6" height="6" rx="1" fill="#bfdbfe"/>
+              <circle cx="16" cy="42" r="4" fill="#ffffff"/>
+              <circle cx="32" cy="42" r="4" fill="#ffffff"/>
+              <circle cx="16" cy="42" r="2" fill="#3b82f6"/>
+              <circle cx="32" cy="42" r="2" fill="#3b82f6"/>
+            </g>
+          </svg>
+        </div>
+        <h1>My Home Cart</h1>
         <p>Gestiona tus listas de la compra en familia</p>
       </div>
 
@@ -176,9 +201,21 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     text-align: center;
   }
 
+  .login-logo {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto var(--space-md);
+  }
+
+  .login-logo svg {
+    width: 100%;
+    height: 100%;
+  }
+
   .login-header h1 {
     font-size: var(--font-size-xl);
     margin-bottom: var(--space-xs);
+    color: var(--color-primary);
   }
 
   .login-header p {
