@@ -3,11 +3,16 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 ---
 
 <AppLayout title="Gestionar Grupo">
-  <div class="group-detail-page">
-    <a href="/app/groups" class="back-link">&larr; Volver a grupos</a>
+  <div class="manage-page">
+    <a href="/app/groups" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M15 18l-6-6 6-6"/>
+      </svg>
+      Grupos
+    </a>
 
     <div id="group-content" class="group-content">
-      <p class="loading">Cargando grupo...</p>
+      <div class="loading-state">Cargando...</div>
     </div>
   </div>
 </AppLayout>
@@ -20,18 +25,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import {
     doc,
     getDoc,
-    getDocs,
-    setDoc,
     updateDoc,
     deleteDoc,
-    collection,
-    query,
-    where,
-    orderBy,
-    serverTimestamp,
     deleteField
   } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
-  import { getCurrentGroupId, setCurrentGroup } from '/js/group.js';
+  import {
+    getCurrentGroupId,
+    setCurrentGroup,
+    inviteUserByEmail,
+    getGroupInvitations,
+    deleteInvitation
+  } from '/js/group.js';
 
   let groupId = null;
   let groupData = null;
@@ -49,7 +53,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     groupId = getGroupIdFromUrl();
     if (!groupId) {
-      container.innerHTML = '<p class="error">ID de grupo no especificado</p>';
+      container.innerHTML = '<div class="error-state">ID de grupo no especificado</div>';
       return;
     }
 
@@ -75,213 +79,157 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       const currentGroupActive = getCurrentGroupId() === groupId;
 
       // Load invitations if admin
-      invitations = isAdmin ? await loadInvitations() : [];
+      invitations = isAdmin ? await getGroupInvitations(groupId) : [];
+      const pendingInvitations = invitations.filter(i => i.status === 'pending');
 
       container.innerHTML = `
-        <div class="group-header">
-          <div class="group-info">
-            <h1 id="group-name-display">${groupData.name}</h1>
-            <p class="group-meta">
-              ${membersList.length} miembro${membersList.length !== 1 ? 's' : ''}
-              ${currentGroupActive ? '<span class="badge badge-primary">Grupo activo</span>' : ''}
-            </p>
-          </div>
-          ${isAdmin ? `
-            <button id="edit-name-btn" class="btn btn-secondary btn-sm">Editar nombre</button>
-          ` : ''}
-        </div>
-
-        <!-- Sección de invitación -->
-        ${isAdmin ? `
-          <section class="section">
-            <h2>Invitar miembros</h2>
-            <p class="section-desc">Genera un código de invitación para que otros se unan al grupo.</p>
-            <div class="invite-section">
-              <div id="invite-code-container">
-                <button id="generate-code-btn" class="btn btn-primary">Generar código de invitación</button>
-              </div>
+        <!-- Header -->
+        <header class="page-header">
+          <div class="header-main">
+            <div class="header-title">
+              <h1 id="group-name-display">${groupData.name}</h1>
+              ${isAdmin ? `
+                <button id="edit-name-btn" class="btn-icon" title="Editar nombre" aria-label="Editar nombre">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+              ` : ''}
             </div>
-          </section>
-        ` : ''}
+            <div class="header-meta">
+              <span>${membersList.length} miembro${membersList.length !== 1 ? 's' : ''}</span>
+              ${currentGroupActive ? '<span class="status-badge">Activo</span>' : ''}
+            </div>
+          </div>
+        </header>
 
-        <!-- Sección de códigos de invitación -->
-        ${renderInvitationsSection(invitations, isAdmin)}
-
-        <!-- Sección de miembros -->
+        <!-- Miembros -->
         <section class="section">
-          <h2>Miembros</h2>
-          <div class="members-list">
+          <h2 class="section-title">Miembros</h2>
+          <div class="members-row">
             ${membersList.map(([uid, member]) => `
-              <div class="member-item" data-uid="${uid}">
+              <div class="member-chip ${uid === currentUser.uid ? 'is-you' : ''}" data-uid="${uid}">
                 <div class="member-avatar">
                   ${member.photoURL
-                    ? `<img src="${member.photoURL}" alt="">`
+                    ? `<img src="${member.photoURL}" alt="" loading="lazy">`
                     : `<span>${(member.displayName || member.email || '?')[0].toUpperCase()}</span>`
                   }
                 </div>
-                <div class="member-info">
-                  <span class="member-name">${member.displayName || member.email}</span>
-                  <span class="member-role">${member.role === 'admin' ? 'Administrador' : 'Miembro'}</span>
-                </div>
+                <span class="member-name">${member.displayName || member.email?.split('@')[0]}${uid === currentUser.uid ? ' (tú)' : ''}</span>
+                ${member.role === 'admin' ? '<span class="member-badge">Admin</span>' : ''}
                 ${isAdmin && uid !== currentUser.uid ? `
-                  <button class="btn btn-sm btn-danger remove-member-btn" data-uid="${uid}">
-                    Eliminar
+                  <button class="chip-remove remove-member-btn" data-uid="${uid}" title="Eliminar" aria-label="Eliminar miembro">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
                   </button>
                 ` : ''}
-                ${uid === currentUser.uid ? '<span class="badge badge-secondary">Tú</span>' : ''}
               </div>
             `).join('')}
           </div>
         </section>
 
-        <!-- Acciones del grupo -->
-        <section class="section section-danger">
-          <h2>Zona de peligro</h2>
-          ${!isCreator ? `
-            <div class="danger-action">
-              <div>
-                <strong>Abandonar grupo</strong>
-                <p>Dejarás de tener acceso a las listas compartidas de este grupo.</p>
+        <!-- Invitar (solo admin) -->
+        ${isAdmin ? `
+          <section class="section">
+            <h2 class="section-title">Invitar</h2>
+            <form id="invite-form" class="invite-form">
+              <input
+                type="email"
+                id="invite-email"
+                placeholder="email@ejemplo.com"
+                autocomplete="off"
+                required
+              />
+              <button type="submit" class="btn btn-primary">Enviar invitación</button>
+            </form>
+            ${pendingInvitations.length > 0 ? `
+              <div class="pending-list">
+                <span class="pending-label">${pendingInvitations.length} pendiente${pendingInvitations.length !== 1 ? 's' : ''}:</span>
+                ${pendingInvitations.map(inv => `
+                  <span class="pending-chip">
+                    ${inv.invitedEmail}
+                    <button class="chip-remove delete-invitation-btn" data-id="${inv.id}" title="Cancelar" aria-label="Cancelar invitación">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                      </svg>
+                    </button>
+                  </span>
+                `).join('')}
               </div>
-              <button id="leave-group-btn" class="btn btn-danger">Abandonar</button>
+            ` : ''}
+          </section>
+        ` : ''}
+
+        <!-- Historial de invitaciones (solo admin, colapsable) -->
+        ${isAdmin && invitations.length > pendingInvitations.length ? `
+          <details class="section-collapsible">
+            <summary>
+              <span>Historial de invitaciones</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </summary>
+            <div class="invitations-history">
+              ${invitations.filter(i => i.status !== 'pending').map(inv => {
+                const statusLabels = {
+                  accepted: 'Aceptada',
+                  rejected: 'Rechazada',
+                  expired: 'Expirada'
+                };
+                return `
+                  <div class="history-row">
+                    <span class="history-email">${inv.invitedEmail}</span>
+                    <span class="history-status status-${inv.status}">${statusLabels[inv.status] || inv.status}</span>
+                    <button class="btn-icon btn-icon-sm delete-invitation-btn" data-id="${inv.id}" title="Eliminar">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      </svg>
+                    </button>
+                  </div>
+                `;
+              }).join('')}
             </div>
-          ` : ''}
-          ${isCreator ? `
-            <div class="danger-action">
-              <div>
-                <strong>Eliminar grupo</strong>
-                <p>Se eliminará el grupo y todos sus datos permanentemente.</p>
+          </details>
+        ` : ''}
+
+        <!-- Zona de peligro -->
+        <details class="section-danger">
+          <summary>
+            <span>Zona de peligro</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </summary>
+          <div class="danger-content">
+            ${!isCreator ? `
+              <div class="danger-row">
+                <div class="danger-info">
+                  <strong>Abandonar grupo</strong>
+                  <p>Perderás acceso a las listas compartidas.</p>
+                </div>
+                <button id="leave-group-btn" class="btn btn-danger-outline">Abandonar</button>
               </div>
-              <button id="delete-group-btn" class="btn btn-danger">Eliminar grupo</button>
-            </div>
-          ` : ''}
-        </section>
+            ` : ''}
+            ${isCreator ? `
+              <div class="danger-row">
+                <div class="danger-info">
+                  <strong>Eliminar grupo</strong>
+                  <p>Se eliminarán todos los datos permanentemente.</p>
+                </div>
+                <button id="delete-group-btn" class="btn btn-danger">Eliminar</button>
+              </div>
+            ` : ''}
+          </div>
+        </details>
       `;
 
       setupEventListeners(isAdmin, isCreator);
     } catch (error) {
       console.error('Error loading group:', error);
-      container.innerHTML = '<p class="error">Error al cargar el grupo</p>';
+      container.innerHTML = '<div class="error-state">Error al cargar el grupo</div>';
     }
-  }
-
-  async function loadInvitations() {
-    if (!groupId) return [];
-
-    try {
-      const invitationsRef = collection(db, 'invitations');
-      // Consulta simple sin orderBy para evitar problemas de índice
-      const q = query(
-        invitationsRef,
-        where('groupId', '==', groupId)
-      );
-      const snapshot = await getDocs(q);
-
-      const now = new Date();
-      const results = snapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        const expiresAt = data.expiresAt?.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
-        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
-        const isExpired = expiresAt < now;
-        const isUsed = data.usedBy != null;
-
-        return {
-          id: docSnap.id,
-          code: docSnap.id,
-          ...data,
-          expiresAt,
-          createdAt,
-          status: isUsed ? 'used' : (isExpired ? 'expired' : 'active')
-        };
-      });
-
-      // Ordenar en cliente por fecha de creación (más reciente primero)
-      return results.sort((a, b) => b.createdAt - a.createdAt);
-    } catch (error) {
-      console.error('Error loading invitations:', error);
-      return [];
-    }
-  }
-
-  function renderInvitationsSection(invitations, isAdmin) {
-    if (!isAdmin) return '';
-
-    const activeCount = invitations.filter(i => i.status === 'active').length;
-    const usedCount = invitations.filter(i => i.status === 'used').length;
-    const expiredCount = invitations.filter(i => i.status === 'expired').length;
-
-    const formatDate = (date) => {
-      return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-    };
-
-    return `
-      <section class="section invitations-section">
-        <div class="section-header">
-          <div>
-            <h2>Invitaciones</h2>
-            <div class="invite-stats">
-              <span class="stat stat-active">${activeCount} activos</span>
-              <span class="stat stat-used">${usedCount} usados</span>
-              <span class="stat stat-expired">${expiredCount} expirados</span>
-            </div>
-          </div>
-        </div>
-
-        ${invitations.length === 0 ? `
-          <p class="empty-message">No hay códigos de invitación. Genera uno desde la sección superior.</p>
-        ` : `
-          <div class="invitations-table-wrapper">
-            <table class="invitations-table">
-              <thead>
-                <tr>
-                  <th>Código</th>
-                  <th>Estado</th>
-                  <th>Creado</th>
-                  <th>Info</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                ${invitations.map(inv => `
-                  <tr class="invitation-row status-row-${inv.status}">
-                    <td class="col-code">
-                      <code>${inv.code}</code>
-                      ${inv.status === 'active' ? `
-                        <button class="btn-icon copy-invite-btn" data-code="${inv.code}" title="Copiar enlace">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                          </svg>
-                        </button>
-                      ` : ''}
-                    </td>
-                    <td class="col-status">
-                      <span class="status-badge status-${inv.status}">
-                        ${inv.status === 'active' ? 'Activo' : inv.status === 'used' ? 'Usado' : 'Expirado'}
-                      </span>
-                    </td>
-                    <td class="col-date">${formatDate(inv.createdAt)}</td>
-                    <td class="col-info">
-                      ${inv.status === 'active' ? `Expira ${formatDate(inv.expiresAt)}` : ''}
-                      ${inv.status === 'used' ? `<span class="used-by">${inv.usedByName || 'Usuario'}</span>` : ''}
-                      ${inv.status === 'expired' ? `Expiró ${formatDate(inv.expiresAt)}` : ''}
-                    </td>
-                    <td class="col-actions">
-                      <button class="btn-icon btn-delete delete-invitation-btn" data-id="${inv.id}" title="Eliminar">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M3 6h18"></path>
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        `}
-      </section>
-    `;
   }
 
   function setupEventListeners(isAdmin, isCreator) {
@@ -300,64 +248,28 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       }
     });
 
-    // Generar código de invitación
-    document.getElementById('generate-code-btn')?.addEventListener('click', async () => {
+    // Enviar invitación por email
+    document.getElementById('invite-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const emailInput = document.getElementById('invite-email');
+      const email = emailInput?.value?.trim();
+      if (!email) return;
+
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+
       try {
-        // Generar código sin caracteres confusos (sin I, L, O, 0, 1)
-        const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-        let code = '';
-        for (let i = 0; i < 6; i++) {
-          code += chars[Math.floor(Math.random() * chars.length)];
-        }
-
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7); // Expira en 7 días
-
-        // Usar el código como ID del documento para que joinGroupWithCode pueda encontrarlo
-        const inviteRef = doc(db, 'invitations', code);
-        await setDoc(inviteRef, {
-          groupId,
-          groupName: groupData.name,
-          createdBy: currentUser.uid,
-          createdAt: serverTimestamp(),
-          expiresAt
-        });
-
-        const inviteUrl = `${window.location.origin}/app/join?code=${code}`;
-        const container = document.getElementById('invite-code-container');
-        container.innerHTML = `
-          <div class="invite-code-display">
-            <span class="code">${code}</span>
-            <button id="copy-link-btn" class="btn btn-sm btn-primary">Copiar enlace</button>
-          </div>
-          <p class="code-expires">Expira en 7 días. Comparte el enlace para que se unan al grupo.</p>
-          <button id="generate-new-code-btn" class="btn btn-sm btn-ghost">Generar otro código</button>
-        `;
-
-        document.getElementById('copy-link-btn')?.addEventListener('click', () => {
-          navigator.clipboard.writeText(inviteUrl);
-          toast.success('Enlace copiado');
-        });
-
-        document.getElementById('generate-new-code-btn')?.addEventListener('click', () => {
-          container.innerHTML = `
-            <button id="generate-code-btn" class="btn btn-primary">Generar código de invitación</button>
-          `;
-          setupEventListeners(isAdmin, isCreator);
-        });
+        await inviteUserByEmail(groupId, email);
+        toast.success(`Invitación enviada a ${email}`);
+        emailInput.value = '';
+        loadGroup();
       } catch (error) {
-        toast.error('Error al generar código: ' + error.message);
+        toast.error(error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enviar invitación';
       }
-    });
-
-    // Copiar enlace de invitación desde la tabla
-    document.querySelectorAll('.copy-invite-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const code = btn.dataset.code;
-        const inviteUrl = `${window.location.origin}/app/join?code=${code}`;
-        navigator.clipboard.writeText(inviteUrl);
-        toast.success('Enlace copiado');
-      });
     });
 
     // Eliminar invitación
@@ -366,15 +278,14 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         const invitationId = btn.dataset.id;
 
         const confirmed = await confirmModal.confirm(
-          '¿Eliminar este código de invitación?',
-          'El código dejará de funcionar si aún no ha sido usado.'
+          '¿Eliminar esta invitación?',
+          'El usuario ya no podrá unirse con esta invitación.'
         );
 
         if (confirmed) {
           try {
-            const invitationRef = doc(db, 'invitations', invitationId);
-            await deleteDoc(invitationRef);
-            toast.success('Código eliminado');
+            await deleteInvitation(invitationId);
+            toast.success('Invitación eliminada');
             loadGroup();
           } catch (error) {
             toast.error('Error: ' + error.message);
@@ -390,7 +301,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         const member = groupData.members[uid];
 
         const confirmed = await confirmModal.confirm(
-          `¿Eliminar a ${member.displayName || member.email} del grupo?`,
+          `¿Eliminar a ${member.displayName || member.email}?`,
           'Esta acción no se puede deshacer.'
         );
 
@@ -423,7 +334,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
             [`members.${currentUser.uid}`]: deleteField()
           });
 
-          // Si era el grupo activo, limpiar selección
           if (getCurrentGroupId() === groupId) {
             setCurrentGroup(null);
           }
@@ -439,8 +349,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     // Eliminar grupo
     document.getElementById('delete-group-btn')?.addEventListener('click', async () => {
       const confirmed = await confirmModal.confirm(
-        '¿Eliminar este grupo permanentemente?',
-        'Se eliminarán todas las listas y datos del grupo. Esta acción no se puede deshacer.'
+        '¿Eliminar este grupo?',
+        'Se eliminarán todas las listas y datos. Esta acción no se puede deshacer.'
       );
 
       if (confirmed) {
@@ -448,7 +358,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
           const groupRef = doc(db, 'groups', groupId);
           await deleteDoc(groupRef);
 
-          // Limpiar selección si era el grupo activo
           if (getCurrentGroupId() === groupId) {
             setCurrentGroup(null);
           }
@@ -474,284 +383,138 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
   }
 
-  // Ejecutar en carga inicial
   tryInit();
-
-  // Re-ejecutar en navegaciones con View Transitions
   document.addEventListener('astro:page-load', tryInit);
 </script>
 
-<style>
-  .group-detail-page {
-    max-width: 900px;
+<style is:global>
+  /* ========================================
+     PAGE LAYOUT
+     ======================================== */
+  .manage-page {
+    max-width: 560px;
+    margin: 0 auto;
   }
 
+  /* ========================================
+     BACK LINK
+     ======================================== */
   .back-link {
-    display: inline-block;
-    margin-bottom: var(--space-lg);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
     text-decoration: none;
+    margin-bottom: var(--space-lg);
+    transition: color var(--transition-fast);
   }
 
   .back-link:hover {
-    color: var(--color-primary);
+    color: var(--color-text);
   }
 
-  .group-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+  /* ========================================
+     HEADER
+     ======================================== */
+  .page-header {
     margin-bottom: var(--space-xl);
     padding-bottom: var(--space-lg);
     border-bottom: 1px solid var(--color-border);
   }
 
-  .group-info h1 {
-    margin-bottom: var(--space-xs);
-  }
-
-  .group-meta {
-    color: var(--color-text-secondary);
+  .header-title {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
   }
 
-  .section {
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-lg);
-    margin-bottom: var(--space-lg);
-  }
-
-  .section h2 {
-    font-size: var(--font-size-lg);
-    margin-bottom: var(--space-sm);
-  }
-
-  .section-desc {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-md);
-  }
-
-  .section-danger {
-    border-color: var(--color-danger);
-    background: rgba(220, 38, 38, 0.02);
-  }
-
-  .section-danger h2 {
-    color: var(--color-danger);
-  }
-
-  .invite-code-display {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-md);
-    background: var(--color-bg-secondary);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-sm);
-  }
-
-  .invite-code-display .code {
-    font-family: monospace;
-    font-size: 1.5rem;
+  .header-title h1 {
+    font-size: var(--font-size-xl);
     font-weight: 600;
-    letter-spacing: 0.1em;
+    letter-spacing: -0.025em;
+    margin: 0;
   }
 
-  .code-expires {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    margin-bottom: var(--space-sm);
-  }
-
-  /* Invitations Section */
-  .invitations-section {
-    margin-top: var(--space-xl);
-  }
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: var(--space-lg);
-  }
-
-  .section-header h2 {
-    margin-bottom: var(--space-xs);
-  }
-
-  .invite-stats {
-    display: flex;
-    gap: var(--space-md);
-    font-size: var(--font-size-sm);
-  }
-
-  .invite-stats .stat {
-    color: var(--color-text-secondary);
-  }
-
-  .invite-stats .stat-active { color: #10b981; }
-  .invite-stats .stat-used { color: var(--color-primary); }
-  .invite-stats .stat-expired { color: #6b7280; }
-
-  .empty-message {
-    color: var(--color-text-secondary);
-    text-align: center;
-    padding: var(--space-xl);
-  }
-
-  .invitations-table-wrapper {
-    overflow-x: auto;
-    margin: 0 calc(-1 * var(--space-lg));
-    padding: 0 var(--space-lg);
-  }
-
-  .invitations-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--font-size-sm);
-  }
-
-  .invitations-table th {
-    text-align: left;
-    padding: var(--space-sm) var(--space-md);
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    border-bottom: 1px solid var(--color-border);
-    white-space: nowrap;
-  }
-
-  .invitations-table td {
-    padding: var(--space-md);
-    border-bottom: 1px solid var(--color-border);
-    vertical-align: middle;
-  }
-
-  .invitations-table tbody tr:last-child td {
-    border-bottom: none;
-  }
-
-  .invitations-table tbody tr:hover {
-    background: var(--color-bg-secondary);
-  }
-
-  .col-code {
+  .header-meta {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-  }
-
-  .col-code code {
-    font-family: monospace;
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    background: var(--color-bg-secondary);
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-  }
-
-  .col-date,
-  .col-info {
+    margin-top: 4px;
+    font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
-    white-space: nowrap;
-  }
-
-  .col-info .used-by {
-    color: var(--color-primary);
-    font-weight: 500;
-  }
-
-  .col-actions {
-    text-align: right;
-    white-space: nowrap;
   }
 
   .status-badge {
-    display: inline-block;
-    font-size: var(--font-size-xs);
-    padding: 3px 10px;
-    border-radius: var(--radius-full);
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .status-badge.status-active {
-    background: rgba(16, 185, 129, 0.1);
-    color: #10b981;
-  }
-
-  .status-badge.status-used {
-    background: rgba(37, 99, 235, 0.1);
-    color: var(--color-primary);
-  }
-
-  .status-badge.status-expired {
-    background: rgba(107, 114, 128, 0.1);
-    color: #6b7280;
-  }
-
-  .status-row-expired {
-    opacity: 0.6;
-  }
-
-  .btn-icon {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: transparent;
-    border-radius: var(--radius-md);
-    cursor: pointer;
+    padding: 2px 8px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.1);
+    border-radius: var(--radius-full);
+  }
+
+  /* ========================================
+     SECTIONS
+     ======================================== */
+  .section {
+    margin-bottom: var(--space-xl);
+  }
+
+  .section-title {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: var(--color-text-secondary);
-    transition: all 0.15s ease;
+    margin: 0 0 var(--space-md) 0;
   }
 
-  .btn-icon:hover {
-    background: var(--color-bg-secondary);
-    color: var(--color-text);
-  }
-
-  .btn-icon.btn-delete:hover {
-    background: rgba(220, 38, 38, 0.1);
-    color: var(--color-danger);
-  }
-
-  .members-list {
+  /* ========================================
+     MEMBERS ROW - Horizontal chips
+     ======================================== */
+  .members-row {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--space-sm);
   }
 
-  .member-item {
-    display: flex;
+  .member-chip {
+    display: inline-flex;
     align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-sm);
-    border-radius: var(--radius-md);
+    gap: 6px;
+    padding: 4px 10px 4px 4px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    transition: all var(--transition-fast);
   }
 
-  .member-item:hover {
-    background: var(--color-bg-secondary);
+  .member-chip:hover {
+    background: var(--color-bg-tertiary);
+  }
+
+  .member-chip.is-you {
+    background: rgba(37, 99, 235, 0.06);
+    border-color: rgba(37, 99, 235, 0.2);
   }
 
   .member-avatar {
-    width: 40px;
-    height: 40px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    background: var(--color-primary);
+    background: var(--color-text-tertiary);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 8px;
     font-weight: 600;
     overflow: hidden;
+    flex-shrink: 0;
   }
 
   .member-avatar img {
@@ -760,54 +523,260 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     object-fit: cover;
   }
 
-  .member-info {
-    flex: 1;
-  }
-
   .member-name {
-    display: block;
+    color: var(--color-text);
     font-weight: 500;
   }
 
-  .member-role {
+  .member-badge {
+    padding: 1px 5px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.1);
+    border-radius: var(--radius-sm);
+  }
+
+  .chip-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 2px;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--color-text-tertiary);
+    transition: all var(--transition-fast);
+  }
+
+  .chip-remove:hover {
+    background: var(--color-danger);
+    color: white;
+  }
+
+  /* ========================================
+     INVITE FORM
+     ======================================== */
+  .invite-form {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .invite-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
     font-size: var(--font-size-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    transition: border-color var(--transition-fast);
+  }
+
+  .invite-form input:focus {
+    outline: none;
+    border-color: var(--color-text);
+  }
+
+  .invite-form input::placeholder {
+    color: var(--color-text-tertiary);
+  }
+
+  /* Pending invitations */
+  .pending-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .pending-label {
+    font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
   }
 
-  .danger-action {
+  .pending-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px 3px 8px;
+    font-size: var(--font-size-xs);
+    color: var(--color-warning);
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: var(--radius-sm);
+  }
+
+  /* ========================================
+     COLLAPSIBLE SECTIONS
+     ======================================== */
+  .section-collapsible,
+  .section-danger {
+    margin-bottom: var(--space-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .section-collapsible summary,
+  .section-danger summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background: var(--color-bg);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+  }
+
+  .section-collapsible summary::-webkit-details-marker,
+  .section-danger summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .section-collapsible summary svg,
+  .section-danger summary svg {
+    transition: transform var(--transition-fast);
+  }
+
+  .section-collapsible[open] summary svg,
+  .section-danger[open] summary svg {
+    transform: rotate(180deg);
+  }
+
+  .section-collapsible[open] summary,
+  .section-danger[open] summary {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* Invitations history */
+  .invitations-history {
+    padding: var(--space-sm);
+    background: var(--color-bg-secondary);
+  }
+
+  .history-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    border-radius: var(--radius-sm);
+  }
+
+  .history-row:hover {
+    background: var(--color-bg);
+  }
+
+  .history-email {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .history-status {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+  }
+
+  .history-status.status-accepted {
+    color: var(--color-success);
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  .history-status.status-rejected {
+    color: var(--color-danger);
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .history-status.status-expired {
+    color: var(--color-text-tertiary);
+    background: var(--color-bg-tertiary);
+  }
+
+  /* Danger zone */
+  .section-danger summary {
+    color: var(--color-danger);
+  }
+
+  .danger-content {
+    padding: var(--space-md);
+    background: rgba(239, 68, 68, 0.02);
+  }
+
+  .danger-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: var(--space-md);
   }
 
-  .danger-action p {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    margin-top: var(--space-xs);
+  .danger-row + .danger-row {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
   }
 
-  .badge {
-    display: inline-block;
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
+  .danger-info strong {
+    display: block;
+    font-size: var(--font-size-sm);
     font-weight: 500;
+    margin-bottom: 2px;
   }
 
-  .badge-primary {
-    background: rgba(37, 99, 235, 0.1);
-    color: var(--color-primary);
-  }
-
-  .badge-secondary {
-    background: var(--color-bg-secondary);
+  .danger-info p {
+    font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
+    margin: 0;
   }
 
-  .btn-sm {
-    padding: var(--space-xs) var(--space-sm);
+  /* ========================================
+     BUTTONS
+     ======================================== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    padding: 8px 14px;
     font-size: var(--font-size-sm);
+    font-weight: 500;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-primary {
+    background: var(--color-text);
+    color: var(--color-bg);
+  }
+
+  .btn-primary:hover {
+    background: var(--color-text-secondary);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .btn-danger {
@@ -816,84 +785,84 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   .btn-danger:hover {
-    background: #b91c1c;
+    background: #dc2626;
   }
 
-  .btn-ghost {
+  .btn-danger-outline {
     background: transparent;
-    border: none;
-    color: var(--color-text-secondary);
-    cursor: pointer;
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger);
   }
 
-  .btn-ghost:hover {
+  .btn-danger-outline:hover {
+    background: var(--color-danger);
+    color: white;
+  }
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: all var(--transition-fast);
+  }
+
+  .btn-icon:hover {
+    background: var(--color-bg-secondary);
     color: var(--color-text);
   }
 
-  .loading,
-  .error {
-    text-align: center;
-    padding: var(--space-xl);
-    color: var(--color-text-secondary);
+  .btn-icon-sm {
+    width: 24px;
+    height: 24px;
   }
 
-  .error {
+  .btn-icon-sm:hover {
     color: var(--color-danger);
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  /* ========================================
+     STATES
+     ======================================== */
+  .loading-state,
+  .error-state {
+    text-align: center;
+    padding: var(--space-2xl);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
   }
 
   .error-state {
-    text-align: center;
-    padding: var(--space-xl);
+    color: var(--color-danger);
   }
 
-  .error-state p {
-    margin-bottom: var(--space-md);
-    color: var(--color-text-secondary);
-  }
-
-  @media (max-width: 640px) {
-    .group-header {
-      flex-direction: column;
-      gap: var(--space-md);
-    }
-
-    .danger-action {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .invite-stats {
-      flex-wrap: wrap;
-      gap: var(--space-sm) var(--space-md);
-    }
-
-    /* Table responsive: hide some columns on mobile */
-    .invitations-table th:nth-child(3),
-    .invitations-table td:nth-child(3) {
-      display: none;
-    }
-
-    .invitations-table th,
-    .invitations-table td {
-      padding: var(--space-sm);
-    }
-
-    .col-code {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: var(--space-xs);
-    }
-
-    .col-code code {
-      font-size: var(--font-size-sm);
-    }
-  }
-
+  /* ========================================
+     RESPONSIVE
+     ======================================== */
   @media (max-width: 480px) {
-    /* Hide more columns on very small screens */
-    .invitations-table th:nth-child(4),
-    .invitations-table td:nth-child(4) {
-      display: none;
+    .invite-form {
+      flex-direction: column;
+    }
+
+    .invite-form .btn {
+      width: 100%;
+    }
+
+    .danger-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--space-sm);
+    }
+
+    .danger-row .btn {
+      width: 100%;
     }
   }
 </style>

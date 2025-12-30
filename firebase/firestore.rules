@@ -41,16 +41,32 @@ service cloud.firestore {
     }
 
     // ==================== INVITATIONS ====================
-    // Colección pública para códigos de invitación
-    match /invitations/{code} {
-      // Cualquier usuario autenticado puede leer invitaciones (para validar código)
-      allow read: if isAuthenticated();
+    // Invitaciones por email para unirse a grupos
+    match /invitations/{invitationId} {
+      // El invitado puede leer sus invitaciones, o el admin del grupo
+      allow read: if isAuthenticated()
+        && (resource.data.invitedEmail == request.auth.token.email
+            || isGroupAdmin(resource.data.groupId));
 
-      // Solo se pueden crear/modificar por admins del grupo
+      // Solo admins del grupo pueden crear invitaciones
       allow create: if isAuthenticated()
-        && hasRequiredFields(['groupId', 'expiresAt', 'createdBy'])
+        && hasRequiredFields(['groupId', 'groupName', 'invitedEmail', 'invitedBy', 'invitedByName', 'status', 'expiresAt', 'createdAt'])
+        && request.resource.data.status == 'pending'
         && isGroupAdmin(request.resource.data.groupId);
-      allow update: if false;
+
+      // El invitado puede rechazar (cambiar status a 'rejected')
+      // El admin puede actualizar otros campos
+      allow update: if isAuthenticated()
+        && (
+          // Invitado rechaza
+          (resource.data.invitedEmail == request.auth.token.email
+           && resource.data.status == 'pending'
+           && request.resource.data.status == 'rejected')
+          // Admin actualiza
+          || isGroupAdmin(resource.data.groupId)
+        );
+
+      // Admins del grupo pueden eliminar
       allow delete: if isAuthenticated()
         && isGroupAdmin(resource.data.groupId);
     }

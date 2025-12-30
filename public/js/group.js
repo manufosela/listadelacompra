@@ -13,26 +13,18 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   arrayUnion,
   arrayRemove,
-  serverTimestamp
+  serverTimestamp,
+  Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js';
+import { functions } from './firebase-config.js';
 import { getCachedOrFetch, setInCache, invalidateCache, invalidateNamespace } from './cache.js';
 
-/**
- * Genera un código de invitación aleatorio
- * @returns {string} Código de 6 caracteres
- */
-function generateInviteCode() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // Sin I, L, O, 0, 1 confusos
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
 
 /**
  * Crea un nuevo grupo
@@ -156,164 +148,188 @@ export function setCurrentGroup(groupId) {
   }));
 }
 
+// ==================== INVITACIONES POR EMAIL ====================
+
 /**
- * Genera un código de invitación para el grupo
+ * Invita a un usuario por email (solo admins)
  * @param {string} groupId - ID del grupo
- * @param {number} expiresInHours - Horas hasta expiración (default 48)
- * @returns {Promise<string>} Código de invitación
+ * @param {string} email - Email del usuario a invitar
+ * @returns {Promise<Object>} Invitación creada
  */
-export async function generateGroupInvite(groupId, expiresInHours = 48) {
+export async function inviteUserByEmail(groupId, email) {
   const user = getCurrentUser();
   if (!user) throw new Error('No authenticated user');
-
-  // Verificar que es admin
-  const group = await getGroup(groupId);
-  if (!group || group.members[user.uid]?.role !== 'admin') {
-    throw new Error('Only admins can generate invite codes');
-  }
-
-  const code = generateInviteCode();
-  const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + expiresInHours);
-
-  // Guardar en colección pública de invitaciones
-  const inviteRef = doc(db, 'invitations', code);
-  await setDoc(inviteRef, {
-    groupId,
-    groupName: group.name,
-    expiresAt,
-    createdAt: serverTimestamp(),
-    createdBy: user.uid
-  });
-
-  return code;
-}
-
-/**
- * Une al usuario actual a un grupo usando código de invitación
- * @param {string} code - Código de invitación
- * @returns {Promise<Object>} Grupo al que se unió
- */
-export async function joinGroupWithCode(code) {
-  const user = getCurrentUser();
-  if (!user) throw new Error('No authenticated user');
-
-  const normalizedCode = code.toUpperCase().trim();
-
-  // Buscar invitación por código
-  const inviteRef = doc(db, 'invitations', normalizedCode);
-  const inviteSnap = await getDoc(inviteRef);
-
-  if (!inviteSnap.exists()) {
-    throw new Error('Invalid invite code');
-  }
-
-  const inviteData = inviteSnap.data();
-
-  // Verificar que no ha expirado
-  const expiresAt = inviteData.expiresAt?.toDate?.() || new Date(inviteData.expiresAt);
-  if (expiresAt <= new Date()) {
-    throw new Error('Invite code has expired');
-  }
-
-  // Obtener el grupo
-  const targetGroup = await getGroup(inviteData.groupId);
-  if (!targetGroup) {
-    throw new Error('Group not found');
-  }
-
-  // Verificar que no es ya miembro
-  if (targetGroup.members[user.uid]) {
-    throw new Error('Already a member of this group');
-  }
-
-  // Añadir como miembro al grupo
-  const groupRef = doc(db, 'groups', targetGroup.id);
-  await updateDoc(groupRef, {
-    [`members.${user.uid}`]: {
-      role: 'member',
-      joinedAt: serverTimestamp(),
-      displayName: user.displayName,
-      email: user.email,
-      photoURL: user.photoURL
-    }
-  });
-
-  // Marcar invitación como usada
-  await updateDoc(inviteRef, {
-    usedBy: user.uid,
-    usedByName: user.displayName || user.email,
-    usedAt: serverTimestamp()
-  });
-
-  // Actualizar usuario (merge: true crea el doc si no existe)
-  const userRef = doc(db, 'users', user.uid);
-  await setDoc(userRef, {
-    groupIds: arrayUnion(targetGroup.id)
-  }, { merge: true });
-
-  // Invalidar caches
-  invalidateCache('userGroups', user.uid);
-  invalidateCache('groups', targetGroup.id);
-
-  // Establecer como grupo activo
-  setCurrentGroup(targetGroup.id);
-
-  return targetGroup;
-}
-
-/**
- * Añade un miembro por email (solo admins)
- * @param {string} groupId - ID del grupo
- * @param {string} email - Email del usuario a añadir
- * @param {string} role - Rol ('admin' o 'member')
- */
-export async function addMemberByEmail(groupId, email, role = 'member') {
-  const currentUser = getCurrentUser();
-  if (!currentUser) throw new Error('No authenticated user');
 
   // Verificar permisos de admin
   if (!(await isAdmin(groupId))) {
-    throw new Error('Only admins can add members');
+    throw new Error('Solo los administradores pueden invitar');
   }
 
-  // Buscar usuario por email
-  const usersRef = collection(db, 'users');
-  const q = query(usersRef, where('email', '==', email.toLowerCase()));
+  // Forzar refresh para evitar datos cacheados obsoletos
+  const group = await getGroup(groupId, true);
+  if (!group) throw new Error('Grupo no encontrado');
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Verificar que no es ya miembro (por email)
+  const memberEmails = Object.values(group.members || {}).map(m => m.email?.toLowerCase());
+  if (memberEmails.includes(normalizedEmail)) {
+    throw new Error('Este usuario ya es miembro del grupo');
+  }
+
+  // Verificar que no hay invitación pendiente
+  const existingQuery = query(
+    collection(db, 'invitations'),
+    where('groupId', '==', groupId),
+    where('invitedEmail', '==', normalizedEmail),
+    where('status', '==', 'pending')
+  );
+  const existingSnap = await getDocs(existingQuery);
+  if (!existingSnap.empty) {
+    throw new Error('Ya existe una invitación pendiente para este email');
+  }
+
+  // Crear invitación (expira en 7 días)
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  const inviteRef = doc(collection(db, 'invitations'));
+  const inviteData = {
+    groupId,
+    groupName: group.name,
+    invitedEmail: normalizedEmail,
+    invitedBy: user.uid,
+    invitedByName: user.displayName || user.email,
+    status: 'pending',
+    expiresAt: Timestamp.fromDate(expiresAt),
+    createdAt: serverTimestamp()
+  };
+
+  await setDoc(inviteRef, inviteData);
+
+  return { id: inviteRef.id, ...inviteData };
+}
+
+/**
+ * Obtiene las invitaciones pendientes para el usuario actual
+ * @returns {Promise<Array>} Lista de invitaciones pendientes
+ */
+export async function getPendingInvitations() {
+  const user = getCurrentUser();
+  if (!user || !user.email) return [];
+
+  const q = query(
+    collection(db, 'invitations'),
+    where('invitedEmail', '==', user.email.toLowerCase()),
+    where('status', '==', 'pending')
+  );
+
   const snapshot = await getDocs(q);
+  const now = new Date();
 
-  if (snapshot.empty) {
-    throw new Error('No user found with that email');
+  return snapshot.docs
+    .map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
+    .filter(inv => {
+      // Filtrar expiradas
+      const expiresAt = inv.expiresAt?.toDate?.() || new Date(inv.expiresAt);
+      return expiresAt > now;
+    });
+}
+
+/**
+ * Obtiene las invitaciones de un grupo (para admins)
+ * @param {string} groupId - ID del grupo
+ * @returns {Promise<Array>} Lista de invitaciones
+ */
+export async function getGroupInvitations(groupId) {
+  const user = getCurrentUser();
+  if (!user) throw new Error('No authenticated user');
+
+  if (!(await isAdmin(groupId))) {
+    throw new Error('Solo administradores pueden ver las invitaciones');
   }
 
-  const targetUser = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+  const q = query(
+    collection(db, 'invitations'),
+    where('groupId', '==', groupId)
+  );
 
-  // Verificar que no es ya miembro
-  const group = await getGroup(groupId);
-  if (group.members[targetUser.id]) {
-    throw new Error('User is already a member');
+  const snapshot = await getDocs(q);
+  const now = new Date();
+
+  return snapshot.docs
+    .map(doc => {
+      const data = doc.data();
+      const expiresAt = data.expiresAt?.toDate?.() || new Date(data.expiresAt);
+      // Marcar como expirada si corresponde
+      let status = data.status;
+      if (status === 'pending' && expiresAt <= now) {
+        status = 'expired';
+      }
+      return {
+        id: doc.id,
+        ...data,
+        status,
+        expiresAt
+      };
+    })
+    .sort((a, b) => {
+      // Pendientes primero, luego por fecha
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      return b.createdAt?.toDate?.() - a.createdAt?.toDate?.();
+    });
+}
+
+/**
+ * Acepta una invitación (llama a Cloud Function)
+ * @param {string} invitationId - ID de la invitación
+ * @returns {Promise<Object>} Resultado con groupId y groupName
+ */
+export async function acceptInvitation(invitationId) {
+  const user = getCurrentUser();
+  if (!user) throw new Error('No authenticated user');
+
+  const acceptFn = httpsCallable(functions, 'acceptInvitation');
+  const result = await acceptFn({ invitationId });
+
+  // Invalidar caches
+  invalidateCache('userGroups', user.uid);
+  if (result.data.groupId) {
+    invalidateCache('groups', result.data.groupId);
+    setCurrentGroup(result.data.groupId);
   }
 
-  // Añadir miembro al grupo
-  const groupRef = doc(db, 'groups', groupId);
-  await updateDoc(groupRef, {
-    [`members.${targetUser.id}`]: {
-      role,
-      joinedAt: serverTimestamp(),
-      displayName: targetUser.displayName,
-      email: targetUser.email,
-      photoURL: targetUser.photoURL
-    }
+  return result.data;
+}
+
+/**
+ * Rechaza una invitación
+ * @param {string} invitationId - ID de la invitación
+ */
+export async function rejectInvitation(invitationId) {
+  const user = getCurrentUser();
+  if (!user) throw new Error('No authenticated user');
+
+  const inviteRef = doc(db, 'invitations', invitationId);
+  await updateDoc(inviteRef, {
+    status: 'rejected',
+    rejectedAt: serverTimestamp()
   });
+}
 
-  // Actualizar usuario
-  const userRef = doc(db, 'users', targetUser.id);
-  await setDoc(userRef, {
-    groupIds: arrayUnion(groupId)
-  }, { merge: true });
+/**
+ * Elimina una invitación (solo admins)
+ * @param {string} invitationId - ID de la invitación
+ */
+export async function deleteInvitation(invitationId) {
+  const user = getCurrentUser();
+  if (!user) throw new Error('No authenticated user');
 
-  // Invalidar cache del grupo
-  invalidateCache('groups', groupId);
+  await deleteDoc(doc(db, 'invitations', invitationId));
 }
 
 /**

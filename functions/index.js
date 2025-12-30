@@ -1,12 +1,13 @@
 /**
  * HomeCart Cloud Functions
- * Functions for ticket processing with OpenAI Vision
+ * Functions for ticket processing and group management
  */
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { getAuth } from 'firebase-admin/auth';
 import OpenAI from 'openai';
 
 // Initialize Firebase Admin
@@ -294,6 +295,123 @@ export const savePurchase = onCall(
       throw new HttpsError(
         'internal',
         error instanceof Error ? error.message : 'Failed to save purchase'
+      );
+    }
+  }
+);
+
+/**
+ * Accept a group invitation
+ * This function runs with admin privileges to add the user to the group
+ */
+export const acceptInvitation = onCall(
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    timeoutSeconds: 30,
+    cors: true,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const { invitationId } = request.data;
+    if (!invitationId) {
+      throw new HttpsError('invalid-argument', 'invitationId is required');
+    }
+
+    const userId = request.auth.uid;
+    const userEmail = request.auth.token.email?.toLowerCase();
+
+    if (!userEmail) {
+      throw new HttpsError('failed-precondition', 'User must have an email');
+    }
+
+    try {
+      // Get invitation
+      const inviteRef = db.collection('invitations').doc(invitationId);
+      const inviteSnap = await inviteRef.get();
+
+      if (!inviteSnap.exists) {
+        throw new HttpsError('not-found', 'Invitación no encontrada');
+      }
+
+      const inviteData = inviteSnap.data();
+
+      // Verify invitation is for this user
+      if (inviteData.invitedEmail?.toLowerCase() !== userEmail) {
+        throw new HttpsError('permission-denied', 'Esta invitación no es para ti');
+      }
+
+      // Verify not already processed
+      if (inviteData.status !== 'pending') {
+        throw new HttpsError('failed-precondition', 'Esta invitación ya fue procesada');
+      }
+
+      // Verify not expired
+      const expiresAt = inviteData.expiresAt?.toDate?.() || new Date(inviteData.expiresAt);
+      if (expiresAt <= new Date()) {
+        await inviteRef.update({ status: 'expired' });
+        throw new HttpsError('failed-precondition', 'Esta invitación ha expirado');
+      }
+
+      // Get group
+      const groupRef = db.collection('groups').doc(inviteData.groupId);
+      const groupSnap = await groupRef.get();
+
+      if (!groupSnap.exists) {
+        throw new HttpsError('not-found', 'El grupo ya no existe');
+      }
+
+      const groupData = groupSnap.data();
+
+      // Check if already a member
+      if (groupData.members?.[userId]) {
+        await inviteRef.update({ status: 'already-member' });
+        throw new HttpsError('already-exists', 'Ya eres miembro de este grupo');
+      }
+
+      // Get user info for member record
+      const userRecord = await getAuth().getUser(userId);
+
+      // Add user to group
+      await groupRef.update({
+        [`members.${userId}`]: {
+          role: 'member',
+          joinedAt: FieldValue.serverTimestamp(),
+          displayName: userRecord.displayName || userEmail,
+          email: userEmail,
+          photoURL: userRecord.photoURL || null,
+        },
+      });
+
+      // Update invitation status
+      await inviteRef.update({
+        status: 'accepted',
+        acceptedAt: FieldValue.serverTimestamp(),
+      });
+
+      // Update user's groupIds
+      const userRef = db.collection('users').doc(userId);
+      await userRef.set(
+        { groupIds: FieldValue.arrayUnion(inviteData.groupId) },
+        { merge: true }
+      );
+
+      return {
+        success: true,
+        groupId: inviteData.groupId,
+        groupName: inviteData.groupName,
+      };
+    } catch (error) {
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      console.error('Error accepting invitation:', error);
+      throw new HttpsError(
+        'internal',
+        error instanceof Error ? error.message : 'Error al aceptar invitación'
       );
     }
   }
