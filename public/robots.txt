@@ -1,0 +1,12 @@
+# robots.txt para MyHomeCart
+# https://myhomec.art
+
+User-agent: *
+Allow: /
+Allow: /login
+
+# Rutas privadas (requieren autenticación)
+Disallow: /app/
+
+# Sitemap
+Sitemap: https://myhomec.art/sitemap.xml

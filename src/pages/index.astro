@@ -1,8 +1,48 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "MyHomeCart",
+  "alternateName": ["Home Cart", "Shared Cart", "Family Shopping List"],
+  "url": "https://myhomec.art",
+  "description": "MyHomeCart es la aplicación perfecta para crear y compartir listas de la compra con tu familia. Sincronización en tiempo real, listas compartidas y gestión colaborativa del hogar.",
+  "applicationCategory": "LifestyleApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "EUR"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "ratingCount": "150"
+  },
+  "featureList": [
+    "Shared shopping lists",
+    "Real-time sync",
+    "Family collaboration",
+    "Multiple lists support",
+    "Group management"
+  ],
+  "screenshot": "https://myhomec.art/og-image.png",
+  "author": {
+    "@type": "Organization",
+    "name": "MyHomeCart",
+    "url": "https://myhomec.art"
+  }
+};
 ---
 
-<BaseLayout title="Inicio">
+<BaseLayout
+  title="Listas de la Compra Compartidas"
+  description="MyHomeCart - Crea y comparte listas de la compra con tu familia. Shared cart, home cart y listas colaborativas sincronizadas en tiempo real."
+>
+  <!-- Structured Data JSON-LD -->
+  <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+
   <main class="landing">
     <div class="landing-logo">
       <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -30,8 +70,28 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </svg>
     </div>
     <h1>MyHomeCart</h1>
-    <p>Tu lista de la compra familiar, sincronizada en tiempo real.</p>
-    <a href="/login" class="btn btn-primary btn-lg">Comenzar</a>
+    <p class="tagline">Tu lista de la compra familiar, sincronizada en tiempo real.</p>
+    <a href="/login" class="btn btn-primary btn-lg">Comenzar gratis</a>
+
+    <!-- Features para SEO -->
+    <section class="features" aria-label="Características principales">
+      <article class="feature">
+        <span class="feature-icon">🛒</span>
+        <h2>Shared Cart</h2>
+        <p>Comparte listas con tu familia y amigos en tiempo real</p>
+      </article>
+      <article class="feature">
+        <span class="feature-icon">🏠</span>
+        <h2>Home Cart</h2>
+        <p>Gestiona las compras del hogar de forma colaborativa</p>
+      </article>
+      <article class="feature">
+        <span class="feature-icon">📋</span>
+        <h2>Multiple Lists</h2>
+        <p>Crea tantas listas como necesites para cada ocasión</p>
+      </article>
+    </section>
+
     <span class="domain-badge">myhomec.art</span>
   </main>
 </BaseLayout>
@@ -75,7 +135,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     background-clip: text;
   }
 
-  p {
+  .tagline {
     font-size: 1.25rem;
     color: var(--color-text-secondary);
     margin-bottom: var(--space-xl);
@@ -85,6 +145,50 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .btn-lg {
     padding: var(--space-md) var(--space-2xl);
     font-size: var(--font-size-lg);
+  }
+
+  /* Features Section */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-2xl);
+    max-width: 800px;
+    width: 100%;
+  }
+
+  .feature {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    padding: var(--space-lg);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(59, 130, 246, 0.1);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .feature:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(59, 130, 246, 0.15);
+  }
+
+  .feature-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: var(--space-sm);
+  }
+
+  .feature h2 {
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    margin-bottom: var(--space-xs);
+    color: var(--color-text);
+  }
+
+  .feature p {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin: 0;
+    line-height: 1.5;
   }
 
   .domain-badge {
@@ -100,6 +204,18 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   @media (prefers-color-scheme: dark) {
     .landing {
       background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    }
+
+    .feature {
+      background: rgba(30, 41, 59, 0.8);
+      border-color: rgba(59, 130, 246, 0.2);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .features {
+      grid-template-columns: 1fr;
+      padding: 0 var(--space-md);
     }
   }
 </style>

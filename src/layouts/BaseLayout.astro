@@ -4,9 +4,21 @@ import { ViewTransitions } from 'astro:transitions';
 interface Props {
   title: string;
   description?: string;
+  image?: string;
+  type?: string;
 }
 
-const { title, description = 'Gestiona tus listas de la compra en familia' } = Astro.props;
+const {
+  title,
+  description = 'MyHomeCart - Tu lista de la compra familiar colaborativa. Crea listas compartidas, sincroniza en tiempo real y gestiona las compras del hogar con tu familia.',
+  image = '/og-image.png',
+  type = 'website'
+} = Astro.props;
+
+const siteUrl = 'https://myhomec.art';
+const fullTitle = `${title} | MyHomeCart`;
+const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href;
+const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopping list, family shopping, listas compartidas, compras del hogar, grocery list, collaborative shopping, carrito de compras, lista familiar';
 ---
 
 <!DOCTYPE html>
@@ -14,9 +26,45 @@ const { title, description = 'Gestiona tus listas de la compra en familia' } = A
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO básico -->
+    <title>{fullTitle}</title>
     <meta name="description" content={description} />
+    <meta name="keywords" content={keywords} />
+    <meta name="author" content="MyHomeCart" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href={canonicalUrl} />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content={type} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={`${siteUrl}${image}`} />
+    <meta property="og:site_name" content="MyHomeCart" />
+    <meta property="og:locale" content="es_ES" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonicalUrl} />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={`${siteUrl}${image}`} />
+
+    <!-- Favicon y iconos -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>{title} | MyHomeCart</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#3b82f6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="MyHomeCart" />
+
+    <!-- Preconnect para rendimiento -->
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
 
     <!-- CSS -->
     <link rel="stylesheet" href="/css/reset.css" />

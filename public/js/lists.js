@@ -17,7 +17,8 @@ import {
   query,
   where,
   orderBy,
-  serverTimestamp
+  serverTimestamp,
+  writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { getCurrentGroupId } from './group.js';
 import { getCachedOrFetch, setInCache, invalidateCache } from './cache.js';
@@ -142,7 +143,7 @@ export async function createSharedListRef(groupId, listId, listData) {
 }
 
 /**
- * Actualiza los miembros de una lista
+ * Actualiza los miembros de una lista (operación atómica)
  * @param {string} listId - ID de la lista
  * @param {Array} members - Nuevos miembros (UIDs)
  */
@@ -153,36 +154,54 @@ export async function updateListMembers(listId, members) {
   // Asegurar que el propietario siempre está
   const allMembers = [user.uid, ...members.filter(m => m !== user.uid)];
 
+  const groupId = getCurrentGroupId();
   const listRef = doc(db, 'users', user.uid, 'lists', listId);
-  await updateDoc(listRef, {
+
+  // Si no hay grupo, solo actualizar la lista
+  if (!groupId) {
+    await updateDoc(listRef, {
+      members: allMembers,
+      updatedAt: serverTimestamp()
+    });
+    invalidateCache('lists', user.uid);
+    invalidateCache('list', `${user.uid}_${listId}`);
+    return;
+  }
+
+  // Leer datos necesarios antes del batch
+  const listSnap = await getDoc(listRef);
+  if (!listSnap.exists()) {
+    throw new Error('Lista no encontrada');
+  }
+  const listData = listSnap.data();
+
+  // Usar batch para operación atómica
+  const batch = writeBatch(db);
+
+  // 1. Actualizar lista
+  batch.update(listRef, {
     members: allMembers,
     updatedAt: serverTimestamp()
   });
 
-  // Actualizar referencia en el grupo si existe
-  const groupId = getCurrentGroupId();
-  if (groupId) {
+  // 2. Crear/actualizar referencia compartida si hay miembros adicionales
+  if (allMembers.length > 1) {
     const refDoc = doc(db, 'groups', groupId, 'sharedListRefs', listId);
-    const refSnap = await getDoc(refDoc);
-
-    if (refSnap.exists()) {
-      await updateDoc(refDoc, {
-        members: allMembers,
-        updatedAt: serverTimestamp()
-      });
-    } else if (allMembers.length > 1) {
-      // Crear referencia si hay miembros adicionales
-      const listSnap = await getDoc(listRef);
-      if (listSnap.exists()) {
-        await createSharedListRef(groupId, listId, {
-          ...listSnap.data(),
-          members: allMembers
-        });
-      }
-    }
+    batch.set(refDoc, {
+      listId,
+      ownerId: user.uid,
+      ownerName: listData.ownerName || user.displayName || 'Usuario',
+      name: listData.name,
+      icon: listData.icon || '🛒',
+      members: allMembers,
+      updatedAt: serverTimestamp()
+    }, { merge: true }); // merge:true para crear o actualizar
   }
 
-  // Invalidar caches
+  // Ejecutar batch (todo o nada)
+  await batch.commit();
+
+  // Invalidar caches solo si el batch tuvo éxito
   invalidateCache('lists', user.uid);
   invalidateCache('list', `${user.uid}_${listId}`);
 }
