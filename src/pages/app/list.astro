@@ -17,14 +17,22 @@ import AppLayout from '../../layouts/AppLayout.astro';
   import '/components/hc-shopping-list.js';
   import { db } from '/js/firebase-config.js';
   import { doc, onSnapshot, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { getCurrentGroupId, getGroup } from '/js/group.js';
+  import { updateListMembers } from '/js/lists.js';
+  import { toast } from '/js/toast.js';
 
   let unsubscribe = null;
   let currentListId = null;
+  let currentUser = null;
+  let groupMembers = [];
 
   function initPage(user) {
+    currentUser = user;
+
     // Re-leer URL params en cada navegación
     const urlParams = new URLSearchParams(window.location.search);
     const listId = urlParams.get('id');
+    const ownerId = urlParams.get('owner') || user.uid; // Si no hay owner, es del usuario
 
     if (!listId) {
       window.location.href = '/app';
@@ -48,7 +56,12 @@ import AppLayout from '../../layouts/AppLayout.astro';
       unsubscribe = null;
     }
 
-    const listRef = doc(db, 'users', user.uid, 'lists', listId);
+    // Cargar miembros del grupo para el selector
+    loadGroupMembers();
+
+    // Usar ownerId para la referencia (puede ser de otro usuario)
+    const listRef = doc(db, 'users', ownerId, 'lists', listId);
+    const isOwner = ownerId === user.uid;
 
     unsubscribe = onSnapshot(listRef, (snapshot) => {
       const headerEl = document.getElementById('list-header');
@@ -67,18 +80,26 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
       const list = { id: snapshot.id, ...snapshot.data() };
       const isAgnostic = list.listType === 'agnostic';
+      const members = list.members || [];
+      const memberCount = members.length;
 
       // Generar badge de tipo según listType
       let typeBadgeHtml = '';
       if (!isAgnostic && list.expenseType) {
         typeBadgeHtml = `
           <span class="type-badge ${list.expenseType === 'shared' ? 'shared' : 'common'}">
-            ${list.expenseType === 'shared' ? '➗ Gasto a dividir' : '🏠 Gasto común'}
+            ${list.expenseType === 'shared' ? '➗ Dividir' : '🏠 Común'}
           </span>
         `;
       } else if (isAgnostic) {
-        typeBadgeHtml = `<span class="type-badge agnostic">📝 Lista general</span>`;
+        typeBadgeHtml = `<span class="type-badge agnostic">📝 General</span>`;
       }
+
+      // Badge de propietario si no eres tú
+      const ownerBadge = !isOwner ? `<span class="owner-badge">De ${list.ownerName}</span>` : '';
+
+      // Badge de miembros
+      const membersBadge = memberCount > 1 ? `<span class="members-badge" id="members-toggle">👥 ${memberCount}</span>` : '';
 
       headerEl.innerHTML = `
         <div class="list-title-row">
@@ -86,30 +107,39 @@ import AppLayout from '../../layouts/AppLayout.astro';
           <div class="list-title-info">
             <h1>${list.name}</h1>
             <div class="list-meta">
+              ${ownerBadge}
               ${typeBadgeHtml}
-              ${list.store ? `<span class="store-badge">📍 ${list.store}</span>` : ''}
+              ${membersBadge}
               <span class="status-badge ${list.closed ? 'closed' : 'open'}">
                 ${list.closed ? 'Cerrada' : 'Abierta'}
               </span>
             </div>
           </div>
         </div>
-        <div class="list-actions">
-          ${!list.closed ? `
-            <button id="close-list-btn" class="btn btn-secondary btn-sm">
-              ✓ Cerrar lista
-            </button>
-          ` : `
-            <button id="reopen-list-btn" class="btn btn-secondary btn-sm">
-              ↺ Reabrir lista
-            </button>
-          `}
-          <button id="edit-list-btn" class="btn btn-secondary btn-sm">
-            ✏️ Editar
-          </button>
+        ${isOwner ? `
+          <div class="list-actions">
+            ${!list.closed ? `
+              <button id="close-list-btn" class="btn btn-ghost btn-sm">✓ Cerrar</button>
+            ` : `
+              <button id="reopen-list-btn" class="btn btn-ghost btn-sm">↺ Reabrir</button>
+            `}
+            <button id="manage-members-btn" class="btn btn-ghost btn-sm">👥 Miembros</button>
+          </div>
+        ` : ''}
+
+        <!-- Panel de miembros (oculto por defecto) -->
+        <div id="members-panel" class="members-panel" hidden>
+          <div class="members-panel-header">
+            <h3>Miembros de la lista</h3>
+            <button id="close-panel-btn" class="btn-icon">✕</button>
+          </div>
+          <div id="members-panel-content" class="members-panel-content">
+            ${isOwner ? '<p class="loading-text">Cargando miembros...</p>' : renderMembersReadonly(list.members || [], list.ownerName)}
+          </div>
         </div>
       `;
 
+      // Event listeners
       document.getElementById('close-list-btn')?.addEventListener('click', async () => {
         await updateDoc(listRef, { closed: true, updatedAt: serverTimestamp() });
       });
@@ -118,10 +148,30 @@ import AppLayout from '../../layouts/AppLayout.astro';
         await updateDoc(listRef, { closed: false, updatedAt: serverTimestamp() });
       });
 
+      document.getElementById('manage-members-btn')?.addEventListener('click', () => {
+        const panel = document.getElementById('members-panel');
+        if (panel) {
+          panel.hidden = !panel.hidden;
+          if (!panel.hidden && isOwner) {
+            renderMembersEditor(list.members || []);
+          }
+        }
+      });
+
+      document.getElementById('members-toggle')?.addEventListener('click', () => {
+        const panel = document.getElementById('members-panel');
+        if (panel) panel.hidden = !panel.hidden;
+      });
+
+      document.getElementById('close-panel-btn')?.addEventListener('click', () => {
+        const panel = document.getElementById('members-panel');
+        if (panel) panel.hidden = true;
+      });
+
       if (container && !container.querySelector('hc-shopping-list')) {
         const listComponent = document.createElement('hc-shopping-list');
         listComponent.setAttribute('list-id', listId);
-        listComponent.setAttribute('user-id', user.uid);
+        listComponent.setAttribute('user-id', ownerId); // Usar ownerId para items
         listComponent.setAttribute('list-type', list.listType || 'shopping');
         container.appendChild(listComponent);
       }
@@ -130,6 +180,76 @@ import AppLayout from '../../layouts/AppLayout.astro';
       const headerEl = document.getElementById('list-header');
       if (headerEl) {
         headerEl.innerHTML = `<div class="list-error">Error al cargar la lista</div>`;
+      }
+    });
+  }
+
+  async function loadGroupMembers() {
+    const groupId = getCurrentGroupId();
+    if (!groupId) return;
+
+    try {
+      const group = await getGroup(groupId);
+      if (group?.members) {
+        groupMembers = Object.entries(group.members)
+          .filter(([uid]) => uid !== currentUser.uid)
+          .map(([uid, data]) => ({
+            uid,
+            name: data.displayName || data.email?.split('@')[0] || 'Usuario'
+          }));
+      }
+    } catch (e) {
+      console.warn('Error loading group members:', e);
+    }
+  }
+
+  function renderMembersReadonly(memberUids, ownerName) {
+    return `
+      <div class="members-readonly">
+        <p>Propietario: <strong>${ownerName}</strong></p>
+        <p>${memberUids.length} miembro${memberUids.length !== 1 ? 's' : ''} en total</p>
+      </div>
+    `;
+  }
+
+  function renderMembersEditor(currentMembers) {
+    const content = document.getElementById('members-panel-content');
+    if (!content) return;
+
+    if (groupMembers.length === 0) {
+      content.innerHTML = `
+        <div class="no-members-to-add">
+          <p>No hay otros miembros en tu grupo.</p>
+          <a href="/app/groups" class="btn btn-sm">Ir a grupos</a>
+        </div>
+      `;
+      return;
+    }
+
+    content.innerHTML = `
+      <form id="members-form" class="members-form">
+        ${groupMembers.map(member => `
+          <label class="member-row">
+            <input type="checkbox" name="member" value="${member.uid}"
+              ${currentMembers.includes(member.uid) ? 'checked' : ''} />
+            <span>${member.name}</span>
+          </label>
+        `).join('')}
+        <button type="submit" class="btn btn-primary btn-sm btn-full">Guardar</button>
+      </form>
+    `;
+
+    document.getElementById('members-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const checked = Array.from(content.querySelectorAll('input[name="member"]:checked'))
+        .map(cb => cb.value);
+
+      try {
+        await updateListMembers(currentListId, checked);
+        toast.success('Miembros actualizados');
+        document.getElementById('members-panel').hidden = true;
+      } catch (error) {
+        toast.error('Error: ' + error.message);
       }
     });
   }
@@ -143,13 +263,9 @@ import AppLayout from '../../layouts/AppLayout.astro';
     }
   }
 
-  // Ejecutar en carga inicial
   tryInit();
-
-  // Re-ejecutar en navegaciones con View Transitions
   document.addEventListener('astro:page-load', tryInit);
 
-  // Limpiar suscripción al cambiar de página
   document.addEventListener('astro:before-swap', () => {
     if (unsubscribe) {
       unsubscribe();
@@ -270,6 +386,136 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
   .list-not-found p {
     margin-bottom: var(--space-md);
+  }
+
+  /* Owner badge */
+  .owner-badge {
+    font-size: var(--font-size-xs);
+    color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.1);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+  }
+
+  /* Members badge clickable */
+  .members-badge {
+    font-size: var(--font-size-xs);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: var(--color-bg-secondary);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .members-badge:hover {
+    background: var(--color-border);
+  }
+
+  /* Members Panel */
+  .members-panel {
+    margin-top: var(--space-md);
+    padding: var(--space-md);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .members-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+  }
+
+  .members-panel-header h3 {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--space-xs);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-md);
+    line-height: 1;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+  }
+
+  .btn-icon:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  .members-panel-content {
+    font-size: var(--font-size-sm);
+  }
+
+  /* Members readonly view */
+  .members-readonly {
+    color: var(--color-text-secondary);
+  }
+
+  .members-readonly p {
+    margin: 0 0 var(--space-xs) 0;
+  }
+
+  .members-readonly strong {
+    color: var(--color-text);
+  }
+
+  /* Members form (editor) */
+  .members-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .member-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    background: var(--color-bg);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .member-row:hover {
+    background: var(--color-border);
+  }
+
+  .member-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+  }
+
+  .member-row span {
+    flex: 1;
+  }
+
+  .no-members-to-add {
+    text-align: center;
+    color: var(--color-text-secondary);
+    padding: var(--space-md);
+  }
+
+  .no-members-to-add p {
+    margin-bottom: var(--space-sm);
+  }
+
+  .btn-full {
+    width: 100%;
+  }
+
+  .loading-text {
+    color: var(--color-text-secondary);
+    font-style: italic;
   }
 
   @media (max-width: 480px) {

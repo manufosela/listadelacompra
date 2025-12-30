@@ -85,13 +85,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         </div>
       </div>
 
-      <!-- Grupos -->
+      <!-- Miembros -->
       <div class="form-group">
-        <label>Compartir con grupos</label>
-        <div id="groups-container" class="groups-container">
-          <p class="loading-text">Cargando grupos...</p>
+        <label>Compartir con miembros</label>
+        <div id="members-container" class="members-container">
+          <p class="loading-text">Cargando miembros...</p>
         </div>
-        <small class="form-help">Selecciona los grupos que podrán ver y editar esta lista</small>
+        <small class="form-help">Selecciona qué miembros del grupo pueden ver y editar esta lista</small>
       </div>
 
       <!-- Tienda (opcional, solo para listas de compra) -->
@@ -140,9 +140,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 <script type="module">
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
   import { toast } from '/js/toast.js';
-  import { getUserGroups } from '/js/group.js';
-  import { db } from '/js/firebase-config.js';
-  import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { getCurrentGroupId, getGroup } from '/js/group.js';
+  import { createList } from '/js/lists.js';
 
   // Iconos disponibles según tipo de lista
   const SHOPPING_ICONS = [
@@ -160,8 +159,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   let currentListType = 'shopping';
 
-  let userGroups = [];
-  let selectedGroups = [];
+  let groupMembers = [];
+  let selectedMembers = [];
+  let currentUser = null;
 
   // Inicializar selector de iconos
   const iconGrid = document.querySelector('.icon-grid');
@@ -236,55 +236,89 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     });
   });
 
-  // Cargar grupos del usuario
-  async function initPage() {
-    const groupsContainer = document.getElementById('groups-container');
-    if (!groupsContainer) return;
+  // Cargar miembros del grupo actual
+  async function initPage(user) {
+    currentUser = user;
+    const membersContainer = document.getElementById('members-container');
+    if (!membersContainer) return;
+
+    const groupId = getCurrentGroupId();
+
+    if (!groupId) {
+      membersContainer.innerHTML = `
+        <div class="no-group">
+          <p>No tienes un grupo activo.</p>
+          <a href="/app/groups" class="btn btn-sm">Ir a grupos</a>
+        </div>
+      `;
+      return;
+    }
 
     try {
-      userGroups = await getUserGroups();
+      const group = await getGroup(groupId);
 
-      if (userGroups.length === 0) {
-        groupsContainer.innerHTML = `
-          <div class="no-groups">
-            <p>No perteneces a ningún grupo.</p>
-            <a href="/app/groups" class="btn btn-sm">Crear grupo</a>
+      if (!group || !group.members) {
+        membersContainer.innerHTML = '<p class="error-text">Error al cargar el grupo</p>';
+        return;
+      }
+
+      // Convertir miembros a array, excluyendo al usuario actual
+      groupMembers = Object.entries(group.members)
+        .filter(([uid]) => uid !== currentUser.uid)
+        .map(([uid, data]) => ({
+          uid,
+          name: data.displayName || data.email?.split('@')[0] || 'Usuario',
+          photoURL: data.photoURL
+        }));
+
+      if (groupMembers.length === 0) {
+        membersContainer.innerHTML = `
+          <div class="no-members">
+            <p>No hay otros miembros en el grupo.</p>
+            <small>Invita a alguien desde la gestión del grupo.</small>
           </div>
         `;
         return;
       }
 
-      groupsContainer.innerHTML = userGroups.map(group => `
-        <label class="group-checkbox">
-          <input type="checkbox" name="groups" value="${group.id}" />
-          <span class="group-name">
-            <span class="group-icon">👥</span>
-            ${group.name}
-            <span class="member-count">${Object.keys(group.members || {}).length} miembros</span>
-          </span>
-        </label>
-      `).join('');
+      membersContainer.innerHTML = `
+        <div class="members-list">
+          ${groupMembers.map(member => `
+            <label class="member-checkbox">
+              <input type="checkbox" name="members" value="${member.uid}" />
+              <div class="member-info">
+                <div class="member-avatar-small">
+                  ${member.photoURL
+                    ? `<img src="${member.photoURL}" alt="">`
+                    : `<span>${member.name[0].toUpperCase()}</span>`
+                  }
+                </div>
+                <span class="member-name">${member.name}</span>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+      `;
 
-      // Manejar selección de grupos
-      groupsContainer.querySelectorAll('input[name="groups"]').forEach(checkbox => {
+      // Manejar selección de miembros
+      membersContainer.querySelectorAll('input[name="members"]').forEach(checkbox => {
         checkbox.addEventListener('change', () => {
-          selectedGroups = Array.from(groupsContainer.querySelectorAll('input[name="groups"]:checked'))
+          selectedMembers = Array.from(membersContainer.querySelectorAll('input[name="members"]:checked'))
             .map(cb => cb.value);
         });
       });
     } catch (error) {
-      console.error('Error loading groups:', error);
-      if (groupsContainer) {
-        groupsContainer.innerHTML = '<p class="error-text">Error al cargar grupos</p>';
-      }
+      console.error('Error loading members:', error);
+      membersContainer.innerHTML = '<p class="error-text">Error al cargar miembros</p>';
     }
   }
 
   // Comprobar estado de auth
   if (isAuthResolved()) {
-    if (getCurrentUser()) initPage();
+    const user = getCurrentUser();
+    if (user) initPage(user);
   } else {
-    window.addEventListener('auth-ready', () => initPage(), { once: true });
+    window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
   }
 
   // Lista recurrente
@@ -302,8 +336,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const user = getCurrentUser();
-    if (!user) {
+    if (!currentUser) {
       toast.error('Debes iniciar sesión');
       return;
     }
@@ -330,26 +363,20 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       : null;
 
     try {
-      // Crear lista en la colección del usuario
-      const listsRef = collection(db, 'users', user.uid, 'lists');
-      const docRef = await addDoc(listsRef, {
+      // Crear lista usando el servicio
+      const newList = await createList({
         name,
         icon,
-        listType, // 'shopping' o 'agnostic'
+        listType,
         store: listType === 'shopping' ? (store || null) : null,
-        expenseType, // 'common', 'shared' o null
-        groupIds: selectedGroups,
+        expenseType,
+        groupIds: getCurrentGroupId() ? [getCurrentGroupId()] : [],
         scheduledDate: date || null,
         isRecurring,
-        recurringPattern: isRecurring ? { frequency } : null,
-        closed: false,
-        itemCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: user.uid
-      });
+        recurringPattern: isRecurring ? { frequency } : null
+      }, selectedMembers);
 
-      window.location.href = `/app/list?id=${docRef.id}`;
+      window.location.href = `/app/list?id=${newList.id}`;
     } catch (error) {
       console.error('Error creating list:', error);
       toast.error('Error al crear la lista: ' + error.message);
@@ -568,52 +595,83 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     color: var(--color-text-secondary);
   }
 
-  /* Grupos */
-  .groups-container {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
+  /* Miembros */
+  .members-container {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
   }
 
-  .group-checkbox {
+  .members-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .member-checkbox {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-md);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
 
-  .group-checkbox:hover {
+  .member-checkbox:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .member-checkbox:hover {
     background: var(--color-bg-secondary);
   }
 
-  .group-checkbox input:checked + .group-name {
-    font-weight: 500;
-  }
-
-  .group-checkbox:has(input:checked) {
-    border-color: var(--color-primary);
+  .member-checkbox:has(input:checked) {
     background: rgba(37, 99, 235, 0.05);
   }
 
-  .group-name {
+  .member-checkbox:has(input:checked) .member-name {
+    font-weight: 500;
+  }
+
+  .member-info {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    flex: 1;
   }
 
-  .group-icon {
-    font-size: 1rem;
+  .member-avatar-small {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-text-tertiary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    overflow: hidden;
   }
 
-  .member-count {
-    margin-left: auto;
-    font-size: var(--font-size-xs);
+  .member-avatar-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .no-group,
+  .no-members {
+    padding: var(--space-md);
+    text-align: center;
     color: var(--color-text-secondary);
+  }
+
+  .no-group p,
+  .no-members p {
+    margin-bottom: var(--space-xs);
+  }
+
+  .no-members small {
+    font-size: var(--font-size-xs);
   }
 
   .form-help {
