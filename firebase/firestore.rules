@@ -84,6 +84,16 @@ service cloud.firestore {
           allow delete: if isAuthenticated() && uid == request.auth.uid;
         }
       }
+
+      // ==================== CUSTOM CATEGORIES ====================
+      // Categorías personalizadas del usuario para listas agnósticas
+      match /customCategories/{categoryId} {
+        allow read: if isAuthenticated() && uid == request.auth.uid;
+        allow create: if isAuthenticated() && uid == request.auth.uid
+          && hasRequiredFields(['name', 'icon']);
+        allow update: if isAuthenticated() && uid == request.auth.uid;
+        allow delete: if isAuthenticated() && uid == request.auth.uid;
+      }
     }
 
     // ==================== GROUPS ====================

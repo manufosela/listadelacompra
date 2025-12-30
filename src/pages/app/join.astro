@@ -1,0 +1,322 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Unirse a grupo">
+  <div class="join-page">
+    <div class="join-card">
+      <h1>Unirse a un grupo</h1>
+      <p class="subtitle">Introduce el código de invitación que te han compartido</p>
+
+      <form id="join-form">
+        <div class="form-group">
+          <label for="invite-code">Código de invitación</label>
+          <input
+            type="text"
+            id="invite-code"
+            placeholder="XXXXXX"
+            maxlength="6"
+            autocomplete="off"
+            required
+          />
+        </div>
+
+        <div id="group-preview" class="group-preview hidden">
+          <p>Te unirás al grupo:</p>
+          <strong id="group-name-preview"></strong>
+        </div>
+
+        <div id="error-message" class="error-message hidden"></div>
+
+        <button type="submit" id="join-btn" class="btn btn-primary btn-block">
+          Unirse al grupo
+        </button>
+      </form>
+
+      <p class="help-text">
+        <a href="/app/groups">Volver a mis grupos</a>
+      </p>
+    </div>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { toast } from '/js/toast.js';
+  import { joinGroupWithCode } from '/js/group.js';
+  import { db } from '/js/firebase-config.js';
+  import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
+  const codeInput = document.getElementById('invite-code');
+  const joinForm = document.getElementById('join-form');
+  const joinBtn = document.getElementById('join-btn');
+  const groupPreview = document.getElementById('group-preview');
+  const groupNamePreview = document.getElementById('group-name-preview');
+  const errorMessage = document.getElementById('error-message');
+
+  let currentUser = null;
+  let validatedCode = null;
+
+  // Leer código de la URL si existe
+  function getCodeFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('code');
+  }
+
+  // Validar código y mostrar preview del grupo
+  async function validateCode(code) {
+    if (!code || code.length !== 6) {
+      hidePreview();
+      return false;
+    }
+
+    const normalizedCode = code.toUpperCase().trim();
+
+    try {
+      const inviteRef = doc(db, 'invitations', normalizedCode);
+      const inviteSnap = await getDoc(inviteRef);
+
+      if (!inviteSnap.exists()) {
+        showError('Código de invitación no válido');
+        return false;
+      }
+
+      const inviteData = inviteSnap.data();
+
+      // Verificar expiración
+      const expiresAt = inviteData.expiresAt?.toDate?.() || new Date(inviteData.expiresAt);
+      if (expiresAt <= new Date()) {
+        showError('Este código ha expirado');
+        return false;
+      }
+
+      // Verificar si ya está usado
+      if (inviteData.usedBy) {
+        showError('Este código ya ha sido usado');
+        return false;
+      }
+
+      // Mostrar preview del grupo
+      showPreview(inviteData.groupName || 'Grupo');
+      validatedCode = normalizedCode;
+      return true;
+
+    } catch (error) {
+      console.error('Error validating code:', error);
+      showError('Error al validar el código');
+      return false;
+    }
+  }
+
+  function showPreview(groupName) {
+    groupNamePreview.textContent = groupName;
+    groupPreview.classList.remove('hidden');
+    errorMessage.classList.add('hidden');
+  }
+
+  function hidePreview() {
+    groupPreview.classList.add('hidden');
+    validatedCode = null;
+  }
+
+  function showError(message) {
+    errorMessage.textContent = message;
+    errorMessage.classList.remove('hidden');
+    groupPreview.classList.add('hidden');
+    validatedCode = null;
+  }
+
+  // Debounce para validación mientras escribe
+  let validateTimeout;
+  codeInput?.addEventListener('input', (e) => {
+    const code = e.target.value.toUpperCase();
+    e.target.value = code; // Forzar mayúsculas
+
+    clearTimeout(validateTimeout);
+
+    if (code.length === 6) {
+      validateTimeout = setTimeout(() => validateCode(code), 300);
+    } else {
+      hidePreview();
+      errorMessage.classList.add('hidden');
+    }
+  });
+
+  // Submit del formulario
+  joinForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!currentUser) {
+      toast.error('Debes iniciar sesión para unirte a un grupo');
+      return;
+    }
+
+    const code = codeInput.value.toUpperCase().trim();
+
+    if (!code) {
+      showError('Introduce un código de invitación');
+      return;
+    }
+
+    joinBtn.disabled = true;
+    joinBtn.textContent = 'Uniéndose...';
+
+    try {
+      const group = await joinGroupWithCode(code);
+      toast.success(`Te has unido a "${group.name}"`);
+      window.location.href = '/app/groups';
+    } catch (error) {
+      showError(error.message === 'Invalid invite code' ? 'Código no válido' :
+                error.message === 'Invite code has expired' ? 'El código ha expirado' :
+                error.message === 'Already a member of this group' ? 'Ya eres miembro de este grupo' :
+                'Error al unirse: ' + error.message);
+      joinBtn.disabled = false;
+      joinBtn.textContent = 'Unirse al grupo';
+    }
+  });
+
+  function tryInit() {
+    if (isAuthResolved()) {
+      currentUser = getCurrentUser();
+      if (!currentUser) {
+        window.location.href = '/login';
+        return;
+      }
+
+      // Si hay código en la URL, rellenarlo y validar
+      const urlCode = getCodeFromUrl();
+      if (urlCode && codeInput) {
+        codeInput.value = urlCode.toUpperCase();
+        validateCode(urlCode);
+      }
+    } else {
+      window.addEventListener('auth-ready', (e) => {
+        currentUser = e.detail.user;
+        if (!currentUser) {
+          window.location.href = '/login';
+          return;
+        }
+
+        const urlCode = getCodeFromUrl();
+        if (urlCode && codeInput) {
+          codeInput.value = urlCode.toUpperCase();
+          validateCode(urlCode);
+        }
+      }, { once: true });
+    }
+  }
+
+  tryInit();
+  document.addEventListener('astro:page-load', tryInit);
+</script>
+
+<style>
+  .join-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+  }
+
+  .join-card {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    max-width: 400px;
+    width: 100%;
+  }
+
+  .join-card h1 {
+    margin-bottom: var(--space-xs);
+    text-align: center;
+  }
+
+  .subtitle {
+    color: var(--color-text-secondary);
+    text-align: center;
+    margin-bottom: var(--space-xl);
+  }
+
+  .form-group {
+    margin-bottom: var(--space-lg);
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: var(--space-xs);
+    font-weight: 500;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-lg);
+    text-align: center;
+    letter-spacing: 0.2em;
+    font-family: monospace;
+    text-transform: uppercase;
+  }
+
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .group-preview {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-lg);
+    text-align: center;
+  }
+
+  .group-preview p {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-xs);
+  }
+
+  .group-preview strong {
+    color: #10b981;
+    font-size: var(--font-size-lg);
+  }
+
+  .error-message {
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-lg);
+    text-align: center;
+    color: var(--color-danger);
+    font-size: var(--font-size-sm);
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .btn-block {
+    width: 100%;
+    padding: var(--space-md);
+  }
+
+  .help-text {
+    text-align: center;
+    margin-top: var(--space-lg);
+    font-size: var(--font-size-sm);
+  }
+
+  .help-text a {
+    color: var(--color-text-secondary);
+  }
+
+  .help-text a:hover {
+    color: var(--color-primary);
+  }
+</style>

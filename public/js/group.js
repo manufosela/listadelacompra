@@ -239,6 +239,13 @@ export async function joinGroupWithCode(code) {
     }
   });
 
+  // Marcar invitación como usada
+  await updateDoc(inviteRef, {
+    usedBy: user.uid,
+    usedByName: user.displayName || user.email,
+    usedAt: serverTimestamp()
+  });
+
   // Actualizar usuario (merge: true crea el doc si no existe)
   const userRef = doc(db, 'users', user.uid);
   await setDoc(userRef, {

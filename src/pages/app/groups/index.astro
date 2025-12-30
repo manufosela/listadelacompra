@@ -134,7 +134,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         btn.addEventListener('click', (e) => {
           const row = e.target.closest('tr');
           const groupId = row.dataset.id;
-          window.location.href = `/app/groups/${groupId}`;
+          window.location.href = `/app/groups/manage?id=${groupId}`;
         });
       });
     } catch (error) {

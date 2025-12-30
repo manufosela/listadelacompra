@@ -1,0 +1,899 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Gestionar Grupo">
+  <div class="group-detail-page">
+    <a href="/app/groups" class="back-link">&larr; Volver a grupos</a>
+
+    <div id="group-content" class="group-content">
+      <p class="loading">Cargando grupo...</p>
+    </div>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { toast } from '/js/toast.js';
+  import { modal as confirmModal } from '/js/modal.js';
+  import { db } from '/js/firebase-config.js';
+  import {
+    doc,
+    getDoc,
+    getDocs,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+    collection,
+    query,
+    where,
+    orderBy,
+    serverTimestamp,
+    deleteField
+  } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { getCurrentGroupId, setCurrentGroup } from '/js/group.js';
+
+  let groupId = null;
+  let groupData = null;
+  let currentUser = null;
+  let invitations = [];
+
+  function getGroupIdFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('id');
+  }
+
+  async function loadGroup() {
+    const container = document.getElementById('group-content');
+    if (!container) return;
+
+    groupId = getGroupIdFromUrl();
+    if (!groupId) {
+      container.innerHTML = '<p class="error">ID de grupo no especificado</p>';
+      return;
+    }
+
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      const groupSnap = await getDoc(groupRef);
+
+      if (!groupSnap.exists()) {
+        container.innerHTML = `
+          <div class="error-state">
+            <p>Grupo no encontrado</p>
+            <a href="/app/groups" class="btn btn-primary">Volver a grupos</a>
+          </div>
+        `;
+        return;
+      }
+
+      groupData = { id: groupSnap.id, ...groupSnap.data() };
+      const members = groupData.members || {};
+      const membersList = Object.entries(members);
+      const isAdmin = members[currentUser.uid]?.role === 'admin';
+      const isCreator = groupData.createdBy === currentUser.uid;
+      const currentGroupActive = getCurrentGroupId() === groupId;
+
+      // Load invitations if admin
+      invitations = isAdmin ? await loadInvitations() : [];
+
+      container.innerHTML = `
+        <div class="group-header">
+          <div class="group-info">
+            <h1 id="group-name-display">${groupData.name}</h1>
+            <p class="group-meta">
+              ${membersList.length} miembro${membersList.length !== 1 ? 's' : ''}
+              ${currentGroupActive ? '<span class="badge badge-primary">Grupo activo</span>' : ''}
+            </p>
+          </div>
+          ${isAdmin ? `
+            <button id="edit-name-btn" class="btn btn-secondary btn-sm">Editar nombre</button>
+          ` : ''}
+        </div>
+
+        <!-- Sección de invitación -->
+        ${isAdmin ? `
+          <section class="section">
+            <h2>Invitar miembros</h2>
+            <p class="section-desc">Genera un código de invitación para que otros se unan al grupo.</p>
+            <div class="invite-section">
+              <div id="invite-code-container">
+                <button id="generate-code-btn" class="btn btn-primary">Generar código de invitación</button>
+              </div>
+            </div>
+          </section>
+        ` : ''}
+
+        <!-- Sección de códigos de invitación -->
+        ${renderInvitationsSection(invitations, isAdmin)}
+
+        <!-- Sección de miembros -->
+        <section class="section">
+          <h2>Miembros</h2>
+          <div class="members-list">
+            ${membersList.map(([uid, member]) => `
+              <div class="member-item" data-uid="${uid}">
+                <div class="member-avatar">
+                  ${member.photoURL
+                    ? `<img src="${member.photoURL}" alt="">`
+                    : `<span>${(member.displayName || member.email || '?')[0].toUpperCase()}</span>`
+                  }
+                </div>
+                <div class="member-info">
+                  <span class="member-name">${member.displayName || member.email}</span>
+                  <span class="member-role">${member.role === 'admin' ? 'Administrador' : 'Miembro'}</span>
+                </div>
+                ${isAdmin && uid !== currentUser.uid ? `
+                  <button class="btn btn-sm btn-danger remove-member-btn" data-uid="${uid}">
+                    Eliminar
+                  </button>
+                ` : ''}
+                ${uid === currentUser.uid ? '<span class="badge badge-secondary">Tú</span>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        </section>
+
+        <!-- Acciones del grupo -->
+        <section class="section section-danger">
+          <h2>Zona de peligro</h2>
+          ${!isCreator ? `
+            <div class="danger-action">
+              <div>
+                <strong>Abandonar grupo</strong>
+                <p>Dejarás de tener acceso a las listas compartidas de este grupo.</p>
+              </div>
+              <button id="leave-group-btn" class="btn btn-danger">Abandonar</button>
+            </div>
+          ` : ''}
+          ${isCreator ? `
+            <div class="danger-action">
+              <div>
+                <strong>Eliminar grupo</strong>
+                <p>Se eliminará el grupo y todos sus datos permanentemente.</p>
+              </div>
+              <button id="delete-group-btn" class="btn btn-danger">Eliminar grupo</button>
+            </div>
+          ` : ''}
+        </section>
+      `;
+
+      setupEventListeners(isAdmin, isCreator);
+    } catch (error) {
+      console.error('Error loading group:', error);
+      container.innerHTML = '<p class="error">Error al cargar el grupo</p>';
+    }
+  }
+
+  async function loadInvitations() {
+    if (!groupId) return [];
+
+    try {
+      const invitationsRef = collection(db, 'invitations');
+      // Consulta simple sin orderBy para evitar problemas de índice
+      const q = query(
+        invitationsRef,
+        where('groupId', '==', groupId)
+      );
+      const snapshot = await getDocs(q);
+
+      const now = new Date();
+      const results = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        const expiresAt = data.expiresAt?.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+        const isExpired = expiresAt < now;
+        const isUsed = data.usedBy != null;
+
+        return {
+          id: docSnap.id,
+          code: docSnap.id,
+          ...data,
+          expiresAt,
+          createdAt,
+          status: isUsed ? 'used' : (isExpired ? 'expired' : 'active')
+        };
+      });
+
+      // Ordenar en cliente por fecha de creación (más reciente primero)
+      return results.sort((a, b) => b.createdAt - a.createdAt);
+    } catch (error) {
+      console.error('Error loading invitations:', error);
+      return [];
+    }
+  }
+
+  function renderInvitationsSection(invitations, isAdmin) {
+    if (!isAdmin) return '';
+
+    const activeCount = invitations.filter(i => i.status === 'active').length;
+    const usedCount = invitations.filter(i => i.status === 'used').length;
+    const expiredCount = invitations.filter(i => i.status === 'expired').length;
+
+    const formatDate = (date) => {
+      return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    };
+
+    return `
+      <section class="section invitations-section">
+        <div class="section-header">
+          <div>
+            <h2>Invitaciones</h2>
+            <div class="invite-stats">
+              <span class="stat stat-active">${activeCount} activos</span>
+              <span class="stat stat-used">${usedCount} usados</span>
+              <span class="stat stat-expired">${expiredCount} expirados</span>
+            </div>
+          </div>
+        </div>
+
+        ${invitations.length === 0 ? `
+          <p class="empty-message">No hay códigos de invitación. Genera uno desde la sección superior.</p>
+        ` : `
+          <div class="invitations-table-wrapper">
+            <table class="invitations-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Estado</th>
+                  <th>Creado</th>
+                  <th>Info</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${invitations.map(inv => `
+                  <tr class="invitation-row status-row-${inv.status}">
+                    <td class="col-code">
+                      <code>${inv.code}</code>
+                      ${inv.status === 'active' ? `
+                        <button class="btn-icon copy-invite-btn" data-code="${inv.code}" title="Copiar enlace">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                          </svg>
+                        </button>
+                      ` : ''}
+                    </td>
+                    <td class="col-status">
+                      <span class="status-badge status-${inv.status}">
+                        ${inv.status === 'active' ? 'Activo' : inv.status === 'used' ? 'Usado' : 'Expirado'}
+                      </span>
+                    </td>
+                    <td class="col-date">${formatDate(inv.createdAt)}</td>
+                    <td class="col-info">
+                      ${inv.status === 'active' ? `Expira ${formatDate(inv.expiresAt)}` : ''}
+                      ${inv.status === 'used' ? `<span class="used-by">${inv.usedByName || 'Usuario'}</span>` : ''}
+                      ${inv.status === 'expired' ? `Expiró ${formatDate(inv.expiresAt)}` : ''}
+                    </td>
+                    <td class="col-actions">
+                      <button class="btn-icon btn-delete delete-invitation-btn" data-id="${inv.id}" title="Eliminar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M3 6h18"></path>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </section>
+    `;
+  }
+
+  function setupEventListeners(isAdmin, isCreator) {
+    // Editar nombre
+    document.getElementById('edit-name-btn')?.addEventListener('click', async () => {
+      const newName = prompt('Nuevo nombre del grupo:', groupData.name);
+      if (newName && newName.trim() && newName !== groupData.name) {
+        try {
+          const groupRef = doc(db, 'groups', groupId);
+          await updateDoc(groupRef, { name: newName.trim() });
+          toast.success('Nombre actualizado');
+          loadGroup();
+        } catch (error) {
+          toast.error('Error al actualizar: ' + error.message);
+        }
+      }
+    });
+
+    // Generar código de invitación
+    document.getElementById('generate-code-btn')?.addEventListener('click', async () => {
+      try {
+        // Generar código sin caracteres confusos (sin I, L, O, 0, 1)
+        const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+          code += chars[Math.floor(Math.random() * chars.length)];
+        }
+
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // Expira en 7 días
+
+        // Usar el código como ID del documento para que joinGroupWithCode pueda encontrarlo
+        const inviteRef = doc(db, 'invitations', code);
+        await setDoc(inviteRef, {
+          groupId,
+          groupName: groupData.name,
+          createdBy: currentUser.uid,
+          createdAt: serverTimestamp(),
+          expiresAt
+        });
+
+        const inviteUrl = `${window.location.origin}/app/join?code=${code}`;
+        const container = document.getElementById('invite-code-container');
+        container.innerHTML = `
+          <div class="invite-code-display">
+            <span class="code">${code}</span>
+            <button id="copy-link-btn" class="btn btn-sm btn-primary">Copiar enlace</button>
+          </div>
+          <p class="code-expires">Expira en 7 días. Comparte el enlace para que se unan al grupo.</p>
+          <button id="generate-new-code-btn" class="btn btn-sm btn-ghost">Generar otro código</button>
+        `;
+
+        document.getElementById('copy-link-btn')?.addEventListener('click', () => {
+          navigator.clipboard.writeText(inviteUrl);
+          toast.success('Enlace copiado');
+        });
+
+        document.getElementById('generate-new-code-btn')?.addEventListener('click', () => {
+          container.innerHTML = `
+            <button id="generate-code-btn" class="btn btn-primary">Generar código de invitación</button>
+          `;
+          setupEventListeners(isAdmin, isCreator);
+        });
+      } catch (error) {
+        toast.error('Error al generar código: ' + error.message);
+      }
+    });
+
+    // Copiar enlace de invitación desde la tabla
+    document.querySelectorAll('.copy-invite-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const code = btn.dataset.code;
+        const inviteUrl = `${window.location.origin}/app/join?code=${code}`;
+        navigator.clipboard.writeText(inviteUrl);
+        toast.success('Enlace copiado');
+      });
+    });
+
+    // Eliminar invitación
+    document.querySelectorAll('.delete-invitation-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const invitationId = btn.dataset.id;
+
+        const confirmed = await confirmModal.confirm(
+          '¿Eliminar este código de invitación?',
+          'El código dejará de funcionar si aún no ha sido usado.'
+        );
+
+        if (confirmed) {
+          try {
+            const invitationRef = doc(db, 'invitations', invitationId);
+            await deleteDoc(invitationRef);
+            toast.success('Código eliminado');
+            loadGroup();
+          } catch (error) {
+            toast.error('Error: ' + error.message);
+          }
+        }
+      });
+    });
+
+    // Eliminar miembro
+    document.querySelectorAll('.remove-member-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const uid = btn.dataset.uid;
+        const member = groupData.members[uid];
+
+        const confirmed = await confirmModal.confirm(
+          `¿Eliminar a ${member.displayName || member.email} del grupo?`,
+          'Esta acción no se puede deshacer.'
+        );
+
+        if (confirmed) {
+          try {
+            const groupRef = doc(db, 'groups', groupId);
+            await updateDoc(groupRef, {
+              [`members.${uid}`]: deleteField()
+            });
+            toast.success('Miembro eliminado');
+            loadGroup();
+          } catch (error) {
+            toast.error('Error: ' + error.message);
+          }
+        }
+      });
+    });
+
+    // Abandonar grupo
+    document.getElementById('leave-group-btn')?.addEventListener('click', async () => {
+      const confirmed = await confirmModal.confirm(
+        '¿Abandonar este grupo?',
+        'Perderás acceso a las listas compartidas.'
+      );
+
+      if (confirmed) {
+        try {
+          const groupRef = doc(db, 'groups', groupId);
+          await updateDoc(groupRef, {
+            [`members.${currentUser.uid}`]: deleteField()
+          });
+
+          // Si era el grupo activo, limpiar selección
+          if (getCurrentGroupId() === groupId) {
+            setCurrentGroup(null);
+          }
+
+          toast.success('Has abandonado el grupo');
+          window.location.href = '/app/groups';
+        } catch (error) {
+          toast.error('Error: ' + error.message);
+        }
+      }
+    });
+
+    // Eliminar grupo
+    document.getElementById('delete-group-btn')?.addEventListener('click', async () => {
+      const confirmed = await confirmModal.confirm(
+        '¿Eliminar este grupo permanentemente?',
+        'Se eliminarán todas las listas y datos del grupo. Esta acción no se puede deshacer.'
+      );
+
+      if (confirmed) {
+        try {
+          const groupRef = doc(db, 'groups', groupId);
+          await deleteDoc(groupRef);
+
+          // Limpiar selección si era el grupo activo
+          if (getCurrentGroupId() === groupId) {
+            setCurrentGroup(null);
+          }
+
+          toast.success('Grupo eliminado');
+          window.location.href = '/app/groups';
+        } catch (error) {
+          toast.error('Error: ' + error.message);
+        }
+      }
+    });
+  }
+
+  function tryInit() {
+    if (isAuthResolved()) {
+      currentUser = getCurrentUser();
+      if (currentUser) loadGroup();
+    } else {
+      window.addEventListener('auth-ready', (e) => {
+        currentUser = e.detail.user;
+        loadGroup();
+      }, { once: true });
+    }
+  }
+
+  // Ejecutar en carga inicial
+  tryInit();
+
+  // Re-ejecutar en navegaciones con View Transitions
+  document.addEventListener('astro:page-load', tryInit);
+</script>
+
+<style>
+  .group-detail-page {
+    max-width: 900px;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: var(--space-lg);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+  }
+
+  .back-link:hover {
+    color: var(--color-primary);
+  }
+
+  .group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-xl);
+    padding-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .group-info h1 {
+    margin-bottom: var(--space-xs);
+  }
+
+  .group-meta {
+    color: var(--color-text-secondary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .section {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-lg);
+  }
+
+  .section h2 {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-sm);
+  }
+
+  .section-desc {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-md);
+  }
+
+  .section-danger {
+    border-color: var(--color-danger);
+    background: rgba(220, 38, 38, 0.02);
+  }
+
+  .section-danger h2 {
+    color: var(--color-danger);
+  }
+
+  .invite-code-display {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-sm);
+  }
+
+  .invite-code-display .code {
+    font-family: monospace;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+
+  .code-expires {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-sm);
+  }
+
+  /* Invitations Section */
+  .invitations-section {
+    margin-top: var(--space-xl);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-lg);
+  }
+
+  .section-header h2 {
+    margin-bottom: var(--space-xs);
+  }
+
+  .invite-stats {
+    display: flex;
+    gap: var(--space-md);
+    font-size: var(--font-size-sm);
+  }
+
+  .invite-stats .stat {
+    color: var(--color-text-secondary);
+  }
+
+  .invite-stats .stat-active { color: #10b981; }
+  .invite-stats .stat-used { color: var(--color-primary); }
+  .invite-stats .stat-expired { color: #6b7280; }
+
+  .empty-message {
+    color: var(--color-text-secondary);
+    text-align: center;
+    padding: var(--space-xl);
+  }
+
+  .invitations-table-wrapper {
+    overflow-x: auto;
+    margin: 0 calc(-1 * var(--space-lg));
+    padding: 0 var(--space-lg);
+  }
+
+  .invitations-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+  }
+
+  .invitations-table th {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+  }
+
+  .invitations-table td {
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+  }
+
+  .invitations-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .invitations-table tbody tr:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .col-code {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .col-code code {
+    font-family: monospace;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    background: var(--color-bg-secondary);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+  }
+
+  .col-date,
+  .col-info {
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  .col-info .used-by {
+    color: var(--color-primary);
+    font-weight: 500;
+  }
+
+  .col-actions {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .status-badge {
+    display: inline-block;
+    font-size: var(--font-size-xs);
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .status-badge.status-active {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .status-badge.status-used {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--color-primary);
+  }
+
+  .status-badge.status-expired {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+  }
+
+  .status-row-expired {
+    opacity: 0.6;
+  }
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: all 0.15s ease;
+  }
+
+  .btn-icon:hover {
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+  }
+
+  .btn-icon.btn-delete:hover {
+    background: rgba(220, 38, 38, 0.1);
+    color: var(--color-danger);
+  }
+
+  .members-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .member-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm);
+    border-radius: var(--radius-md);
+  }
+
+  .member-item:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .member-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    overflow: hidden;
+  }
+
+  .member-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .member-info {
+    flex: 1;
+  }
+
+  .member-name {
+    display: block;
+    font-weight: 500;
+  }
+
+  .member-role {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .danger-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .danger-action p {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-xs);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+  }
+
+  .badge-primary {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--color-primary);
+  }
+
+  .badge-secondary {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+  }
+
+  .btn-sm {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .btn-danger {
+    background: var(--color-danger);
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+  }
+
+  .btn-ghost:hover {
+    color: var(--color-text);
+  }
+
+  .loading,
+  .error {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+  }
+
+  .error {
+    color: var(--color-danger);
+  }
+
+  .error-state {
+    text-align: center;
+    padding: var(--space-xl);
+  }
+
+  .error-state p {
+    margin-bottom: var(--space-md);
+    color: var(--color-text-secondary);
+  }
+
+  @media (max-width: 640px) {
+    .group-header {
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .danger-action {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .invite-stats {
+      flex-wrap: wrap;
+      gap: var(--space-sm) var(--space-md);
+    }
+
+    /* Table responsive: hide some columns on mobile */
+    .invitations-table th:nth-child(3),
+    .invitations-table td:nth-child(3) {
+      display: none;
+    }
+
+    .invitations-table th,
+    .invitations-table td {
+      padding: var(--space-sm);
+    }
+
+    .col-code {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-xs);
+    }
+
+    .col-code code {
+      font-size: var(--font-size-sm);
+    }
+  }
+
+  @media (max-width: 480px) {
+    /* Hide more columns on very small screens */
+    .invitations-table th:nth-child(4),
+    .invitations-table td:nth-child(4) {
+      display: none;
+    }
+  }
+</style>
