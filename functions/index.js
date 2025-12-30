@@ -91,6 +91,7 @@ Importante:
  */
 export const processTicket = onCall(
   {
+    region: 'europe-west1',
     memory: '512MiB',
     timeoutSeconds: 120,
     cors: true,
@@ -159,6 +160,7 @@ export const processTicket = onCall(
  */
 export const savePurchase = onCall(
   {
+    region: 'europe-west1',
     memory: '256MiB',
     timeoutSeconds: 30,
     cors: true,
