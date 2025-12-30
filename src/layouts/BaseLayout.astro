@@ -1,0 +1,80 @@
+---
+import { ViewTransitions } from 'astro:transitions';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'Gestiona tus listas de la compra en familia' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} | HomeCart</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="/css/reset.css" />
+    <link rel="stylesheet" href="/css/variables.css" />
+    <link rel="stylesheet" href="/css/global.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+
+    <!-- Firebase -->
+    <script type="module" src="/js/firebase-config.js"></script>
+
+    <!-- View Transitions para navegación fluida tipo SPA -->
+    <ViewTransitions />
+
+    <style is:global>
+      /* Animaciones de View Transitions */
+      @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes fade-out {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
+
+      @keyframes slide-from-right {
+        from { transform: translateX(30px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+
+      @keyframes slide-to-left {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(-30px); opacity: 0; }
+      }
+
+      ::view-transition-old(root) {
+        animation: 150ms ease-out fade-out;
+      }
+
+      ::view-transition-new(root) {
+        animation: 150ms ease-in fade-in;
+      }
+
+      /* Transición más suave para el contenido principal */
+      .app-main {
+        view-transition-name: main-content;
+      }
+
+      ::view-transition-old(main-content) {
+        animation: 150ms ease-out slide-to-left;
+      }
+
+      ::view-transition-new(main-content) {
+        animation: 150ms ease-in slide-from-right;
+      }
+    </style>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

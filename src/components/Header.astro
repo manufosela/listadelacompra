@@ -1,0 +1,80 @@
+---
+/**
+ * Header Component
+ * Barra superior de la aplicación con logo, selector de grupo y menú de usuario.
+ */
+---
+
+<header class="app-header" transition:persist>
+  <div class="header-left">
+    <a href="/app" class="logo-link">
+      <span class="logo-text">HomeCart</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <hc-group-selector></hc-group-selector>
+  </div>
+
+  <div class="header-right">
+    <hc-user-menu></hc-user-menu>
+  </div>
+</header>
+
+<script type="module">
+  import '/components/hc-group-selector.js';
+  import '/components/hc-user-menu.js';
+</script>
+
+<style>
+  .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .header-left {
+    flex: 1;
+  }
+
+  .logo-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    text-decoration: none;
+  }
+
+  .logo-text {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .header-center {
+    flex: 2;
+    display: flex;
+    justify-content: center;
+  }
+
+  .header-right {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 768px) {
+    .app-header {
+      padding: var(--space-sm) var(--space-md);
+    }
+
+    .header-center {
+      display: none;
+    }
+  }
+</style>

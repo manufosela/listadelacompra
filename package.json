@@ -1,0 +1,52 @@
+{
+  "name": "homecart",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "generate:config": "node scripts/generate-firebase-config.js",
+    "bundle:lit": "node scripts/bundle-lit.js",
+    "dev": "pnpm generate:config && astro dev",
+    "build": "pnpm generate:config && pnpm bundle:lit && astro build",
+    "preview": "astro preview",
+    "start": "pnpm dev",
+    "lint": "eslint src public --ext .js,.astro --ignore-pattern 'public/js/firebase-config.js'",
+    "lint:fix": "eslint src public --ext .js,.astro --fix --ignore-pattern 'public/js/firebase-config.js'",
+    "format": "prettier --write \"src/**/*.{astro,js,css}\" \"public/**/*.{js,css}\" --ignore-path .gitignore",
+    "test": "pnpm test:unit && pnpm test:e2e",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:unit:ui": "vitest --ui",
+    "test:unit:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "firebase:emulators": "firebase emulators:start",
+    "firebase:deploy": "firebase deploy",
+    "deploy": "pnpm build && firebase deploy --only hosting",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "astro": "^5.16.6",
+    "dotenv": "^17.2.3",
+    "firebase": "^12.7.0",
+    "lit": "^3.3.2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.2.0",
+    "@commitlint/config-conventional": "^20.2.0",
+    "@playwright/test": "^1.57.0",
+    "@vitest/ui": "^4.0.16",
+    "esbuild": "^0.27.2",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^1.5.0",
+    "husky": "^9.1.7",
+    "jsdom": "^27.4.0",
+    "playwright": "^1.57.0",
+    "prettier": "^3.7.4",
+    "prettier-plugin-astro": "^0.14.1",
+    "vitest": "^4.0.16"
+  },
+  "packageManager": "pnpm@10.20.0"
+}

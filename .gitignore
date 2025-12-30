@@ -1,0 +1,42 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+.astro/
+
+# Entorno
+.env
+.env.local
+.env.*.local
+
+# Firebase config generado (NUNCA commitear)
+public/js/firebase-config.js
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*

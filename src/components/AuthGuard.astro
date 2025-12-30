@@ -1,0 +1,160 @@
+---
+/**
+ * AuthGuard Component
+ * Protege páginas que requieren autenticación.
+ *
+ * - Consulta el estado de auth desde auth.js
+ * - Si ya hay sesión, muestra contenido inmediatamente
+ * - Si no hay sesión resuelta, espera evento 'auth-ready' (que se dispara UNA vez)
+ * - Si no hay usuario, redirige a login
+ * - Compatible con Astro View Transitions
+ */
+
+interface Props {
+  redirectTo?: string;
+}
+
+const { redirectTo = '/login' } = Astro.props;
+---
+
+<div
+  id="auth-guard"
+  class="auth-guard"
+  data-redirect={redirectTo}
+>
+  <div class="auth-guard-content">
+    <div class="auth-spinner"></div>
+    <p>Verificando sesión...</p>
+  </div>
+</div>
+
+<div id="auth-content" class="auth-content">
+  <slot />
+</div>
+
+<style>
+  .auth-guard {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-bg, white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    margin: 0;
+    padding: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .auth-guard.hidden {
+    opacity: 0;
+    pointer-events: none;
+    display: none;
+  }
+
+  .auth-guard-content {
+    text-align: center;
+  }
+
+  .auth-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #e2e8f0;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: auth-spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  .auth-guard-content p {
+    color: #64748b;
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  .auth-content {
+    display: none;
+  }
+
+  .auth-content.visible {
+    display: block;
+  }
+
+  @keyframes auth-spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+
+<script is:inline>
+  // Registrar listeners globales solo una vez
+  if (!window.__authGuardInitialized) {
+    window.__authGuardInitialized = true;
+
+    function showContent() {
+      const authGuard = document.getElementById('auth-guard');
+      const authContent = document.getElementById('auth-content');
+      if (authGuard && authContent) {
+        authGuard.classList.add('hidden');
+        authContent.classList.add('visible');
+      }
+    }
+
+    function redirectToLogin() {
+      const authGuard = document.getElementById('auth-guard');
+      const redirectTo = authGuard?.dataset.redirect || '/login';
+      window.location.href = redirectTo;
+    }
+
+    async function runAuthGuard() {
+      const authGuard = document.getElementById('auth-guard');
+      const authContent = document.getElementById('auth-content');
+
+      if (!authGuard || !authContent) return;
+      if (authContent.classList.contains('visible')) return;
+
+      const { isAuthResolved, getCurrentUser } = await import('/js/auth.js');
+
+      if (isAuthResolved()) {
+        const user = getCurrentUser();
+        if (user) {
+          showContent();
+        } else {
+          redirectToLogin();
+        }
+      } else {
+        window.addEventListener('auth-ready', (e) => {
+          if (e.detail.user) {
+            showContent();
+          } else {
+            redirectToLogin();
+          }
+        }, { once: true });
+      }
+    }
+
+    // Listener para View Transitions
+    document.addEventListener('astro:page-load', runAuthGuard);
+
+    // Ejecutar inmediatamente
+    runAuthGuard();
+  } else {
+    // En navegaciones subsiguientes, ejecutar directamente
+    (async function() {
+      const authGuard = document.getElementById('auth-guard');
+      const authContent = document.getElementById('auth-content');
+      if (!authGuard || !authContent) return;
+      if (authContent.classList.contains('visible')) return;
+
+      const { isAuthResolved, getCurrentUser } = await import('/js/auth.js');
+      if (isAuthResolved() && getCurrentUser()) {
+        authGuard.classList.add('hidden');
+        authContent.classList.add('visible');
+      }
+    })();
+  }
+</script>

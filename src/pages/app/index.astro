@@ -1,0 +1,452 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Mis Listas">
+  <div class="lists-page">
+    <header class="page-header">
+      <div>
+        <h1>Mis Listas</h1>
+        <p id="user-greeting"></p>
+      </div>
+      <div class="header-actions">
+        <div class="view-toggle">
+          <button id="view-table" class="view-btn active" title="Vista tabla">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <button id="view-grid" class="view-btn" title="Vista iconos">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+            </svg>
+          </button>
+        </div>
+        <a href="/app/lists/new" class="btn btn-primary">+ Nueva lista</a>
+      </div>
+    </header>
+
+    <div id="lists-container" class="lists-table-view">
+      <!-- Se carga dinámicamente -->
+    </div>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { getUserLists } from '/js/lists.js';
+  import { db } from '/js/firebase-config.js';
+  import { collection, query, onSnapshot, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
+  let currentView = 'table';
+  let lists = [];
+  let unsubscribe = null;
+
+  function getElements() {
+    return {
+      container: document.getElementById('lists-container'),
+      viewTableBtn: document.getElementById('view-table'),
+      viewGridBtn: document.getElementById('view-grid'),
+      greeting: document.getElementById('user-greeting')
+    };
+  }
+
+  function setupViewToggle() {
+    const { container, viewTableBtn, viewGridBtn } = getElements();
+    if (!viewTableBtn || !viewGridBtn) return;
+
+    viewTableBtn.onclick = () => {
+      currentView = 'table';
+      viewTableBtn.classList.add('active');
+      viewGridBtn.classList.remove('active');
+      if (container) container.className = 'lists-table-view';
+      renderLists();
+    };
+
+    viewGridBtn.onclick = () => {
+      currentView = 'grid';
+      viewGridBtn.classList.add('active');
+      viewTableBtn.classList.remove('active');
+      if (container) container.className = 'lists-grid-view';
+      renderLists();
+    };
+  }
+
+  async function initPage(user) {
+    const { greeting } = getElements();
+    if (!greeting) return;
+
+    // Cancelar suscripción anterior si existe
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+
+    setupViewToggle();
+
+    const displayName = user.displayName?.split(' ')[0] || 'Usuario';
+    greeting.textContent = `Hola, ${displayName}`;
+
+    // Primero mostrar datos cacheados
+    try {
+      const cachedLists = await getUserLists(user);
+      if (cachedLists && cachedLists.length > 0) {
+        lists = cachedLists;
+        renderLists();
+      }
+    } catch (e) {
+      console.warn('Error loading cached lists:', e);
+    }
+
+    // Luego suscribirse para actualizaciones en tiempo real
+    const listsRef = collection(db, 'users', user.uid, 'lists');
+    const q = query(listsRef, orderBy('updatedAt', 'desc'));
+
+    unsubscribe = onSnapshot(q, (snapshot) => {
+      lists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderLists();
+    }, (error) => {
+      console.error('Error loading lists:', error);
+    });
+  }
+
+  // Función para inicializar según estado de auth
+  function tryInit() {
+    if (isAuthResolved()) {
+      const user = getCurrentUser();
+      if (user) initPage(user);
+    } else {
+      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+    }
+  }
+
+  // Ejecutar en carga inicial
+  tryInit();
+
+  // Re-ejecutar en navegaciones con View Transitions
+  document.addEventListener('astro:page-load', tryInit);
+
+  // Limpiar antes de cambiar de página
+  document.addEventListener('astro:before-swap', () => {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+  });
+
+  function renderLists() {
+    const { container } = getElements();
+    if (!container) return;
+
+    if (lists.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>No tienes listas todavía</p>
+          <a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>
+        </div>
+      `;
+      return;
+    }
+
+    if (currentView === 'table') {
+      container.innerHTML = `
+        <table class="lists-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Elementos</th>
+              <th>Estado</th>
+              <th>Actualizada</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lists.map(list => `
+              <tr onclick="window.location='/app/list?id=${list.id}'" class="list-row">
+                <td class="list-icon">${list.icon || '🛒'}</td>
+                <td class="list-name">${list.name}</td>
+                <td class="list-type">${list.expenseType === 'shared' ? 'A dividir' : 'Común'}</td>
+                <td class="list-items">${list.itemCount || 0}</td>
+                <td class="list-status">
+                  <span class="status-badge ${list.closed ? 'closed' : 'open'}">
+                    ${list.closed ? 'Cerrada' : 'Abierta'}
+                  </span>
+                </td>
+                <td class="list-date">${formatDate(list.updatedAt)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      container.innerHTML = `
+        <div class="lists-grid">
+          ${lists.map(list => `
+            <a href="/app/list?id=${list.id}" class="list-card">
+              <div class="list-card-icon">${list.icon || '🛒'}</div>
+              <div class="list-card-name">${list.name}</div>
+              <div class="list-card-badges">
+                <span class="type-badge ${list.expenseType === 'shared' ? 'shared' : 'common'}">
+                  ${list.expenseType === 'shared' ? '➗ Dividir' : '🏠 Común'}
+                </span>
+                ${list.groupIds?.length ? `<span class="groups-badge">👥 ${list.groupIds.length}</span>` : ''}
+              </div>
+              <div class="list-card-meta">
+                <span>${list.itemCount || 0} elementos</span>
+                <span class="status-badge ${list.closed ? 'closed' : 'open'}">
+                  ${list.closed ? 'Cerrada' : 'Abierta'}
+                </span>
+              </div>
+            </a>
+          `).join('')}
+        </div>
+      `;
+    }
+  }
+
+  function formatDate(timestamp) {
+    if (!timestamp) return '-';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+
+    if (diff < 60000) return 'Ahora';
+    if (diff < 3600000) return `Hace ${Math.floor(diff / 60000)} min`;
+    if (diff < 86400000) return `Hace ${Math.floor(diff / 3600000)}h`;
+    if (diff < 604800000) return `Hace ${Math.floor(diff / 86400000)}d`;
+
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  }
+</script>
+
+<style>
+  .lists-page {
+    max-width: 1000px;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+    flex-wrap: wrap;
+    gap: var(--space-md);
+  }
+
+  .page-header h1 {
+    margin-bottom: var(--space-xs);
+  }
+
+  .page-header p {
+    color: var(--color-text-secondary);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .view-toggle {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .view-btn {
+    padding: var(--space-sm);
+    background: var(--color-bg);
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: all var(--transition-fast);
+  }
+
+  .view-btn:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .view-btn.active {
+    background: var(--color-primary);
+    color: white;
+  }
+
+  /* Vista tabla */
+  .lists-table-view {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lists-table {
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+  }
+
+  .lists-table th {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 2px solid var(--color-border);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .lists-table td {
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .list-row {
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .list-row:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .list-icon {
+    font-size: 1.5rem;
+    width: 40px;
+  }
+
+  .list-name {
+    font-weight: 500;
+  }
+
+  .list-type {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .list-items {
+    text-align: center;
+  }
+
+  .list-date {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-badge.open {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .status-badge.closed {
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+
+  /* Vista grid */
+  .lists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .list-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-lg);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all var(--transition-fast);
+    text-align: center;
+  }
+
+  .list-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .list-card-icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-sm);
+  }
+
+  .list-card-name {
+    font-weight: 500;
+    margin-bottom: var(--space-sm);
+  }
+
+  .list-card-badges {
+    display: flex;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-sm);
+  }
+
+  .type-badge {
+    font-size: 0.7rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+  }
+
+  .type-badge.common {
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+
+  .type-badge.shared {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .groups-badge {
+    font-size: 0.7rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    background: #f3e8ff;
+    color: #7c3aed;
+  }
+
+  .list-card-meta {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    align-items: center;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-xl) var(--space-lg);
+    color: var(--color-text-secondary);
+  }
+
+  .empty-state p {
+    margin-bottom: var(--space-lg);
+  }
+
+  @media (max-width: 768px) {
+    .lists-table th:nth-child(3),
+    .lists-table td:nth-child(3),
+    .lists-table th:nth-child(6),
+    .lists-table td:nth-child(6) {
+      display: none;
+    }
+  }
+</style>

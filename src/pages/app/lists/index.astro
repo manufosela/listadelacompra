@@ -1,0 +1,243 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Mis Listas">
+  <div class="lists-page">
+    <header class="page-header">
+      <div>
+        <h1>Mis Listas</h1>
+        <p>Gestiona tus listas de la compra</p>
+      </div>
+      <a href="/app/lists/new" class="btn btn-primary">+ Nueva lista</a>
+    </header>
+
+    <div class="lists-tabs">
+      <button class="tab active" data-status="pending">Pendientes</button>
+      <button class="tab" data-status="shopping">En curso</button>
+      <button class="tab" data-status="completed">Completadas</button>
+    </div>
+
+    <div id="lists-container" class="lists-grid">
+      <p class="loading">Cargando listas...</p>
+    </div>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { subscribeToLists } from '/js/realtime-sync.js';
+  import { getCurrentGroupId } from '/js/group.js';
+
+  let allLists = [];
+  let activeStatus = 'pending';
+  let unsubscribe = null;
+
+  function initPage() {
+    const container = document.getElementById('lists-container');
+    if (!container) return;
+
+    const groupId = getCurrentGroupId();
+    if (!groupId) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>Primero necesitas crear o unirte a un grupo.</p>
+          <a href="/app/groups" class="btn btn-primary">Configurar grupo</a>
+        </div>
+      `;
+      return;
+    }
+
+    // Cancelar suscripción anterior si existe
+    if (unsubscribe) {
+      unsubscribe();
+    }
+
+    unsubscribe = subscribeToLists(groupId, (lists) => {
+      allLists = lists;
+      renderLists();
+    });
+  }
+
+  // Comprobar estado de auth
+  if (isAuthResolved()) {
+    if (getCurrentUser()) initPage();
+  } else {
+    window.addEventListener('auth-ready', () => initPage(), { once: true });
+  }
+
+  document.addEventListener('astro:before-swap', () => {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+  });
+
+  // Tabs
+  const tabs = document.querySelectorAll('.tab');
+  if (tabs.length > 0) {
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        activeStatus = tab.dataset.status;
+        renderLists();
+      });
+    });
+  }
+
+  function renderLists() {
+    const container = document.getElementById('lists-container');
+    if (!container) return;
+
+    const filtered = allLists.filter(l => l.status === activeStatus);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>No hay listas ${activeStatus === 'pending' ? 'pendientes' : activeStatus === 'shopping' ? 'en curso' : 'completadas'}.</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filtered.map(list => `
+      <a href="/app/list?id=${list.id}" class="list-card">
+        <div class="list-card-header">
+          <h3>${list.name}</h3>
+          <span class="list-status ${list.status}">${list.status}</span>
+        </div>
+        ${list.store ? `<p class="list-store">📍 ${list.store}</p>` : ''}
+        ${list.scheduledDate ? `<p class="list-date">📅 ${list.scheduledDate.toLocaleDateString()}</p>` : ''}
+        ${list.isRecurring ? `<p class="list-recurring">🔄 Recurrente</p>` : ''}
+      </a>
+    `).join('');
+  }
+</script>
+
+<style>
+  .lists-page {
+    max-width: 1000px;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+  }
+
+  .page-header h1 {
+    margin-bottom: var(--space-xs);
+  }
+
+  .page-header p {
+    color: var(--color-text-secondary);
+  }
+
+  .lists-tabs {
+    display: flex;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: var(--space-xs);
+  }
+
+  .tab {
+    padding: var(--space-sm) var(--space-md);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    transition: all var(--transition-fast);
+  }
+
+  .tab:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .tab.active {
+    background: var(--color-primary);
+    color: white;
+  }
+
+  .lists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-md);
+  }
+
+  .list-card {
+    display: block;
+    padding: var(--space-lg);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all var(--transition-fast);
+  }
+
+  .list-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .list-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-sm);
+  }
+
+  .list-card-header h3 {
+    font-size: var(--font-size-lg);
+  }
+
+  .list-status {
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .list-status.pending {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .list-status.shopping {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .list-status.completed {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .list-store,
+  .list-date,
+  .list-recurring {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-xs);
+  }
+
+  .empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+  }
+
+  .loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+  }
+</style>

@@ -1,0 +1,200 @@
+/**
+ * Database Service
+ * Gestiona operaciones CRUD de productos y otras entidades.
+ */
+
+import { db } from './firebase-config.js';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  serverTimestamp,
+  increment
+} from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
+// ============================================
+// CATEGORÍAS Y UNIDADES
+// ============================================
+
+export const PRODUCT_CATEGORIES = [
+  { id: 'frutas', name: 'Frutas', icon: '🍎' },
+  { id: 'verduras', name: 'Verduras', icon: '🥬' },
+  { id: 'carnes', name: 'Carnes', icon: '🥩' },
+  { id: 'pescados', name: 'Pescados', icon: '🐟' },
+  { id: 'lacteos', name: 'Lácteos', icon: '🥛' },
+  { id: 'panaderia', name: 'Panadería', icon: '🍞' },
+  { id: 'bebidas', name: 'Bebidas', icon: '🥤' },
+  { id: 'limpieza', name: 'Limpieza', icon: '🧹' },
+  { id: 'higiene', name: 'Higiene', icon: '🧴' },
+  { id: 'congelados', name: 'Congelados', icon: '❄️' },
+  { id: 'despensa', name: 'Despensa', icon: '🥫' },
+  { id: 'snacks', name: 'Snacks', icon: '🍿' },
+  { id: 'mascotas', name: 'Mascotas', icon: '🐕' },
+  { id: 'otros', name: 'Otros', icon: '📦' }
+];
+
+export const UNITS = [
+  { id: 'unidad', name: 'Unidad(es)' },
+  { id: 'kg', name: 'Kilogramo(s)' },
+  { id: 'g', name: 'Gramo(s)' },
+  { id: 'l', name: 'Litro(s)' },
+  { id: 'ml', name: 'Mililitro(s)' },
+  { id: 'pack', name: 'Pack(s)' },
+  { id: 'paquete', name: 'Paquete(s)' },
+  { id: 'caja', name: 'Caja(s)' },
+  { id: 'docena', name: 'Docena(s)' },
+  { id: 'bolsa', name: 'Bolsa(s)' },
+  { id: 'lata', name: 'Lata(s)' },
+  { id: 'botella', name: 'Botella(s)' }
+];
+
+// ============================================
+// PRODUCTOS
+// ============================================
+
+/**
+ * Crea un nuevo producto
+ */
+export async function createProduct(groupId, productData) {
+  const productsRef = collection(db, 'groups', groupId, 'products');
+  const normalizedName = productData.name.toLowerCase().trim();
+
+  const docRef = await addDoc(productsRef, {
+    name: productData.name.trim(),
+    normalizedName,
+    brand: productData.brand?.trim() || null,
+    category: productData.category || 'otros',
+    defaultUnit: productData.defaultUnit || 'unidad',
+    defaultQuantity: productData.defaultQuantity || 1,
+    barcode: productData.barcode || null,
+    notes: productData.notes || '',
+    createdAt: serverTimestamp(),
+    lastPurchasedAt: null,
+    purchaseCount: 0
+  });
+
+  return docRef.id;
+}
+
+/**
+ * Obtiene un producto por ID
+ */
+export async function getProduct(groupId, productId) {
+  const productRef = doc(db, 'groups', groupId, 'products', productId);
+  const productSnap = await getDoc(productRef);
+
+  if (productSnap.exists()) {
+    return { id: productSnap.id, ...productSnap.data() };
+  }
+  return null;
+}
+
+/**
+ * Obtiene todos los productos de un grupo
+ */
+export async function getAllProducts(groupId) {
+  const productsRef = collection(db, 'groups', groupId, 'products');
+  const q = query(productsRef, orderBy('name', 'asc'));
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Busca productos por nombre
+ */
+export async function searchProducts(groupId, searchQuery, maxResults = 10) {
+  const normalizedQuery = searchQuery.toLowerCase().trim();
+  if (!normalizedQuery) return [];
+
+  const productsRef = collection(db, 'groups', groupId, 'products');
+  const q = query(
+    productsRef,
+    where('normalizedName', '>=', normalizedQuery),
+    where('normalizedName', '<=', normalizedQuery + '\uf8ff'),
+    limit(maxResults)
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Obtiene productos por categoría
+ */
+export async function getProductsByCategory(groupId, category) {
+  const productsRef = collection(db, 'groups', groupId, 'products');
+  const q = query(productsRef, where('category', '==', category), orderBy('name', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Obtiene los productos más usados
+ */
+export async function getMostUsedProducts(groupId, maxResults = 10) {
+  const productsRef = collection(db, 'groups', groupId, 'products');
+  const q = query(productsRef, orderBy('purchaseCount', 'desc'), limit(maxResults));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Actualiza un producto
+ */
+export async function updateProduct(groupId, productId, updates) {
+  const productRef = doc(db, 'groups', groupId, 'products', productId);
+
+  if (updates.name) {
+    updates.normalizedName = updates.name.toLowerCase().trim();
+    updates.name = updates.name.trim();
+  }
+
+  await updateDoc(productRef, updates);
+}
+
+/**
+ * Elimina un producto
+ */
+export async function deleteProduct(groupId, productId) {
+  const productRef = doc(db, 'groups', groupId, 'products', productId);
+  await deleteDoc(productRef);
+}
+
+/**
+ * Incrementa el contador de compras
+ */
+export async function incrementProductPurchase(groupId, productId) {
+  const productRef = doc(db, 'groups', groupId, 'products', productId);
+  await updateDoc(productRef, {
+    purchaseCount: increment(1),
+    lastPurchasedAt: serverTimestamp()
+  });
+}
+
+/**
+ * Busca o crea un producto por nombre
+ */
+export async function findOrCreateProduct(groupId, name, defaults = {}) {
+  const normalizedName = name.toLowerCase().trim();
+
+  const productsRef = collection(db, 'groups', groupId, 'products');
+  const q = query(productsRef, where('normalizedName', '==', normalizedName), limit(1));
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+    const docSnap = snapshot.docs[0];
+    return { id: docSnap.id, ...docSnap.data() };
+  }
+
+  const productId = await createProduct(groupId, { name, ...defaults });
+  return getProduct(groupId, productId);
+}

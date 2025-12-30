@@ -1,0 +1,273 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Lista de la Compra">
+  <div class="list-detail-page">
+    <a href="/app" class="back-link">← Volver a listas</a>
+    <div id="list-header" class="list-header">
+      <div class="list-header-loading">Cargando...</div>
+    </div>
+    <div id="list-container"></div>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import '/components/hc-shopping-list.js';
+  import { db } from '/js/firebase-config.js';
+  import { doc, onSnapshot, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
+  let unsubscribe = null;
+  let currentListId = null;
+
+  function initPage(user) {
+    // Re-leer URL params en cada navegación
+    const urlParams = new URLSearchParams(window.location.search);
+    const listId = urlParams.get('id');
+
+    if (!listId) {
+      window.location.href = '/app';
+      return;
+    }
+
+    // Si es la misma lista, no reinicializar
+    if (listId === currentListId && unsubscribe) return;
+
+    currentListId = listId;
+
+    const headerEl = document.getElementById('list-header');
+    const container = document.getElementById('list-container');
+    if (!headerEl || !container) return;
+
+    // Limpiar contenido previo
+    container.innerHTML = '';
+
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+
+    const listRef = doc(db, 'users', user.uid, 'lists', listId);
+
+    unsubscribe = onSnapshot(listRef, (snapshot) => {
+      const headerEl = document.getElementById('list-header');
+      const container = document.getElementById('list-container');
+      if (!headerEl) return;
+
+      if (!snapshot.exists()) {
+        headerEl.innerHTML = `
+          <div class="list-not-found">
+            <p>Lista no encontrada</p>
+            <a href="/app" class="btn btn-primary">Volver al inicio</a>
+          </div>
+        `;
+        return;
+      }
+
+      const list = { id: snapshot.id, ...snapshot.data() };
+
+      headerEl.innerHTML = `
+        <div class="list-title-row">
+          <span class="list-icon">${list.icon || '🛒'}</span>
+          <div class="list-title-info">
+            <h1>${list.name}</h1>
+            <div class="list-meta">
+              <span class="type-badge ${list.expenseType === 'shared' ? 'shared' : 'common'}">
+                ${list.expenseType === 'shared' ? '➗ Gasto a dividir' : '🏠 Gasto común'}
+              </span>
+              ${list.store ? `<span class="store-badge">📍 ${list.store}</span>` : ''}
+              <span class="status-badge ${list.closed ? 'closed' : 'open'}">
+                ${list.closed ? 'Cerrada' : 'Abierta'}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="list-actions">
+          ${!list.closed ? `
+            <button id="close-list-btn" class="btn btn-secondary btn-sm">
+              ✓ Cerrar lista
+            </button>
+          ` : `
+            <button id="reopen-list-btn" class="btn btn-secondary btn-sm">
+              ↺ Reabrir lista
+            </button>
+          `}
+          <button id="edit-list-btn" class="btn btn-secondary btn-sm">
+            ✏️ Editar
+          </button>
+        </div>
+      `;
+
+      document.getElementById('close-list-btn')?.addEventListener('click', async () => {
+        await updateDoc(listRef, { closed: true, updatedAt: serverTimestamp() });
+      });
+
+      document.getElementById('reopen-list-btn')?.addEventListener('click', async () => {
+        await updateDoc(listRef, { closed: false, updatedAt: serverTimestamp() });
+      });
+
+      if (container && !container.querySelector('hc-shopping-list')) {
+        const listComponent = document.createElement('hc-shopping-list');
+        listComponent.setAttribute('list-id', listId);
+        listComponent.setAttribute('user-id', user.uid);
+        container.appendChild(listComponent);
+      }
+    }, (error) => {
+      console.error('Error loading list:', error);
+      const headerEl = document.getElementById('list-header');
+      if (headerEl) {
+        headerEl.innerHTML = `<div class="list-error">Error al cargar la lista</div>`;
+      }
+    });
+  }
+
+  function tryInit() {
+    if (isAuthResolved()) {
+      const user = getCurrentUser();
+      if (user) initPage(user);
+    } else {
+      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+    }
+  }
+
+  // Ejecutar en carga inicial
+  tryInit();
+
+  // Re-ejecutar en navegaciones con View Transitions
+  document.addEventListener('astro:page-load', tryInit);
+
+  // Limpiar suscripción al cambiar de página
+  document.addEventListener('astro:before-swap', () => {
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+    currentListId = null;
+  });
+</script>
+
+<style>
+  .list-detail-page {
+    max-width: 800px;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: var(--space-lg);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+  }
+
+  .back-link:hover {
+    color: var(--color-primary);
+  }
+
+  .list-header {
+    margin-bottom: var(--space-xl);
+  }
+
+  .list-header-loading {
+    color: var(--color-text-secondary);
+    padding: var(--space-lg);
+  }
+
+  .list-title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+  }
+
+  .list-icon {
+    font-size: 2.5rem;
+  }
+
+  .list-title-info h1 {
+    margin-bottom: var(--space-xs);
+  }
+
+  .list-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: center;
+  }
+
+  .type-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+  }
+
+  .type-badge.common {
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+
+  .type-badge.shared {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .store-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+
+  .status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+  }
+
+  .status-badge.open {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .status-badge.closed {
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+
+  .list-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .btn-sm {
+    padding: var(--space-xs) var(--space-md);
+    font-size: var(--font-size-sm);
+  }
+
+  .list-not-found,
+  .list-error {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+  }
+
+  .list-not-found p {
+    margin-bottom: var(--space-md);
+  }
+
+  @media (max-width: 480px) {
+    .list-title-row {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .list-meta {
+      justify-content: center;
+    }
+
+    .list-actions {
+      justify-content: center;
+    }
+  }
+</style>

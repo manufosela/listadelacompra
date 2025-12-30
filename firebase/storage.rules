@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ==================== HELPERS ====================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function userId() {
+      return request.auth.uid;
+    }
+
+    // Verifica si el archivo es una imagen válida
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 10 * 1024 * 1024; // Max 10MB
+    }
+
+    // ==================== USER AVATARS ====================
+
+    match /users/{userId}/avatar/{fileName} {
+      // Cualquiera puede ver avatares
+      allow read: if isAuthenticated();
+
+      // Solo el propio usuario puede subir su avatar
+      allow write: if isAuthenticated()
+        && userId == userId()
+        && isValidImage();
+    }
+
+    // ==================== GROUP TICKETS ====================
+
+    match /groups/{groupId}/tickets/{ticketId} {
+      // Miembros pueden ver tickets
+      allow read: if isAuthenticated();
+
+      // Usuarios autenticados pueden subir tickets
+      allow create: if isAuthenticated() && isValidImage();
+
+      // No se permite modificar tickets existentes
+      allow update: if false;
+
+      // Solo el creador puede eliminar
+      allow delete: if isAuthenticated();
+    }
+  }
+}

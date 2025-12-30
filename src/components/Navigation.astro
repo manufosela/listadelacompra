@@ -1,0 +1,163 @@
+---
+/**
+ * Navigation Component
+ * Sidebar/bottom navigation para la aplicación.
+ */
+
+const navItems = [
+  { href: '/app', icon: '🛒', label: 'Listas' },
+  { href: '/app/tickets', icon: '🧾', label: 'Tickets' },
+  { href: '/app/balances', icon: '💰', label: 'Balances' },
+  { href: '/app/products', icon: '📦', label: 'Productos' },
+  { href: '/app/groups', icon: '👥', label: 'Grupos' },
+  { href: '/app/settings', icon: '⚙️', label: 'Ajustes' }
+];
+
+const currentPath = Astro.url.pathname;
+---
+
+<nav class="app-nav" transition:persist>
+  <ul class="nav-list">
+    {navItems.map((item) => {
+      // Lógica para determinar si el link está activo
+      // - Match exacto siempre activa
+      // - Para /app, solo match exacto
+      // - Para otras rutas, match por prefijo
+      const isExactMatch = currentPath === item.href;
+      const isSubpageMatch = item.href !== '/app' && currentPath.startsWith(item.href);
+      const isActive = isExactMatch || isSubpageMatch;
+
+      return (
+        <li class="nav-item">
+          <a
+            href={item.href}
+            class:list={['nav-link', { active: isActive }]}
+            data-href={item.href}
+          >
+            <span class="nav-icon">{item.icon}</span>
+            <span class="nav-label">{item.label}</span>
+          </a>
+        </li>
+      );
+    })}
+  </ul>
+</nav>
+
+<script>
+  // Actualizar estado activo de la navegación con View Transitions
+  function updateActiveNav() {
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.nav-link').forEach(link => {
+      const href = link.getAttribute('data-href') || link.getAttribute('href');
+
+      const isExactMatch = currentPath === href;
+      const isSubpageMatch = href !== '/app' && currentPath.startsWith(href);
+      const isActive = isExactMatch || isSubpageMatch;
+
+      link.classList.toggle('active', isActive);
+    });
+  }
+
+  document.addEventListener('astro:page-load', updateActiveNav);
+</script>
+
+<style>
+  .app-nav {
+    background: var(--color-bg);
+    border-right: 1px solid var(--color-border);
+    width: 240px;
+    height: calc(100vh - 60px);
+    position: fixed;
+    top: 60px;
+    left: 0;
+    overflow-y: auto;
+    display: none;
+  }
+
+  @media (min-width: 768px) {
+    .app-nav {
+      display: block;
+    }
+  }
+
+  .nav-list {
+    padding: var(--space-md);
+  }
+
+  .nav-item {
+    margin-bottom: var(--space-xs);
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+  }
+
+  .nav-link:hover {
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+  }
+
+  .nav-link.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--color-primary);
+    font-weight: 500;
+  }
+
+  .nav-icon {
+    font-size: 1.25rem;
+    width: 24px;
+    text-align: center;
+  }
+
+  .nav-label {
+    font-size: var(--font-size-sm);
+  }
+
+  /* Mobile bottom nav */
+  @media (max-width: 767px) {
+    .app-nav {
+      display: block;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: auto;
+      width: 100%;
+      height: auto;
+      border-right: none;
+      border-top: 1px solid var(--color-border);
+      z-index: 50;
+    }
+
+    .nav-list {
+      display: flex;
+      justify-content: space-around;
+      padding: var(--space-xs) 0;
+    }
+
+    .nav-item {
+      margin-bottom: 0;
+    }
+
+    .nav-link {
+      flex-direction: column;
+      gap: var(--space-xs);
+      padding: var(--space-xs) var(--space-sm);
+    }
+
+    .nav-icon {
+      font-size: 1.5rem;
+    }
+
+    .nav-label {
+      font-size: var(--font-size-xs);
+    }
+  }
+</style>

@@ -1,0 +1,428 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Balances">
+  <div class="balances-page">
+    <header class="page-header">
+      <div>
+        <h1>Balances del Grupo</h1>
+        <p>Resumen de deudas entre miembros</p>
+      </div>
+    </header>
+
+    <div id="balances-container" class="balances-container">
+      <p class="loading">Calculando balances...</p>
+    </div>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { getCurrentGroupId, getGroup } from '/js/group.js';
+  import { db } from '/js/firebase-config.js';
+  import { collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
+  async function initPage(user) {
+    const container = document.getElementById('balances-container');
+    if (!container) return;
+
+    const currentUser = user;
+
+    if (!currentUser) {
+      container.innerHTML = '<p class="empty-state">Inicia sesión para ver los balances.</p>';
+      return;
+    }
+
+    const groupId = getCurrentGroupId();
+
+    if (!groupId) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>No tienes ningún grupo configurado.</p>
+          <a href="/app/groups" class="btn btn-primary">Crear o unirse a un grupo</a>
+        </div>
+      `;
+      return;
+    }
+
+    try {
+      // Cargar miembros del grupo
+      const group = await getGroup(groupId);
+
+      if (!group) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p>El grupo seleccionado no existe.</p>
+            <a href="/app/groups" class="btn btn-primary">Ir a grupos</a>
+          </div>
+        `;
+        return;
+      }
+
+      const members = group.members || {};
+      const memberIds = Object.keys(members);
+
+      if (memberIds.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p>El grupo no tiene miembros.</p>
+            <a href="/app/groups" class="btn btn-primary">Configurar grupo</a>
+          </div>
+        `;
+        return;
+      }
+
+      // Cargar todas las compras
+      const purchasesRef = collection(db, 'groups', groupId, 'purchases');
+      const q = query(purchasesRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p>No hay compras registradas aún.</p>
+            <a href="/app/tickets/upload" class="btn btn-primary">Escanear primer ticket</a>
+          </div>
+        `;
+        return;
+      }
+
+      // Calcular balances agregados
+      // balances[debtorId][creditorId] = amount
+      const balances = {};
+
+      // Inicializar balances
+      memberIds.forEach(id => {
+        balances[id] = {};
+        memberIds.forEach(otherId => {
+          if (id !== otherId) {
+            balances[id][otherId] = 0;
+          }
+        });
+      });
+
+      // Sumar deudas de todas las compras
+      snapshot.docs.forEach(doc => {
+        const purchase = doc.data();
+        const debts = purchase.debts || {};
+
+        Object.entries(debts).forEach(([debtorId, debtInfo]) => {
+          if (balances[debtorId] && debtInfo.owesTo) {
+            balances[debtorId][debtInfo.owesTo] += debtInfo.amount || 0;
+          }
+        });
+      });
+
+      // Simplificar deudas mutuas
+      const simplifiedDebts = [];
+      const processed = new Set();
+
+      memberIds.forEach(id1 => {
+        memberIds.forEach(id2 => {
+          if (id1 !== id2 && !processed.has(`${id1}-${id2}`) && !processed.has(`${id2}-${id1}`)) {
+            const debt1to2 = balances[id1][id2] || 0;
+            const debt2to1 = balances[id2][id1] || 0;
+            const netDebt = debt1to2 - debt2to1;
+
+            if (Math.abs(netDebt) >= 0.01) {
+              if (netDebt > 0) {
+                simplifiedDebts.push({
+                  from: id1,
+                  to: id2,
+                  amount: netDebt
+                });
+              } else {
+                simplifiedDebts.push({
+                  from: id2,
+                  to: id1,
+                  amount: -netDebt
+                });
+              }
+            }
+
+            processed.add(`${id1}-${id2}`);
+          }
+        });
+      });
+
+      // Calcular saldo neto de cada miembro
+      const netBalances = {};
+      memberIds.forEach(id => {
+        netBalances[id] = 0;
+      });
+
+      simplifiedDebts.forEach(debt => {
+        netBalances[debt.from] -= debt.amount;
+        netBalances[debt.to] += debt.amount;
+      });
+
+      // Renderizar
+      const userBalance = netBalances[currentUser.uid] ?? 0;
+      const isUserInGroup = memberIds.includes(currentUser.uid);
+
+      if (simplifiedDebts.length === 0) {
+        container.innerHTML = `
+          <div class="all-settled">
+            <div class="settled-icon">🎉</div>
+            <p>¡Todos los balances están equilibrados!</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        ${isUserInGroup ? `
+        <div class="balances-summary">
+          <h2>Tu Balance</h2>
+          <div class="your-balance ${userBalance >= 0 ? 'positive' : 'negative'}">
+            <span class="balance-amount">${userBalance >= 0 ? '+' : ''}${userBalance.toFixed(2)}€</span>
+            <span class="balance-label">${userBalance >= 0 ? 'Te deben' : 'Debes'}</span>
+          </div>
+        </div>
+        ` : ''}
+
+        <div class="debts-list">
+          <h2>Deudas Pendientes</h2>
+          ${simplifiedDebts.map(debt => {
+            const fromName = members[debt.from]?.displayName || 'Miembro';
+            const toName = members[debt.to]?.displayName || 'Miembro';
+            const isYouDebtor = debt.from === currentUser.uid;
+            const isYouCreditor = debt.to === currentUser.uid;
+
+            return `
+              <div class="debt-card ${isYouDebtor ? 'you-owe' : ''} ${isYouCreditor ? 'owed-to-you' : ''}">
+                <div class="debt-parties">
+                  <span class="debtor ${isYouDebtor ? 'is-you' : ''}">${isYouDebtor ? 'Tú' : fromName}</span>
+                  <span class="debt-arrow">→</span>
+                  <span class="creditor ${isYouCreditor ? 'is-you' : ''}">${isYouCreditor ? 'Tú' : toName}</span>
+                </div>
+                <div class="debt-amount">${debt.amount.toFixed(2)}€</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <div class="members-summary">
+          <h2>Resumen por Miembro</h2>
+          ${memberIds.map(id => {
+            const member = members[id];
+            const balance = netBalances[id];
+            const isYou = id === currentUser.uid;
+
+            return `
+              <div class="member-balance ${balance >= 0 ? 'positive' : 'negative'} ${isYou ? 'is-you' : ''}">
+                <div class="member-info">
+                  <span class="member-name">${isYou ? 'Tú' : member.displayName || member.email}</span>
+                </div>
+                <span class="member-amount ${balance >= 0 ? 'positive' : 'negative'}">
+                  ${balance >= 0 ? '+' : ''}${balance.toFixed(2)}€
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } catch (error) {
+      console.error('Error calculating balances:', error);
+      const container = document.getElementById('balances-container');
+      if (container) {
+        container.innerHTML = '<p class="error">Error al calcular los balances.</p>';
+      }
+    }
+  }
+
+  function tryInit() {
+    if (isAuthResolved()) {
+      const user = getCurrentUser();
+      if (user) initPage(user);
+    } else {
+      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+    }
+  }
+
+  // Ejecutar en carga inicial
+  tryInit();
+
+  // Re-ejecutar en navegaciones con View Transitions
+  document.addEventListener('astro:page-load', tryInit);
+</script>
+
+<style>
+  .balances-page {
+    max-width: 600px;
+  }
+
+  .page-header {
+    margin-bottom: var(--space-xl);
+  }
+
+  .page-header h1 {
+    margin-bottom: var(--space-xs);
+  }
+
+  .page-header p {
+    color: var(--color-text-secondary);
+  }
+
+  .balances-summary {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    text-align: center;
+    margin-bottom: var(--space-xl);
+  }
+
+  .balances-summary h2 {
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-md);
+  }
+
+  .your-balance {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .your-balance .balance-amount {
+    font-size: 2.5rem;
+    font-weight: 700;
+  }
+
+  .your-balance.positive .balance-amount {
+    color: #16a34a;
+  }
+
+  .your-balance.negative .balance-amount {
+    color: #dc2626;
+  }
+
+  .your-balance .balance-label {
+    color: var(--color-text-secondary);
+  }
+
+  .debts-list,
+  .members-summary {
+    margin-bottom: var(--space-xl);
+  }
+
+  .debts-list h2,
+  .members-summary h2 {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-md);
+  }
+
+  .debt-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-sm);
+  }
+
+  .debt-card.you-owe {
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
+
+  .debt-card.owed-to-you {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+  }
+
+  .debt-parties {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .debtor,
+  .creditor {
+    font-weight: 500;
+  }
+
+  .debtor.is-you,
+  .creditor.is-you {
+    color: var(--color-primary);
+  }
+
+  .debt-arrow {
+    color: var(--color-text-secondary);
+  }
+
+  .debt-amount {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+  }
+
+  .member-balance {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-sm);
+  }
+
+  .member-balance.is-you {
+    border-color: var(--color-primary);
+    border-width: 2px;
+  }
+
+  .member-name {
+    font-weight: 500;
+  }
+
+  .member-amount {
+    font-weight: 600;
+  }
+
+  .member-amount.positive {
+    color: #16a34a;
+  }
+
+  .member-amount.negative {
+    color: #dc2626;
+  }
+
+  .all-settled {
+    text-align: center;
+    padding: var(--space-xl);
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius-lg);
+  }
+
+  .settled-icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+  }
+
+  .empty-state .btn {
+    margin-top: var(--space-md);
+  }
+
+  .loading,
+  .error {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+  }
+
+  .error {
+    color: var(--color-danger);
+  }
+</style>

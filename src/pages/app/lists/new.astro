@@ -1,0 +1,596 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Nueva Lista">
+  <div class="new-list-page">
+    <a href="/app" class="back-link">← Volver</a>
+
+    <h1>Crear Nueva Lista</h1>
+
+    <form id="new-list-form" class="form">
+      <!-- Icono y Nombre -->
+      <div class="form-row icon-name-row">
+        <div class="form-group icon-group">
+          <label>Icono</label>
+          <button type="button" id="icon-selector-btn" class="icon-selector-btn">
+            <span id="selected-icon">🛒</span>
+          </button>
+          <input type="hidden" id="icon" value="🛒" />
+        </div>
+        <div class="form-group name-group">
+          <label for="name">Nombre de la lista *</label>
+          <input type="text" id="name" required placeholder="Ej: Compra semanal" />
+        </div>
+      </div>
+
+      <!-- Selector de iconos (modal) -->
+      <div id="icon-picker" class="icon-picker" hidden>
+        <div class="icon-grid">
+          <!-- Se llena dinámicamente -->
+        </div>
+      </div>
+
+      <!-- Tipo de gasto -->
+      <div class="form-group">
+        <label>Tipo de gasto</label>
+        <div class="expense-type-options">
+          <label class="expense-option">
+            <input type="radio" name="expenseType" value="common" checked />
+            <div class="expense-card">
+              <span class="expense-icon">🏠</span>
+              <div class="expense-info">
+                <strong>Gasto Común</strong>
+                <small>Se paga de un fondo común del grupo</small>
+              </div>
+            </div>
+          </label>
+          <label class="expense-option">
+            <input type="radio" name="expenseType" value="shared" />
+            <div class="expense-card">
+              <span class="expense-icon">➗</span>
+              <div class="expense-info">
+                <strong>Gasto a dividir</strong>
+                <small>Se divide entre los miembros seleccionados</small>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Grupos -->
+      <div class="form-group">
+        <label>Compartir con grupos</label>
+        <div id="groups-container" class="groups-container">
+          <p class="loading-text">Cargando grupos...</p>
+        </div>
+        <small class="form-help">Selecciona los grupos que podrán ver y editar esta lista</small>
+      </div>
+
+      <!-- Tienda (opcional) -->
+      <div class="form-group">
+        <label for="store">Tienda (opcional)</label>
+        <input type="text" id="store" placeholder="Ej: Mercadona, Carrefour..." />
+      </div>
+
+      <!-- Opciones avanzadas -->
+      <details class="advanced-options">
+        <summary>Opciones avanzadas</summary>
+        <div class="advanced-content">
+          <div class="form-group">
+            <label for="date">Fecha programada</label>
+            <input type="date" id="date" />
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="recurring" />
+              Lista recurrente
+            </label>
+          </div>
+
+          <div id="recurring-options" class="recurring-options" hidden>
+            <div class="form-group">
+              <label for="frequency">Frecuencia</label>
+              <select id="frequency">
+                <option value="weekly">Semanal</option>
+                <option value="biweekly">Quincenal</option>
+                <option value="monthly">Mensual</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div class="form-actions">
+        <a href="/app" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Crear lista</button>
+      </div>
+    </form>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { toast } from '/js/toast.js';
+  import { getUserGroups } from '/js/group.js';
+  import { db } from '/js/firebase-config.js';
+  import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
+  // Iconos disponibles para listas
+  const LIST_ICONS = [
+    '🛒', '🛍️', '🏪', '🏬', '🛵', '📦',
+    '🥗', '🍎', '🥩', '🧀', '🥖', '🍪',
+    '🧹', '🧴', '💊', '🐕', '🎁', '🎄',
+    '🏠', '🔧', '📚', '✏️', '💻', '📱',
+    '👶', '👗', '👟', '⚽', '🎮', '🎨'
+  ];
+
+  let userGroups = [];
+  let selectedGroups = [];
+
+  // Inicializar selector de iconos
+  const iconGrid = document.querySelector('.icon-grid');
+  const iconPicker = document.getElementById('icon-picker');
+  const iconSelectorBtn = document.getElementById('icon-selector-btn');
+  const selectedIconSpan = document.getElementById('selected-icon');
+  const iconInput = document.getElementById('icon');
+
+  LIST_ICONS.forEach(icon => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'icon-option';
+    btn.textContent = icon;
+    btn.addEventListener('click', () => {
+      selectedIconSpan.textContent = icon;
+      iconInput.value = icon;
+      iconPicker.hidden = true;
+      document.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+    if (icon === '🛒') btn.classList.add('selected');
+    iconGrid.appendChild(btn);
+  });
+
+  iconSelectorBtn.addEventListener('click', () => {
+    iconPicker.hidden = !iconPicker.hidden;
+  });
+
+  // Cerrar picker al hacer clic fuera
+  document.addEventListener('click', (e) => {
+    if (!iconPicker.contains(e.target) && e.target !== iconSelectorBtn && !iconSelectorBtn.contains(e.target)) {
+      iconPicker.hidden = true;
+    }
+  });
+
+  // Cargar grupos del usuario
+  async function initPage() {
+    const groupsContainer = document.getElementById('groups-container');
+    if (!groupsContainer) return;
+
+    try {
+      userGroups = await getUserGroups();
+
+      if (userGroups.length === 0) {
+        groupsContainer.innerHTML = `
+          <div class="no-groups">
+            <p>No perteneces a ningún grupo.</p>
+            <a href="/app/groups" class="btn btn-sm">Crear grupo</a>
+          </div>
+        `;
+        return;
+      }
+
+      groupsContainer.innerHTML = userGroups.map(group => `
+        <label class="group-checkbox">
+          <input type="checkbox" name="groups" value="${group.id}" />
+          <span class="group-name">
+            <span class="group-icon">👥</span>
+            ${group.name}
+            <span class="member-count">${Object.keys(group.members || {}).length} miembros</span>
+          </span>
+        </label>
+      `).join('');
+
+      // Manejar selección de grupos
+      groupsContainer.querySelectorAll('input[name="groups"]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+          selectedGroups = Array.from(groupsContainer.querySelectorAll('input[name="groups"]:checked'))
+            .map(cb => cb.value);
+        });
+      });
+    } catch (error) {
+      console.error('Error loading groups:', error);
+      if (groupsContainer) {
+        groupsContainer.innerHTML = '<p class="error-text">Error al cargar grupos</p>';
+      }
+    }
+  }
+
+  // Comprobar estado de auth
+  if (isAuthResolved()) {
+    if (getCurrentUser()) initPage();
+  } else {
+    window.addEventListener('auth-ready', () => initPage(), { once: true });
+  }
+
+  // Lista recurrente
+  const recurringCheckbox = document.getElementById('recurring');
+  const recurringOptions = document.getElementById('recurring-options');
+
+  recurringCheckbox.addEventListener('change', () => {
+    recurringOptions.hidden = !recurringCheckbox.checked;
+  });
+
+  // Enviar formulario
+  const form = document.getElementById('new-list-form');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const user = getCurrentUser();
+    if (!user) {
+      toast.error('Debes iniciar sesión');
+      return;
+    }
+
+    const name = document.getElementById('name').value.trim();
+    if (!name) {
+      toast.warning('El nombre es obligatorio');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creando...';
+
+    const icon = document.getElementById('icon').value;
+    const store = document.getElementById('store').value.trim();
+    const date = document.getElementById('date').value;
+    const isRecurring = recurringCheckbox.checked;
+    const frequency = document.getElementById('frequency').value;
+    const expenseType = document.querySelector('input[name="expenseType"]:checked').value;
+
+    try {
+      // Crear lista en la colección del usuario
+      const listsRef = collection(db, 'users', user.uid, 'lists');
+      const docRef = await addDoc(listsRef, {
+        name,
+        icon,
+        store: store || null,
+        expenseType, // 'common' o 'shared'
+        groupIds: selectedGroups,
+        scheduledDate: date || null,
+        isRecurring,
+        recurringPattern: isRecurring ? { frequency } : null,
+        closed: false,
+        itemCount: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: user.uid
+      });
+
+      window.location.href = `/app/list?id=${docRef.id}`;
+    } catch (error) {
+      console.error('Error creating list:', error);
+      toast.error('Error al crear la lista: ' + error.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Crear lista';
+    }
+  });
+</script>
+
+<style>
+  .new-list-page {
+    max-width: 560px;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: var(--space-lg);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+  }
+
+  .back-link:hover {
+    color: var(--color-primary);
+  }
+
+  h1 {
+    margin-bottom: var(--space-xl);
+  }
+
+  .form-group {
+    margin-bottom: var(--space-lg);
+  }
+
+  .form-group > label {
+    display: block;
+    margin-bottom: var(--space-xs);
+    font-weight: 500;
+  }
+
+  .form-row {
+    display: flex;
+    gap: var(--space-md);
+  }
+
+  .icon-name-row {
+    align-items: flex-end;
+  }
+
+  .icon-group {
+    flex-shrink: 0;
+  }
+
+  .name-group {
+    flex: 1;
+  }
+
+  .icon-selector-btn {
+    width: 56px;
+    height: 42px;
+    font-size: 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .icon-selector-btn:hover {
+    border-color: var(--color-primary);
+    background: var(--color-bg-secondary);
+  }
+
+  .icon-picker {
+    position: relative;
+    margin-top: calc(-1 * var(--space-md));
+    margin-bottom: var(--space-lg);
+    padding: var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--space-xs);
+  }
+
+  .icon-option {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .icon-option:hover {
+    background: var(--color-bg-tertiary);
+    transform: scale(1.1);
+  }
+
+  .icon-option.selected {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.1);
+  }
+
+  /* Tipo de gasto */
+  .expense-type-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .expense-option {
+    cursor: pointer;
+  }
+
+  .expense-option input {
+    display: none;
+  }
+
+  .expense-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+  }
+
+  .expense-option input:checked + .expense-card {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.05);
+  }
+
+  .expense-card:hover {
+    border-color: var(--color-primary);
+  }
+
+  .expense-icon {
+    font-size: 1.5rem;
+  }
+
+  .expense-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .expense-info strong {
+    font-size: var(--font-size-base);
+  }
+
+  .expense-info small {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  /* Grupos */
+  .groups-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .group-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .group-checkbox:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .group-checkbox input:checked + .group-name {
+    font-weight: 500;
+  }
+
+  .group-checkbox:has(input:checked) {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.05);
+  }
+
+  .group-name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+  }
+
+  .group-icon {
+    font-size: 1rem;
+  }
+
+  .member-count {
+    margin-left: auto;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  .form-help {
+    display: block;
+    margin-top: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .no-groups {
+    padding: var(--space-md);
+    text-align: center;
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+  }
+
+  .no-groups p {
+    margin-bottom: var(--space-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .btn-sm {
+    padding: var(--space-xs) var(--space-md);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Inputs */
+  .form-group input[type="text"],
+  .form-group input[type="date"],
+  .form-group select {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+  }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  /* Opciones avanzadas */
+  .advanced-options {
+    margin-bottom: var(--space-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .advanced-options summary {
+    padding: var(--space-md);
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .advanced-options summary:hover {
+    color: var(--color-text);
+  }
+
+  .advanced-content {
+    padding: 0 var(--space-md) var(--space-md);
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+  }
+
+  .recurring-options {
+    padding: var(--space-md);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-sm);
+  }
+
+  .recurring-options .form-group {
+    margin-bottom: 0;
+  }
+
+  /* Actions */
+  .form-actions {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: flex-end;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .loading-text,
+  .error-text {
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+
+  .error-text {
+    color: var(--color-danger);
+  }
+
+  @media (max-width: 480px) {
+    .icon-grid {
+      grid-template-columns: repeat(5, 1fr);
+    }
+
+    .expense-card {
+      padding: var(--space-sm);
+    }
+  }
+</style>

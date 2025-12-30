@@ -1,0 +1,34 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Inicio">
+  <main class="landing">
+    <h1>HomeCart</h1>
+    <p>Tu lista de la compra familiar, sincronizada en tiempo real.</p>
+    <a href="/login" class="btn btn-primary">Comenzar</a>
+  </main>
+</BaseLayout>
+
+<style>
+  .landing {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--space-xl);
+  }
+
+  h1 {
+    font-size: 3rem;
+    margin-bottom: var(--space-md);
+  }
+
+  p {
+    font-size: 1.25rem;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-xl);
+  }
+</style>

@@ -1,0 +1,163 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==================== HELPERS ====================
+
+    // Verifica si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Obtiene el ID del usuario actual
+    function userId() {
+      return request.auth.uid;
+    }
+
+    // Verifica si el usuario es miembro del grupo
+    function isGroupMember(groupId) {
+      let group = get(/databases/$(database)/documents/groups/$(groupId));
+      return group != null && userId() in group.data.members;
+    }
+
+    // Verifica si el usuario es admin del grupo
+    function isGroupAdmin(groupId) {
+      let group = get(/databases/$(database)/documents/groups/$(groupId));
+      return group != null
+        && userId() in group.data.members
+        && group.data.members[userId()].role == 'admin';
+    }
+
+    // Verifica si el usuario es el creador del grupo
+    function isGroupCreator(groupId) {
+      let group = get(/databases/$(database)/documents/groups/$(groupId));
+      return group != null && group.data.createdBy == userId();
+    }
+
+    // Valida que los campos requeridos estén presentes
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ==================== INVITATIONS ====================
+    // Colección pública para códigos de invitación
+    match /invitations/{code} {
+      // Cualquier usuario autenticado puede leer invitaciones (para validar código)
+      allow read: if isAuthenticated();
+
+      // Solo se pueden crear/modificar por admins del grupo
+      allow create: if isAuthenticated()
+        && hasRequiredFields(['groupId', 'expiresAt', 'createdBy'])
+        && isGroupAdmin(request.resource.data.groupId);
+      allow update: if false;
+      allow delete: if isAuthenticated()
+        && isGroupAdmin(resource.data.groupId);
+    }
+
+    // ==================== USERS ====================
+
+    match /users/{uid} {
+      // Cualquier usuario autenticado puede leer perfiles públicos
+      allow read: if isAuthenticated();
+
+      // Solo el propio usuario puede crear/modificar su perfil
+      allow create: if isAuthenticated() && uid == request.auth.uid;
+      allow update: if isAuthenticated() && uid == request.auth.uid;
+
+      // No se permite eliminar usuarios
+      allow delete: if false;
+
+      // ==================== USER LISTS ====================
+      // Listas personales del usuario
+      match /lists/{listId} {
+        allow read: if isAuthenticated() && uid == request.auth.uid;
+        allow create: if isAuthenticated() && uid == request.auth.uid;
+        allow update: if isAuthenticated() && uid == request.auth.uid;
+        allow delete: if isAuthenticated() && uid == request.auth.uid;
+
+        // Items de la lista del usuario
+        match /items/{itemId} {
+          allow read: if isAuthenticated() && uid == request.auth.uid;
+          allow create: if isAuthenticated() && uid == request.auth.uid;
+          allow update: if isAuthenticated() && uid == request.auth.uid;
+          allow delete: if isAuthenticated() && uid == request.auth.uid;
+        }
+      }
+    }
+
+    // ==================== GROUPS ====================
+
+    match /groups/{groupId} {
+      // Solo miembros pueden leer el grupo
+      allow read: if isAuthenticated() && isGroupMember(groupId);
+
+      // Cualquier usuario autenticado puede crear un grupo
+      allow create: if isAuthenticated()
+        && hasRequiredFields(['name', 'createdBy', 'createdAt', 'members'])
+        && request.resource.data.createdBy == userId()
+        && userId() in request.resource.data.members
+        && request.resource.data.members[userId()].role == 'admin';
+
+      // Solo admins pueden actualizar el grupo
+      allow update: if isAuthenticated() && isGroupAdmin(groupId);
+
+      // Solo el creador puede eliminar el grupo
+      allow delete: if isAuthenticated() && isGroupCreator(groupId);
+
+      // ==================== PRODUCTS ====================
+
+      match /products/{productId} {
+        allow read: if isAuthenticated() && isGroupMember(groupId);
+        allow create: if isAuthenticated() && isGroupMember(groupId);
+        allow update: if isAuthenticated() && isGroupMember(groupId);
+        allow delete: if isAuthenticated() && isGroupAdmin(groupId);
+      }
+
+      // ==================== SHOPPING LISTS ====================
+
+      match /shoppingLists/{listId} {
+        allow read: if isAuthenticated() && isGroupMember(groupId);
+        allow create: if isAuthenticated() && isGroupMember(groupId);
+        allow update: if isAuthenticated() && isGroupMember(groupId);
+        allow delete: if isAuthenticated()
+          && (isGroupAdmin(groupId) || resource.data.createdBy == userId());
+
+        // ==================== LIST ITEMS ====================
+
+        match /items/{itemId} {
+          allow read: if isAuthenticated() && isGroupMember(groupId);
+          allow create: if isAuthenticated() && isGroupMember(groupId);
+          allow update: if isAuthenticated() && isGroupMember(groupId);
+          allow delete: if isAuthenticated() && isGroupMember(groupId);
+        }
+      }
+
+      // ==================== PURCHASES ====================
+
+      match /purchases/{purchaseId} {
+        allow read: if isAuthenticated() && isGroupMember(groupId);
+        allow create: if isAuthenticated() && isGroupMember(groupId);
+        allow update: if isAuthenticated()
+          && isGroupMember(groupId)
+          && resource.data.createdBy == userId();
+        allow delete: if isAuthenticated()
+          && (isGroupAdmin(groupId) || resource.data.createdBy == userId());
+
+        match /items/{itemId} {
+          allow read: if isAuthenticated() && isGroupMember(groupId);
+          allow write: if isAuthenticated() && isGroupMember(groupId);
+        }
+      }
+
+      // ==================== PRICE HISTORY ====================
+
+      match /priceHistory/{productId}/entries/{entryId} {
+        allow read: if isAuthenticated() && isGroupMember(groupId);
+        allow create: if isAuthenticated() && isGroupMember(groupId);
+        allow update: if false;
+        allow delete: if isAuthenticated() && isGroupAdmin(groupId);
+      }
+    }
+  }
+}
