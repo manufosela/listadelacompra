@@ -156,10 +156,11 @@ service cloud.firestore {
       // ==================== SHARED LIST REFS ====================
       // Referencias a listas compartidas con miembros del grupo
       match /sharedListRefs/{refId} {
-        // Miembros del grupo pueden leer referencias donde están incluidos
+        // Propietario o miembros incluidos pueden leer
         allow read: if isAuthenticated()
           && isGroupMember(groupId)
-          && request.auth.uid in resource.data.members;
+          && (resource.data.ownerId == request.auth.uid
+              || request.auth.uid in resource.data.members);
 
         // Solo el propietario de la lista puede crear/actualizar la referencia
         allow create: if isAuthenticated()

@@ -21,6 +21,6 @@ test.describe('Navigation - Public', () => {
 
   test('landing page should be accessible', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText('My Home Cart');
+    await expect(page.locator('h1')).toContainText('MyHomeCart');
   });
 });
