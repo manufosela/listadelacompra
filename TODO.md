@@ -6,6 +6,14 @@ Tareas pendientes y features planificadas para desarrollo futuro.
 
 ## Pendiente Inmediato
 
+### Modo claro/oscuro
+
+- [x] Asegurar que el cambio de tema funciona correctamente en toda la aplicación
+- [x] Usar preferencia del sistema (`prefers-color-scheme`) como valor por defecto
+- [x] Permitir al usuario sobrescribir la preferencia del sistema manualmente
+- [x] Persistir la preferencia del usuario en `localStorage`
+- [x] Escuchar cambios en la preferencia del sistema y actualizar si no hay preferencia manual
+
 ### SEO - Assets gráficos
 
 - [ ] Convertir `public/og-image.svg` a `public/og-image.png` (1200x630px)

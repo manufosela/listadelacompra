@@ -25,6 +25,24 @@ const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopp
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <!-- Script inline para evitar flash de tema incorrecto -->
+    <script is:inline>
+      (function() {
+        function applyTheme() {
+          const saved = localStorage.getItem('theme-preference');
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (saved === 'dark' || (!saved && prefersDark)) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        }
+        // Aplicar en carga inicial
+        applyTheme();
+        // Re-aplicar después de navegaciones con View Transitions
+        document.addEventListener('astro:after-swap', applyTheme);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- SEO básico -->
@@ -74,6 +92,8 @@ const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopp
 
     <!-- Firebase -->
     <script type="module" src="/js/firebase-config.js"></script>
+    <!-- Sistema de temas -->
+    <script type="module" src="/js/theme.js"></script>
 
     <!-- View Transitions para navegación fluida tipo SPA -->
     <ViewTransitions />
