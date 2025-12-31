@@ -30,21 +30,18 @@ Tareas pendientes y features planificadas para desarrollo futuro.
 
 ## Bugs Críticos
 
-### Sincronización en tiempo real de listas compartidas
+### ~~Sincronización en tiempo real de listas compartidas~~ ✅ RESUELTO
 
-**Problema:** Cuando dos usuarios tienen abierta la misma lista compartida, los cambios que hace uno no se reflejan en tiempo real en el otro. Solo se actualiza al recargar la página.
+**Estado:** No reproducible. La sincronización funciona correctamente.
 
-**Causa probable:** El sistema de suscripciones `onSnapshot` en `realtime-sync.js` puede estar escuchando solo la ruta del propietario, no la ruta correcta cuando eres un miembro invitado.
+**Verificación realizada:**
+- [x] Se verificó que `hc-shopping-list.js` usa `onSnapshot` correctamente
+- [x] Se verificó que el `ownerId` se pasa correctamente desde la URL
+- [x] Se probó con dos usuarios y los cambios se sincronizan en tiempo real
 
-**Archivos a revisar:**
-- [ ] `public/js/realtime-sync.js` - Verificar que las suscripciones usan `ownerId` para construir la ruta correcta
-- [ ] `public/js/list-detail.js` o componente de detalle - Verificar que se pasa el `ownerId` correcto
-- [ ] `src/pages/app/list.astro` - Verificar que se obtiene el `ownerId` de la URL o referencia compartida
-
-**Solución propuesta:**
-1. Al abrir una lista compartida, obtener el `ownerId` de la referencia en `sharedListRefs`
-2. Construir la ruta de suscripción como `users/{ownerId}/lists/{listId}/items`
-3. Asegurar que todos los miembros suscriben a la misma ruta
+**Mejoras aplicadas:**
+- Eliminadas suscripciones duplicadas en `hc-shopping-list.js`
+- Corregido warning de meta tag `apple-mobile-web-app-capable`
 
 ---
 

@@ -498,6 +498,7 @@ export class HcShoppingList extends LitElement {
     this.mode = 'shopping'; // Default to shopping mode
     this._searchTimeout = null;
     this._unsubscribers = [];
+    this._subscribedPath = null; // Para evitar suscripciones duplicadas
     // Estado de edición
     this.editingItem = null;
     this.editItemName = '';
@@ -526,15 +527,21 @@ export class HcShoppingList extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this._unsubscribers.forEach(unsub => unsub());
+    this._subscribedPath = null;
     eventBus.unregisterComponent(this._componentId);
   }
 
   async _setupSubscriptions() {
+    if (!this.userId || !this.listId) return;
+
+    // Evitar suscripciones duplicadas al mismo path
+    const newPath = `${this.userId}/${this.listId}`;
+    if (this._subscribedPath === newPath) return;
+
     // Limpiar suscripciones anteriores
     this._unsubscribers.forEach(unsub => unsub());
     this._unsubscribers = [];
-
-    if (!this.userId || !this.listId) return;
+    this._subscribedPath = newPath;
 
     // Suscribirse a la lista para obtener groupIds
     const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
@@ -557,7 +564,7 @@ export class HcShoppingList extends LitElement {
       this.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       this.loading = false;
     }, (error) => {
-      console.error('Error loading items:', error);
+      console.error('Error en suscripción a items:', error);
       this.loading = false;
     });
     this._unsubscribers.push(unsubItems);
