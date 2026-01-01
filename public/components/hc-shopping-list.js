@@ -2276,9 +2276,25 @@ export class HcShoppingList extends LitElement {
     }
   }
 
-  _handleTicketApplied(e) {
+  async _handleTicketApplied(e) {
     // El ticket ha sido aplicado, la lista se actualiza automáticamente via onSnapshot
-    console.log('Ticket aplicado:', e.detail);
+    // Guardamos el ticket en el historial
+    const { ticketData, results } = e.detail || {};
+    if (ticketData && this.userId && this.listId) {
+      try {
+        const { saveTicketToHistory } = await import('/js/tickets.js');
+        const groupId = getCurrentGroupId();
+        await saveTicketToHistory({
+          userId: this.userId,
+          listId: this.listId,
+          groupId,
+          ticketData,
+          imageUrl: null
+        });
+      } catch (error) {
+        console.error('Error saving ticket to history:', error);
+      }
+    }
   }
 
   async _handleQuickAdd(e) {

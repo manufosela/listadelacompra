@@ -576,7 +576,7 @@ export class HcTicketScanner extends LitElement {
       this._step = 'done';
 
       this.dispatchEvent(new CustomEvent('ticket-applied', {
-        detail: results,
+        detail: { results, ticketData: this._ticketData },
         bubbles: true,
         composed: true
       }));

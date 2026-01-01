@@ -7,9 +7,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     <header class="page-header">
       <div>
         <h1>Tickets</h1>
-        <p>Revisa tus tickets de compra</p>
+        <p>Historial de tickets escaneados</p>
       </div>
-      <a href="/app/tickets/upload" class="btn btn-primary">+ Nuevo ticket</a>
     </header>
 
     <div id="tickets-list" class="tickets-list">
@@ -20,92 +19,91 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
 <script type="module">
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
-  import { getCurrentGroupId, getGroup } from '/js/group.js';
   import { db } from '/js/firebase-config.js';
-  import { collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
-
-  let members = {};
+  import { collection, getDocs, query, orderBy, collectionGroup } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
   async function initPage() {
     const container = document.getElementById('tickets-list');
     if (!container) return;
 
-    const groupId = getCurrentGroupId();
-
-    if (!groupId) {
+    const user = getCurrentUser();
+    if (!user) {
       container.innerHTML = `
         <div class="empty-state">
-          <p>No tienes ningún grupo configurado.</p>
-          <a href="/app/groups" class="btn btn-primary">Crear o unirse a un grupo</a>
+          <p>Debes iniciar sesión para ver los tickets.</p>
         </div>
       `;
       return;
     }
 
     try {
-      // Cargar miembros del grupo
-      const group = await getGroup(groupId);
-      if (group?.members) {
-        members = group.members;
+      // Obtener todas las listas del usuario
+      const listsRef = collection(db, 'users', user.uid, 'lists');
+      const listsSnapshot = await getDocs(listsRef);
+
+      // Obtener tickets de cada lista
+      const allTickets = [];
+      const listNames = {};
+
+      for (const listDoc of listsSnapshot.docs) {
+        const listData = listDoc.data();
+        listNames[listDoc.id] = listData.name || 'Lista';
+
+        const ticketsRef = collection(db, 'users', user.uid, 'lists', listDoc.id, 'tickets');
+        const ticketsQuery = query(ticketsRef, orderBy('processedAt', 'desc'));
+        const ticketsSnapshot = await getDocs(ticketsQuery);
+
+        ticketsSnapshot.docs.forEach(ticketDoc => {
+          allTickets.push({
+            id: ticketDoc.id,
+            listId: listDoc.id,
+            listName: listData.name || 'Lista',
+            listIcon: listData.icon || '🛒',
+            ...ticketDoc.data()
+          });
+        });
       }
 
-      const purchasesRef = collection(db, 'groups', groupId, 'purchases');
-      const q = query(purchasesRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
+      // Ordenar todos los tickets por fecha
+      allTickets.sort((a, b) => {
+        const dateA = a.processedAt?.toDate?.() || new Date(0);
+        const dateB = b.processedAt?.toDate?.() || new Date(0);
+        return dateB - dateA;
+      });
 
-      if (snapshot.empty) {
+      if (allTickets.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
             <p>No hay tickets registrados.</p>
-            <a href="/app/tickets/upload" class="btn btn-primary">Escanear primer ticket</a>
+            <p class="hint">Escanea un ticket desde cualquier lista de compra.</p>
           </div>
         `;
         return;
       }
 
-      const purchases = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate?.() || doc.data().createdAt?.toDate?.()
-      }));
-
-      container.innerHTML = purchases.map(p => {
-        const paidByName = members[p.paidBy]?.displayName?.split(' ')[0] || 'Alguien';
+      container.innerHTML = allTickets.map(t => {
+        const processedDate = t.processedAt?.toDate?.();
+        const ticketDate = t.date || processedDate?.toLocaleDateString() || 'Fecha desconocida';
 
         return `
-          <div class="ticket-card">
+          <a href="/app/list?id=${t.listId}" class="ticket-card">
             <div class="ticket-header">
               <div>
-                <h3>${p.store || 'Tienda'}</h3>
-                <span class="ticket-date">${p.date?.toLocaleDateString() || 'Fecha desconocida'}</span>
+                <h3>${t.store || 'Tienda desconocida'}</h3>
+                <span class="ticket-date">${ticketDate}</span>
               </div>
-              <span class="ticket-total">${(p.totalAmount || 0).toFixed(2)}€</span>
+              <span class="ticket-total">${(t.total || 0).toFixed(2)}€</span>
             </div>
             <div class="ticket-meta">
-              <span class="paid-by-badge">Pagó ${paidByName}</span>
-              ${p.listId ? '<span class="list-badge">Con lista</span>' : ''}
+              <span class="list-badge">${t.listIcon} ${t.listName}</span>
+              <span class="items-badge">${t.itemCount || 0} productos</span>
             </div>
-            <div class="ticket-items">
-              ${p.items?.slice(0, 3).map(item => `<span class="item-badge">${item.name}</span>`).join('') || ''}
-              ${(p.items?.length || 0) > 3 ? `<span class="item-badge more">+${p.items.length - 3} más</span>` : ''}
-            </div>
-            ${p.debts && Object.keys(p.debts).length > 0 ? `
-              <div class="ticket-debts">
-                ${Object.entries(p.debts).map(([memberId, debt]) => {
-                  const debtorName = members[memberId]?.displayName?.split(' ')[0] || 'Alguien';
-                  return `<span class="debt-badge">${debtorName} debe ${debt.amount.toFixed(2)}€</span>`;
-                }).join('')}
-              </div>
-            ` : ''}
-          </div>
+          </a>
         `;
       }).join('');
     } catch (error) {
       console.error('Error loading tickets:', error);
-      const container = document.getElementById('tickets-list');
-      if (container) {
-        container.innerHTML = '<p class="error">Error al cargar los tickets.</p>';
-      }
+      container.innerHTML = '<p class="error">Error al cargar los tickets.</p>';
     }
   }
 
@@ -151,11 +149,14 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   .ticket-card {
+    display: block;
     background: var(--color-bg);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
     transition: all var(--transition-fast);
+    text-decoration: none;
+    color: inherit;
   }
 
   .ticket-card:hover {
@@ -173,6 +174,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   .ticket-header h3 {
     font-size: var(--font-size-lg);
     margin-bottom: var(--space-xs);
+    color: var(--color-text);
   }
 
   .ticket-date {
@@ -189,62 +191,25 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   .ticket-meta {
     display: flex;
     gap: var(--space-sm);
-    margin-bottom: var(--space-md);
+    flex-wrap: wrap;
   }
 
-  .paid-by-badge,
-  .list-badge {
+  .list-badge,
+  .items-badge {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
     padding: var(--space-xs) var(--space-sm);
-    background: #eff6ff;
-    color: #2563eb;
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-  }
-
-  .list-badge {
     background: #f0fdf4;
     color: #166534;
-  }
-
-  .ticket-items {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-
-  .ticket-debts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    margin-top: var(--space-md);
-    padding-top: var(--space-md);
-    border-top: 1px solid var(--color-border);
-  }
-
-  .debt-badge {
-    padding: var(--space-xs) var(--space-sm);
-    background: #fef3c7;
-    color: #92400e;
     border-radius: var(--radius-full);
     font-size: var(--font-size-sm);
     font-weight: 500;
   }
 
-  .item-badge {
-    padding: var(--space-xs) var(--space-sm);
+  .items-badge {
     background: var(--color-bg-secondary);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
-  }
-
-  .item-badge.more {
-    background: var(--color-bg-tertiary);
-    color: var(--color-text-tertiary);
   }
 
   .empty-state {
@@ -253,8 +218,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     color: var(--color-text-secondary);
   }
 
-  .empty-state .btn {
-    margin-top: var(--space-md);
+  .empty-state .hint {
+    font-size: var(--font-size-sm);
+    margin-top: var(--space-sm);
   }
 
   .loading,
@@ -266,5 +232,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .error {
     color: var(--color-danger);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .list-badge {
+      background: #052e16;
+      color: #86efac;
+    }
   }
 </style>
