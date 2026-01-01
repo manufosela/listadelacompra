@@ -96,7 +96,7 @@ export const processTicket = onCall(
     region: 'europe-west1',
     memory: '512MiB',
     timeoutSeconds: 120,
-    cors: true,
+    cors: [/localhost/, /lista-de-mi-compra\.web\.app$/, /lista-de-mi-compra\.firebaseapp\.com$/, /myhomec\.art$/],
   },
   async (request) => {
     // Verify authentication
@@ -246,7 +246,7 @@ export const savePurchase = onCall(
     region: 'europe-west1',
     memory: '256MiB',
     timeoutSeconds: 30,
-    cors: true,
+    cors: [/localhost/, /lista-de-mi-compra\.web\.app$/, /lista-de-mi-compra\.firebaseapp\.com$/, /myhomec\.art$/],
   },
   async (request) => {
     if (!request.auth) {
@@ -391,7 +391,7 @@ export const acceptInvitation = onCall(
     region: 'europe-west1',
     memory: '256MiB',
     timeoutSeconds: 30,
-    cors: true,
+    cors: [/localhost/, /lista-de-mi-compra\.web\.app$/, /lista-de-mi-compra\.firebaseapp\.com$/, /myhomec\.art$/],
   },
   async (request) => {
     if (!request.auth) {
