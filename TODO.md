@@ -4,9 +4,9 @@ Tareas pendientes y features planificadas para desarrollo futuro.
 
 ---
 
-## Sesión actual (01/01/2026) - Sublistas v2
+## Sesión actual (01/01/2026) - Sublistas v2 ✅ COMPLETADO
 
-### Sublistas con details/summary - PENDIENTE DE PROBAR
+### Sublistas con details/summary ✅
 
 Se ha rediseñado la UI de sublistas para usar `<details><summary>` nativo.
 
@@ -15,44 +15,72 @@ Se ha rediseñado la UI de sublistas para usar `<details><summary>` nativo.
 - Items normales: checkbox tradicional
 - Sublistas: `<details><summary>` expandible con subelementos dentro
 - Indicador de progreso (0/3, 2/3, etc.) con colores según estado
+- Modal de edición permite convertir items normales en sublistas
 
 **Archivos modificados:**
 - `public/components/hc-shopping-list.js`:
-  - Checkbox "Es sublista" en formulario
+  - Checkbox "Es sublista" en formulario de creación
   - Builder de subelementos al crear
-  - Nuevos campos: `newItemIsChecklist`, `newChecklistItems`
+  - Modal de edición con opción de convertir a sublista
+  - Dark mode completo para todos los elementos
 - `public/components/hc-list-item.js`:
   - Render diferenciado: checkbox vs details/summary
   - Estilos CSS para `.item-checklist`, `summary`, `details`
+  - Dark mode completo para items y sublistas
 
-**Cómo probar:**
-1. Ejecutar `pnpm dev`
-2. Crear lista agnóstica
-3. En modo edición:
-   - Escribir nombre del item
-   - Marcar "Es sublista"
-   - Añadir subelementos con el builder
-   - Click en "+ Añadir"
-4. Verificar que aparece como `<details>` expandible
-5. Expandir y marcar/desmarcar subelementos
-6. Verificar progreso (0/3, 1/3, 3/3) con colores
+**Verificado:**
+- [x] Estilos en dark mode
+- [x] Edición de sublistas existentes
+- [x] Conversión de item normal a sublista
+- [x] Sincronización real-time
 
-**Pendiente:**
-- [ ] Verificar estilos en dark mode
-- [ ] Probar edición de sublistas existentes
-- [ ] Verificar sincronización real-time
+---
+
+### Tests E2E automatizados ✅
+
+Configuración completa de tests E2E con emuladores de Firebase.
+
+**Nuevo flujo:**
+```bash
+pnpm test:e2e
+```
+
+Este comando:
+1. Arranca emuladores de Firebase automáticamente
+2. Espera a que estén listos
+3. Siembra datos de prueba (usuario, listas, items)
+4. Ejecuta tests con Playwright
+5. Apaga emuladores al terminar
+
+**Archivos creados:**
+- `.env.test` - Configuración para emuladores
+- `scripts/run-e2e-tests.js` - Script principal que orquesta todo
+- `scripts/seed-test-data.js` - Siembra datos de prueba
+- `scripts/start-test-server.js` - Arranca servidor con config test
+- `tests/global-setup.js` - Setup de Playwright
+
+**Dependencias añadidas:**
+- `firebase-admin` - Para sembrar datos en emuladores
+
+---
+
+### Otras mejoras ✅
+
+- Eliminado rewrite `/api/**` no usado en `firebase.json`
+- Actualizado formato de hooks husky para v10
 
 ---
 
 ## Pendiente Inmediato
 
-### Modo claro/oscuro
+### Modo claro/oscuro ✅ COMPLETADO
 
 - [x] Asegurar que el cambio de tema funciona correctamente en toda la aplicación
 - [x] Usar preferencia del sistema (`prefers-color-scheme`) como valor por defecto
 - [x] Permitir al usuario sobrescribir la preferencia del sistema manualmente
 - [x] Persistir la preferencia del usuario en `localStorage`
 - [x] Escuchar cambios en la preferencia del sistema y actualizar si no hay preferencia manual
+- [x] Dark mode en componentes Lit (usando `@media (prefers-color-scheme: dark)` en Shadow DOM)
 
 ### SEO - Assets gráficos
 
