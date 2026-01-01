@@ -31,7 +31,7 @@ export class HcTicketScanner extends LitElement {
     this._results = null;
   }
 
-  static styles = css\`
+  static styles = css`
     :host {
       display: block;
     }
@@ -395,7 +395,7 @@ export class HcTicketScanner extends LitElement {
       .error { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
       .done-title { color: #f1f5f9; }
     }
-  \`;
+  `;
 
   open() {
     this._isOpen = true;
@@ -540,9 +540,9 @@ export class HcTicketScanner extends LitElement {
   }
 
   _renderUploadStep() {
-    return html\`
+    return html`
       <div class="modal-body">
-        \${this._error ? html\`<div class="error">\${this._error}</div>\` : ''}
+        \${this._error ? html`<div class="error">\${this._error}</div>` : ''}
         <div
           class="upload-zone"
           @click=\${() => this.shadowRoot.getElementById('file-input').click()}
@@ -559,11 +559,11 @@ export class HcTicketScanner extends LitElement {
       <div class="modal-footer">
         <button class="btn btn-secondary" @click=\${this.close}>Cancelar</button>
       </div>
-    \`;
+    `;
   }
 
   _renderProcessingStep() {
-    return html\`
+    return html`
       <div class="modal-body">
         <div class="processing">
           <div class="spinner"></div>
@@ -571,19 +571,19 @@ export class HcTicketScanner extends LitElement {
           <div class="processing-hint">Esto puede tardar unos segundos</div>
         </div>
       </div>
-    \`;
+    `;
   }
 
   _renderReviewStep() {
     const data = this._ticketData;
     const activeItems = data.items.filter(i => i.status !== 'ignored');
 
-    return html\`
+    return html`
       <div class="modal-body">
-        \${this._error ? html\`<div class="error">\${this._error}</div>\` : ''}
+        \${this._error ? html`<div class="error">\${this._error}</div>` : ''}
         <div class="ticket-summary">
-          \${data.store ? html\`<div class="summary-row"><span class="summary-label">Tienda</span><span class="summary-value">\${data.store}</span></div>\` : ''}
-          \${data.date ? html\`<div class="summary-row"><span class="summary-label">Fecha</span><span class="summary-value">\${data.date}</span></div>\` : ''}
+          \${data.store ? html`<div class="summary-row"><span class="summary-label">Tienda</span><span class="summary-value">\${data.store}</span></div>` : ''}
+          \${data.date ? html`<div class="summary-row"><span class="summary-label">Fecha</span><span class="summary-value">\${data.date}</span></div>` : ''}
           <div class="summary-row"><span class="summary-label">Total</span><span class="summary-value">\${data.total?.toFixed(2) || '?'} €</span></div>
         </div>
         <div class="items-header"><h3>Productos detectados (\${activeItems.length})</h3></div>
@@ -597,26 +597,26 @@ export class HcTicketScanner extends LitElement {
           Aplicar \${activeItems.length} productos
         </button>
       </div>
-    \`;
+    `;
   }
 
   _renderTicketItem(item, index) {
     const statusIcons = { matched: '✓', unmatched: '?', new: '+', ignored: '✕' };
-    return html\`
+    return html`
       <div class="ticket-item">
         <div class="item-status status-\${item.status}">\${statusIcons[item.status]}</div>
         <div class="item-info">
           <div class="item-name">\${item.name}</div>
-          \${item.status === 'matched' ? html\`<div class="item-match">→ <span class="item-match-name">\${item.matchedListItemName}</span></div>\` : ''}
-          \${item.status === 'new' ? html\`<div class="item-match">Se añadirá como nuevo</div>\` : ''}
-          \${item.status === 'unmatched' && this.listItems.length > 0 ? html\`
+          \${item.status === 'matched' ? html`<div class="item-match">→ <span class="item-match-name">\${item.matchedListItemName}</span></div>` : ''}
+          \${item.status === 'new' ? html`<div class="item-match">Se añadirá como nuevo</div>` : ''}
+          \${item.status === 'unmatched' && this.listItems.length > 0 ? html`
             <div class="match-selector">
               <select @change=\${(e) => this._handleMatchChange(index, e.target.value)}>
                 <option value="">Añadir como nuevo</option>
-                \${this.listItems.map(li => html\`<option value="\${li.id}">\${li.name}</option>\`)}
+                \${this.listItems.map(li => html`<option value="\${li.id}">\${li.name}</option>`)}
               </select>
             </div>
-          \` : ''}
+          ` : ''}
         </div>
         <div class="item-price">\${item.totalPrice?.toFixed(2) || item.unitPrice?.toFixed(2) || '?'} €</div>
         <div class="item-actions">
@@ -625,44 +625,44 @@ export class HcTicketScanner extends LitElement {
           </button>
         </div>
       </div>
-    \`;
+    `;
   }
 
   _renderApplyingStep() {
-    return html\`
+    return html`
       <div class="modal-body">
         <div class="processing">
           <div class="spinner"></div>
           <div class="processing-text">Aplicando cambios...</div>
         </div>
       </div>
-    \`;
+    `;
   }
 
   _renderDoneStep() {
     const r = this._results;
-    return html\`
+    return html`
       <div class="modal-body">
         <div class="done">
           <div class="done-icon">✅</div>
           <div class="done-title">Ticket procesado</div>
           <div class="done-stats">
-            \${r.updated > 0 ? html\`<div>\${r.updated} productos actualizados</div>\` : ''}
-            \${r.created > 0 ? html\`<div>\${r.created} productos añadidos</div>\` : ''}
-            \${r.ignored > 0 ? html\`<div>\${r.ignored} productos ignorados</div>\` : ''}
+            \${r.updated > 0 ? html`<div>\${r.updated} productos actualizados</div>` : ''}
+            \${r.created > 0 ? html`<div>\${r.created} productos añadidos</div>` : ''}
+            \${r.ignored > 0 ? html`<div>\${r.ignored} productos ignorados</div>` : ''}
           </div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" @click=\${this.close}>Cerrar</button>
       </div>
-    \`;
+    `;
   }
 
   render() {
-    return html\`
+    return html`
       <button class="scan-button" @click=\${this.open}>📷 Escanear ticket</button>
-      \${this._isOpen ? html\`
+      \${this._isOpen ? html`
         <div class="modal-backdrop" @click=\${(e) => e.target === e.currentTarget && this.close()}>
           <div class="modal">
             <div class="modal-header">
@@ -682,8 +682,8 @@ export class HcTicketScanner extends LitElement {
             \${this._step === 'done' ? this._renderDoneStep() : ''}
           </div>
         </div>
-      \` : ''}
-    \`;
+      ` : ''}
+    `;
   }
 }
 
