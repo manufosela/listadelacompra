@@ -89,6 +89,7 @@ Importante:
 
 /**
  * Process a ticket image and extract purchase data
+ * Now supports associating with a specific list for item matching
  */
 export const processTicket = onCall(
   {
@@ -103,7 +104,7 @@ export const processTicket = onCall(
       throw new HttpsError('unauthenticated', 'User must be authenticated');
     }
 
-    const { imageUrl, imageBase64, groupId } = request.data;
+    const { imageUrl, imageBase64, groupId, listId, userId } = request.data;
 
     if (!imageUrl && !imageBase64) {
       throw new HttpsError('invalid-argument', 'Either imageUrl or imageBase64 is required');
@@ -142,9 +143,59 @@ export const processTicket = onCall(
       // Analyze with OpenAI
       const analysis = await analyzeTicketWithOpenAI(imageContent);
 
+      // If listId provided, load list items for matching suggestions
+      let listItems = [];
+      if (listId && userId) {
+        const itemsSnap = await db
+          .collection('users')
+          .doc(userId)
+          .collection('lists')
+          .doc(listId)
+          .collection('items')
+          .get();
+
+        listItems = itemsSnap.docs.map(doc => ({
+          id: doc.id,
+          name: doc.data().name,
+          normalizedName: (doc.data().name || '').toLowerCase().trim(),
+          checked: doc.data().checked || false,
+          quantity: doc.data().quantity,
+          unit: doc.data().unit,
+        }));
+      }
+
+      // Try to match ticket items with list items
+      const enrichedItems = (analysis.items || []).map(ticketItem => {
+        const normalizedTicketName = (ticketItem.name || '').toLowerCase().trim();
+
+        // Find best match in list items
+        let bestMatch = null;
+        let bestScore = 0;
+
+        for (const listItem of listItems) {
+          const score = calculateMatchScore(normalizedTicketName, listItem.normalizedName);
+          if (score > bestScore && score >= 0.4) {
+            bestScore = score;
+            bestMatch = listItem;
+          }
+        }
+
+        return {
+          ...ticketItem,
+          matchedListItemId: bestMatch?.id || null,
+          matchedListItemName: bestMatch?.name || null,
+          matchConfidence: bestScore,
+          status: bestMatch ? 'matched' : 'unmatched',
+        };
+      });
+
       return {
         success: true,
-        data: analysis,
+        data: {
+          ...analysis,
+          items: enrichedItems,
+        },
+        listItemCount: listItems.length,
       };
     } catch (error) {
       console.error('Error processing ticket:', error);
@@ -155,6 +206,37 @@ export const processTicket = onCall(
     }
   }
 );
+
+/**
+ * Calculate match score between two product names (0-1)
+ */
+function calculateMatchScore(name1, name2) {
+  if (!name1 || !name2) return 0;
+
+  const a = name1.toLowerCase().trim();
+  const b = name2.toLowerCase().trim();
+
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) return 0.8;
+
+  // Check word overlap
+  const words1 = a.split(/\s+/).filter(w => w.length > 2);
+  const words2 = b.split(/\s+/).filter(w => w.length > 2);
+
+  if (words1.length === 0 || words2.length === 0) return 0;
+
+  let matches = 0;
+  for (const w1 of words1) {
+    for (const w2 of words2) {
+      if (w1.includes(w2) || w2.includes(w1)) {
+        matches++;
+        break;
+      }
+    }
+  }
+
+  return matches / Math.max(words1.length, words2.length);
+}
 
 /**
  * Save a processed purchase to Firestore

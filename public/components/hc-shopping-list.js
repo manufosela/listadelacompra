@@ -25,6 +25,7 @@ import {
   getNextAvailableColor
 } from '/js/categories.js';
 import './hc-list-item.js';
+import './hc-ticket-scanner.js';
 
 export class HcShoppingList extends LitElement {
   static properties = {
@@ -755,6 +756,10 @@ export class HcShoppingList extends LitElement {
     .bulk-actions {
       display: flex;
       gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .ticket-scanner-container {
       margin-bottom: 1rem;
     }
 
@@ -2271,6 +2276,11 @@ export class HcShoppingList extends LitElement {
     }
   }
 
+  _handleTicketApplied(e) {
+    // El ticket ha sido aplicado, la lista se actualiza automáticamente via onSnapshot
+    console.log('Ticket aplicado:', e.detail);
+  }
+
   async _handleQuickAdd(e) {
     e.preventDefault();
     const name = (this._quickAddValue || '').trim();
@@ -2427,6 +2437,18 @@ export class HcShoppingList extends LitElement {
               </div>
             </div>
           ` : ''}
+        </div>
+      ` : ''}
+
+      <!-- Ticket Scanner (only for shopping lists, not readonly) -->
+      ${!isAgnostic && !this.readonly && this.mode === 'shopping' ? html`
+        <div class="ticket-scanner-container">
+          <hc-ticket-scanner
+            list-id="${this.listId}"
+            user-id="${this.userId}"
+            .listItems=${this.items}
+            @ticket-applied=${this._handleTicketApplied}
+          ></hc-ticket-scanner>
         </div>
       ` : ''}
 
