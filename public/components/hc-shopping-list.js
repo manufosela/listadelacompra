@@ -35,6 +35,8 @@ export class HcShoppingList extends LitElement {
     newItemUnit: { type: String, state: true },
     newItemNotes: { type: String, state: true }, // Para listas agnósticas
     newItemPriority: { type: String, state: true }, // Para listas agnósticas
+    newItemIsChecklist: { type: Boolean, state: true }, // Si el item es una sublista
+    newChecklistItems: { type: Array, state: true }, // Items de la sublista al crear
     suggestions: { type: Array, state: true },
     showSuggestions: { type: Boolean, state: true },
     selectedSuggestionIndex: { type: Number, state: true },
@@ -45,7 +47,11 @@ export class HcShoppingList extends LitElement {
     editItemQuantity: { type: Number, state: true },
     editItemUnit: { type: String, state: true },
     editItemNotes: { type: String, state: true },
-    editItemPriority: { type: String, state: true }
+    editItemPriority: { type: String, state: true },
+    // Estado para edición de sublistas
+    editItemIsChecklist: { type: Boolean, state: true },
+    editChecklistItems: { type: Array, state: true },
+    editChecklistItemText: { type: String, state: true }
   };
 
   static styles = css`
@@ -118,6 +124,48 @@ export class HcShoppingList extends LitElement {
       font-size: 0.875rem;
       cursor: pointer;
       transition: all 0.15s ease;
+      color: #1e293b;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .control-btn {
+        border-color: #475569;
+        color: #94a3b8;
+      }
+
+      .control-btn:hover {
+        background: #334155;
+        color: #f1f5f9;
+      }
+
+      .control-btn.active {
+        background: #1e3a5f;
+        border-color: #3b82f6;
+        color: #3b82f6;
+      }
+
+      .mode-toggle {
+        background: #334155;
+      }
+
+      .mode-btn {
+        color: #94a3b8;
+      }
+
+      .mode-btn:hover {
+        color: #f1f5f9;
+      }
+
+      .mode-btn.active {
+        background: #1e293b;
+        color: #3b82f6;
+      }
+
+      .filter-select {
+        background: #1e293b;
+        border-color: #334155;
+        color: #f1f5f9;
+      }
     }
 
     .filter-select:focus {
@@ -157,12 +205,34 @@ export class HcShoppingList extends LitElement {
       font-size: 1rem;
       transition: border-color 0.15s ease;
       box-sizing: border-box;
+      background: white;
+      color: #1e293b;
+    }
+
+    .add-item-input::placeholder {
+      color: #94a3b8;
     }
 
     .add-item-input:focus {
       outline: none;
       border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .add-item-input {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #334155;
+      }
+
+      .add-item-input::placeholder {
+        color: #64748b;
+      }
+
+      .add-item-input:focus {
+        border-color: #3b82f6;
+      }
     }
 
     .suggestions-dropdown {
@@ -187,6 +257,7 @@ export class HcShoppingList extends LitElement {
       align-items: center;
       gap: 0.5rem;
       transition: background 0.1s ease;
+      color: #1e293b;
     }
 
     .suggestion-item:hover,
@@ -207,6 +278,26 @@ export class HcShoppingList extends LitElement {
       color: #94a3b8;
     }
 
+    @media (prefers-color-scheme: dark) {
+      .suggestions-dropdown {
+        background: #1e293b;
+        border-color: #334155;
+      }
+
+      .suggestion-item {
+        color: #f1f5f9;
+      }
+
+      .suggestion-item:hover,
+      .suggestion-item.selected {
+        background: #334155;
+      }
+
+      .suggestion-category {
+        color: #64748b;
+      }
+    }
+
     .quantity-input {
       width: 70px;
     }
@@ -218,6 +309,8 @@ export class HcShoppingList extends LitElement {
       border-radius: 0.5rem;
       font-size: 1rem;
       text-align: center;
+      background: white;
+      color: #1e293b;
     }
 
     .quantity-input input:focus {
@@ -236,12 +329,27 @@ export class HcShoppingList extends LitElement {
       border-radius: 0.5rem;
       font-size: 1rem;
       background: white;
+      color: #1e293b;
       cursor: pointer;
     }
 
     .unit-select select:focus {
       outline: none;
       border-color: #2563eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .quantity-input input {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #334155;
+      }
+
+      .unit-select select {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #334155;
+      }
     }
 
     .add-btn {
@@ -352,6 +460,12 @@ export class HcShoppingList extends LitElement {
       resize: none;
       font-family: inherit;
       box-sizing: border-box;
+      background: white;
+      color: #1e293b;
+    }
+
+    .notes-input textarea::placeholder {
+      color: #94a3b8;
     }
 
     .notes-input textarea:focus {
@@ -370,12 +484,190 @@ export class HcShoppingList extends LitElement {
       border-radius: 0.5rem;
       font-size: 1rem;
       background: white;
+      color: #1e293b;
       cursor: pointer;
     }
 
     .priority-select select:focus {
       outline: none;
       border-color: #2563eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .notes-input textarea {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #334155;
+      }
+
+      .notes-input textarea::placeholder {
+        color: #64748b;
+      }
+
+      .priority-select select {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #334155;
+      }
+    }
+
+    /* Checkbox "Es sublista" */
+    .checklist-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+    }
+
+    .checklist-option input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .checklist-option label {
+      font-size: 0.875rem;
+      color: #64748b;
+      cursor: pointer;
+    }
+
+    /* Formulario de subelementos */
+    .checklist-builder {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      margin-top: 0.5rem;
+      width: 100%;
+    }
+
+    .checklist-builder-title {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+
+    .checklist-builder-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .checklist-builder-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      background: white;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+      color: #1e293b;
+    }
+
+    .checklist-builder-item span {
+      flex: 1;
+    }
+
+    .checklist-builder-item button {
+      width: 20px;
+      height: 20px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: #94a3b8;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+    }
+
+    .checklist-builder-item button:hover {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    .checklist-builder-add {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .checklist-builder-add input {
+      flex: 1;
+      padding: 0.375rem 0.5rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+      background: white;
+      color: #1e293b;
+    }
+
+    .checklist-builder-add input::placeholder {
+      color: #94a3b8;
+    }
+
+    .checklist-builder-add input:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .checklist-builder-add button {
+      padding: 0.375rem 0.75rem;
+      background: #e2e8f0;
+      border: none;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: #334155;
+    }
+
+    .checklist-builder-add button:hover {
+      background: #cbd5e1;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .checklist-option label {
+        color: #94a3b8;
+      }
+
+      .checklist-builder {
+        background: #334155;
+        border-color: #475569;
+      }
+
+      .checklist-builder-title {
+        color: #94a3b8;
+      }
+
+      .checklist-builder-item {
+        background: #1e293b;
+        color: #f1f5f9;
+      }
+
+      .checklist-builder-item button {
+        color: #64748b;
+      }
+
+      .checklist-builder-add input {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #475569;
+      }
+
+      .checklist-builder-add input::placeholder {
+        color: #64748b;
+      }
+
+      .checklist-builder-add button {
+        background: #475569;
+        color: #f1f5f9;
+      }
+
+      .checklist-builder-add button:hover {
+        background: #64748b;
+      }
     }
 
     /* Modal de edición */
@@ -475,6 +767,50 @@ export class HcShoppingList extends LitElement {
     .btn-save:hover {
       background: #1d4ed8;
     }
+
+    @media (prefers-color-scheme: dark) {
+      .edit-modal {
+        background: #1e293b;
+        color: #f1f5f9;
+      }
+
+      .edit-modal h3 {
+        color: #f1f5f9;
+      }
+
+      .edit-modal label {
+        color: #94a3b8;
+      }
+
+      .edit-modal input,
+      .edit-modal select,
+      .edit-modal textarea {
+        background: #0f172a;
+        border-color: #334155;
+        color: #f1f5f9;
+      }
+
+      .edit-modal input::placeholder,
+      .edit-modal textarea::placeholder {
+        color: #64748b;
+      }
+
+      .edit-modal input:focus,
+      .edit-modal select:focus,
+      .edit-modal textarea:focus {
+        border-color: #3b82f6;
+      }
+
+      .btn-cancel {
+        border-color: #475569;
+        color: #94a3b8;
+      }
+
+      .btn-cancel:hover {
+        background: #334155;
+        color: #f1f5f9;
+      }
+    }
   `;
 
   constructor() {
@@ -492,6 +828,9 @@ export class HcShoppingList extends LitElement {
     this.newItemUnit = 'unidad';
     this.newItemNotes = '';
     this.newItemPriority = '';
+    this.newItemIsChecklist = false;
+    this.newChecklistItems = [];
+    this.newChecklistItemText = '';
     this.suggestions = [];
     this.showSuggestions = false;
     this.selectedSuggestionIndex = -1;
@@ -506,6 +845,9 @@ export class HcShoppingList extends LitElement {
     this.editItemUnit = 'unidad';
     this.editItemNotes = '';
     this.editItemPriority = '';
+    this.editItemIsChecklist = false;
+    this.editChecklistItems = [];
+    this.editChecklistItemText = '';
   }
 
   connectedCallback() {
@@ -680,6 +1022,12 @@ export class HcShoppingList extends LitElement {
       if (isAgnostic) {
         itemData.notes = this.newItemNotes || null;
         itemData.priority = this.newItemPriority || null;
+
+        // Si es sublista, añadir el checklist
+        if (this.newItemIsChecklist && this.newChecklistItems.length > 0) {
+          itemData.isChecklist = true;
+          itemData.checklist = this.newChecklistItems;
+        }
       } else {
         itemData.quantity = this.newItemQuantity || 1;
         itemData.unit = this.newItemUnit || 'unidad';
@@ -708,6 +1056,9 @@ export class HcShoppingList extends LitElement {
       this.newItemUnit = 'unidad';
       this.newItemNotes = '';
       this.newItemPriority = '';
+      this.newItemIsChecklist = false;
+      this.newChecklistItems = [];
+      this.newChecklistItemText = '';
       this.suggestions = [];
       this.showSuggestions = false;
       this._selectedProduct = null;
@@ -803,6 +1154,107 @@ export class HcShoppingList extends LitElement {
     }
   }
 
+  // Manejadores de sublista/checklist
+  async _handleChecklistToggle(e) {
+    const { itemId, checklistIndex, checked } = e.detail;
+
+    if (!this.userId || !this.listId) return;
+
+    try {
+      // Encontrar el item actual
+      const item = this.items.find(i => i.id === itemId);
+      if (!item || !item.checklist) return;
+
+      // Crear una copia del checklist con el cambio
+      const updatedChecklist = [...item.checklist];
+      updatedChecklist[checklistIndex] = {
+        ...updatedChecklist[checklistIndex],
+        checked
+      };
+
+      // Calcular estado del item padre basado en la sublista
+      const allChecked = updatedChecklist.every(i => i.checked);
+      const someChecked = updatedChecklist.some(i => i.checked);
+
+      const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', itemId);
+      await updateDoc(itemRef, {
+        checklist: updatedChecklist,
+        checked: allChecked,
+        partiallyChecked: someChecked && !allChecked,
+        updatedAt: serverTimestamp()
+      });
+
+      // Actualizar timestamp de la lista
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+    } catch (error) {
+      console.error('Error toggling checklist item:', error);
+    }
+  }
+
+  async _handleChecklistAdd(e) {
+    const { itemId, text } = e.detail;
+
+    if (!this.userId || !this.listId || !text.trim()) return;
+
+    try {
+      // Encontrar el item actual
+      const item = this.items.find(i => i.id === itemId);
+      const currentChecklist = item?.checklist || [];
+
+      // Añadir nuevo elemento al checklist
+      const updatedChecklist = [
+        ...currentChecklist,
+        { text: text.trim(), checked: false }
+      ];
+
+      const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', itemId);
+      await updateDoc(itemRef, {
+        checklist: updatedChecklist,
+        updatedAt: serverTimestamp()
+      });
+
+      // Actualizar timestamp de la lista
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+    } catch (error) {
+      console.error('Error adding checklist item:', error);
+    }
+  }
+
+  async _handleChecklistRemove(e) {
+    const { itemId, checklistIndex } = e.detail;
+
+    if (!this.userId || !this.listId) return;
+
+    try {
+      // Encontrar el item actual
+      const item = this.items.find(i => i.id === itemId);
+      if (!item || !item.checklist) return;
+
+      // Crear una copia del checklist sin el elemento eliminado
+      const updatedChecklist = item.checklist.filter((_, index) => index !== checklistIndex);
+
+      // Recalcular estado del item padre
+      const allChecked = updatedChecklist.length > 0 && updatedChecklist.every(i => i.checked);
+      const someChecked = updatedChecklist.some(i => i.checked);
+
+      const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', itemId);
+      await updateDoc(itemRef, {
+        checklist: updatedChecklist,
+        checked: allChecked,
+        partiallyChecked: someChecked && !allChecked,
+        updatedAt: serverTimestamp()
+      });
+
+      // Actualizar timestamp de la lista
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+    } catch (error) {
+      console.error('Error removing checklist item:', error);
+    }
+  }
+
   _handleEditItem(e) {
     const { item } = e.detail;
     this.editingItem = item;
@@ -811,6 +1263,10 @@ export class HcShoppingList extends LitElement {
     this.editItemUnit = item.unit || 'unidad';
     this.editItemNotes = item.notes || '';
     this.editItemPriority = item.priority || '';
+    // Cargar datos de sublista
+    this.editItemIsChecklist = item.isChecklist || false;
+    this.editChecklistItems = item.checklist ? [...item.checklist] : [];
+    this.editChecklistItemText = '';
   }
 
   _handleCancelEdit() {
@@ -820,6 +1276,9 @@ export class HcShoppingList extends LitElement {
     this.editItemUnit = 'unidad';
     this.editItemNotes = '';
     this.editItemPriority = '';
+    this.editItemIsChecklist = false;
+    this.editChecklistItems = [];
+    this.editChecklistItemText = '';
   }
 
   async _handleSaveEdit(e) {
@@ -840,6 +1299,16 @@ export class HcShoppingList extends LitElement {
       if (isAgnostic) {
         updates.notes = this.editItemNotes || null;
         updates.priority = this.editItemPriority || null;
+        // Datos de sublista
+        updates.isChecklist = this.editItemIsChecklist;
+        updates.checklist = this.editItemIsChecklist ? this.editChecklistItems : null;
+        // Recalcular estado checked si es sublista
+        if (this.editItemIsChecklist && this.editChecklistItems.length > 0) {
+          const checkedCount = this.editChecklistItems.filter(i => i.checked).length;
+          const total = this.editChecklistItems.length;
+          updates.checked = checkedCount === total;
+          updates.partiallyChecked = checkedCount > 0 && checkedCount < total;
+        }
       } else {
         updates.quantity = this.editItemQuantity || 1;
         updates.unit = this.editItemUnit || 'unidad';
@@ -891,6 +1360,73 @@ export class HcShoppingList extends LitElement {
 
   _handlePriorityChange(e) {
     this.newItemPriority = e.target.value;
+  }
+
+  _handleIsChecklistChange(e) {
+    this.newItemIsChecklist = e.target.checked;
+    if (!e.target.checked) {
+      this.newChecklistItems = [];
+    }
+  }
+
+  _handleNewChecklistItemTextChange(e) {
+    this.newChecklistItemText = e.target.value;
+  }
+
+  _handleAddChecklistBuilderItem(e) {
+    e?.preventDefault();
+    if (!this.newChecklistItemText.trim()) return;
+
+    this.newChecklistItems = [
+      ...this.newChecklistItems,
+      { text: this.newChecklistItemText.trim(), checked: false }
+    ];
+    this.newChecklistItemText = '';
+  }
+
+  _handleRemoveChecklistBuilderItem(index) {
+    this.newChecklistItems = this.newChecklistItems.filter((_, i) => i !== index);
+  }
+
+  _handleChecklistBuilderKeydown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this._handleAddChecklistBuilderItem();
+    }
+  }
+
+  // Métodos para el checklist builder en modo edición
+  _handleEditIsChecklistChange(e) {
+    this.editItemIsChecklist = e.target.checked;
+    if (!this.editItemIsChecklist) {
+      this.editChecklistItems = [];
+    }
+  }
+
+  _handleEditChecklistItemTextChange(e) {
+    this.editChecklistItemText = e.target.value;
+  }
+
+  _handleAddEditChecklistItem(e) {
+    e?.preventDefault();
+    if (!this.editChecklistItemText.trim()) return;
+
+    this.editChecklistItems = [
+      ...this.editChecklistItems,
+      { text: this.editChecklistItemText.trim(), checked: false }
+    ];
+    this.editChecklistItemText = '';
+  }
+
+  _handleRemoveEditChecklistItem(index) {
+    this.editChecklistItems = this.editChecklistItems.filter((_, i) => i !== index);
+  }
+
+  _handleEditChecklistBuilderKeydown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this._handleAddEditChecklistItem();
+    }
   }
 
   async _handleInputChange(e) {
@@ -1094,15 +1630,6 @@ export class HcShoppingList extends LitElement {
           </div>
           ${isAgnostic ? html`
             <!-- Campos para listas agnósticas -->
-            <div class="notes-input">
-              <label>Notas (opcional)</label>
-              <textarea
-                rows="1"
-                placeholder="Notas..."
-                .value=${this.newItemNotes}
-                @input=${this._handleNotesChange}
-              ></textarea>
-            </div>
             <div class="priority-select">
               <label>Prioridad</label>
               <select .value=${this.newItemPriority} @change=${this._handlePriorityChange}>
@@ -1111,6 +1638,15 @@ export class HcShoppingList extends LitElement {
                   <option value="${p.id}">${p.icon} ${p.name}</option>
                 `)}
               </select>
+            </div>
+            <div class="checklist-option">
+              <input
+                type="checkbox"
+                id="is-checklist"
+                .checked=${this.newItemIsChecklist}
+                @change=${this._handleIsChecklistChange}
+              />
+              <label for="is-checklist">Es sublista</label>
             </div>
           ` : html`
             <!-- Campos para listas de compra -->
@@ -1134,10 +1670,35 @@ export class HcShoppingList extends LitElement {
               </select>
             </div>
           `}
-          <button type="submit" class="add-btn" ?disabled=${!this.newItemName.trim()}>
+          <button type="submit" class="add-btn" ?disabled=${!this.newItemName.trim() || (this.newItemIsChecklist && this.newChecklistItems.length === 0)}>
             + Añadir
           </button>
         </form>
+        ${isAgnostic && this.newItemIsChecklist ? html`
+          <div class="checklist-builder">
+            <div class="checklist-builder-title">Subelementos de "${this.newItemName || 'sublista'}"</div>
+            ${this.newChecklistItems.length > 0 ? html`
+              <div class="checklist-builder-items">
+                ${this.newChecklistItems.map((item, index) => html`
+                  <div class="checklist-builder-item">
+                    <span>☐ ${item.text}</span>
+                    <button type="button" @click=${() => this._handleRemoveChecklistBuilderItem(index)} title="Eliminar">✕</button>
+                  </div>
+                `)}
+              </div>
+            ` : ''}
+            <div class="checklist-builder-add">
+              <input
+                type="text"
+                placeholder="Añadir subelemento..."
+                .value=${this.newChecklistItemText}
+                @input=${this._handleNewChecklistItemTextChange}
+                @keydown=${this._handleChecklistBuilderKeydown}
+              />
+              <button type="button" @click=${this._handleAddChecklistBuilderItem}>+ Añadir</button>
+            </div>
+          </div>
+        ` : ''}
         </div>
       ` : ''}
 
@@ -1167,6 +1728,9 @@ export class HcShoppingList extends LitElement {
                   @remove=${this._handleRemoveItem}
                   @assign=${this._handleAssignItem}
                   @edit=${this._handleEditItem}
+                  @checklist-toggle=${this._handleChecklistToggle}
+                  @checklist-add=${this._handleChecklistAdd}
+                  @checklist-remove=${this._handleChecklistRemove}
                 ></hc-list-item>
               `)}
             </div>
@@ -1210,6 +1774,40 @@ export class HcShoppingList extends LitElement {
                     `)}
                   </select>
                 </div>
+                <div class="checklist-option">
+                  <input
+                    type="checkbox"
+                    id="edit-is-checklist"
+                    .checked=${this.editItemIsChecklist}
+                    @change=${this._handleEditIsChecklistChange}
+                  />
+                  <label for="edit-is-checklist">Es sublista</label>
+                </div>
+                ${this.editItemIsChecklist ? html`
+                  <div class="checklist-builder">
+                    <div class="checklist-builder-title">Subelementos de "${this.editItemName || 'sublista'}"</div>
+                    ${this.editChecklistItems.length > 0 ? html`
+                      <div class="checklist-builder-items">
+                        ${this.editChecklistItems.map((item, index) => html`
+                          <div class="checklist-builder-item">
+                            <span>${item.checked ? '☑' : '☐'} ${item.text}</span>
+                            <button type="button" @click=${() => this._handleRemoveEditChecklistItem(index)} title="Eliminar">✕</button>
+                          </div>
+                        `)}
+                      </div>
+                    ` : ''}
+                    <div class="checklist-builder-add">
+                      <input
+                        type="text"
+                        placeholder="Añadir subelemento..."
+                        .value=${this.editChecklistItemText}
+                        @input=${this._handleEditChecklistItemTextChange}
+                        @keydown=${this._handleEditChecklistBuilderKeydown}
+                      />
+                      <button type="button" @click=${this._handleAddEditChecklistItem}>+ Añadir</button>
+                    </div>
+                  </div>
+                ` : ''}
               ` : html`
                 <div class="form-group">
                   <label>Cantidad</label>

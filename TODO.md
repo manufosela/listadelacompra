@@ -4,6 +4,46 @@ Tareas pendientes y features planificadas para desarrollo futuro.
 
 ---
 
+## Sesión actual (01/01/2026) - Sublistas v2
+
+### Sublistas con details/summary - PENDIENTE DE PROBAR
+
+Se ha rediseñado la UI de sublistas para usar `<details><summary>` nativo.
+
+**Cambios realizados:**
+- Al crear item: checkbox "Es sublista" que permite definir subelementos antes de crear
+- Items normales: checkbox tradicional
+- Sublistas: `<details><summary>` expandible con subelementos dentro
+- Indicador de progreso (0/3, 2/3, etc.) con colores según estado
+
+**Archivos modificados:**
+- `public/components/hc-shopping-list.js`:
+  - Checkbox "Es sublista" en formulario
+  - Builder de subelementos al crear
+  - Nuevos campos: `newItemIsChecklist`, `newChecklistItems`
+- `public/components/hc-list-item.js`:
+  - Render diferenciado: checkbox vs details/summary
+  - Estilos CSS para `.item-checklist`, `summary`, `details`
+
+**Cómo probar:**
+1. Ejecutar `pnpm dev`
+2. Crear lista agnóstica
+3. En modo edición:
+   - Escribir nombre del item
+   - Marcar "Es sublista"
+   - Añadir subelementos con el builder
+   - Click en "+ Añadir"
+4. Verificar que aparece como `<details>` expandible
+5. Expandir y marcar/desmarcar subelementos
+6. Verificar progreso (0/3, 1/3, 3/3) con colores
+
+**Pendiente:**
+- [ ] Verificar estilos en dark mode
+- [ ] Probar edición de sublistas existentes
+- [ ] Verificar sincronización real-time
+
+---
+
 ## Pendiente Inmediato
 
 ### Modo claro/oscuro
@@ -47,19 +87,25 @@ Tareas pendientes y features planificadas para desarrollo futuro.
 
 ## Features Planificadas
 
-### 1. Sublistas / Checklists en elementos
+### 1. Sublistas / Checklists en elementos ✅ IMPLEMENTADO
 
 **Contexto:** Un elemento de una lista general (ej: "Neceser" en lista de viajes) puede necesitar una sublista de cosas a comprobar/meter.
 
 **Requisitos:**
-- [ ] Reemplazar/extender campo "Notas" por sublista con checkboxes
-- [ ] Cada elemento de la sublista es un checkbox simple (texto + checked)
-- [ ] Estados visuales del elemento padre:
+- [x] Reemplazar/extender campo "Notas" por sublista con checkboxes
+- [x] Cada elemento de la sublista es un checkbox simple (texto + checked)
+- [x] Estados visuales del elemento padre:
   - ☐ Sin marcar: ningún checkbox de sublista marcado
-  - ☐ Parcial (rayita horizontal): algunos checkboxes marcados
+  - ☐ Parcial (rayita horizontal naranja): algunos checkboxes marcados
   - ☑ Completado: todos los checkboxes de la sublista marcados
-- [ ] UI para añadir/eliminar elementos de la sublista
-- [ ] Persistir sublista en Firestore como array de objetos `{ text: string, checked: boolean }`
+- [x] UI para añadir/eliminar elementos de la sublista
+- [x] Persistir sublista en Firestore como array de objetos `{ text: string, checked: boolean }`
+
+**Implementación:**
+- `hc-list-item.js`: Renderiza sublista expandible con toggle, checkboxes individuales
+- `hc-shopping-list.js`: Manejadores para toggle/add/remove de items de sublista
+- Solo disponible en listas agnósticas (no en listas de compra)
+- El estado checked del item padre se auto-calcula según la sublista
 
 **Modelo de datos:**
 ```javascript
