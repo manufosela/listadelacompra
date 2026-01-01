@@ -7,6 +7,15 @@ import { LitElement, html, css } from '/js/vendor/lit.bundle.js';
 import { processTicket, applyTicketToList } from '/js/tickets.js';
 import { getCurrentGroupId } from '/js/group.js';
 
+// Cargar pdf.js dinámicamente
+let pdfjsLib = null;
+async function loadPdfJs() {
+  if (pdfjsLib) return pdfjsLib;
+  pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+  return pdfjsLib;
+}
+
 export class HcTicketScanner extends LitElement {
   static properties = {
     listId: { type: String, attribute: 'list-id' },
@@ -412,7 +421,7 @@ export class HcTicketScanner extends LitElement {
   async _handleFileSelect(e) {
     const file = e.target.files?.[0];
     if (file) {
-      await this._processImage(file);
+      await this._processFile(file);
     }
   }
 
@@ -429,9 +438,48 @@ export class HcTicketScanner extends LitElement {
     e.preventDefault();
     e.currentTarget.classList.remove('dragover');
     const file = e.dataTransfer?.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      await this._processImage(file);
+    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
+      await this._processFile(file);
     }
+  }
+
+  async _convertPdfToImage(file) {
+    const pdfjs = await loadPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+
+    const scale = 2;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+    });
+  }
+
+  async _processFile(file) {
+    let imageFile = file;
+
+    if (file.type === 'application/pdf') {
+      this._step = 'processing';
+      this._error = null;
+      try {
+        imageFile = await this._convertPdfToImage(file);
+      } catch (error) {
+        console.error('Error converting PDF:', error);
+        this._error = 'Error al convertir el PDF';
+        this._step = 'upload';
+        return;
+      }
+    }
+
+    await this._processImage(imageFile);
   }
 
   async _processImage(file) {
@@ -551,10 +599,10 @@ export class HcTicketScanner extends LitElement {
           @drop=${this._handleDrop}
         >
           <div class="upload-icon">📷</div>
-          <div class="upload-text">Haz clic o arrastra una foto del ticket</div>
-          <div class="upload-hint">JPG, PNG - Se procesará con IA</div>
+          <div class="upload-text">Haz clic o arrastra una foto o PDF del ticket</div>
+          <div class="upload-hint">JPG, PNG, PDF</div>
         </div>
-        <input type="file" id="file-input" class="hidden-input" accept="image/*" capture="environment" @change=${this._handleFileSelect} />
+        <input type="file" id="file-input" class="hidden-input" accept="image/*,application/pdf" capture="environment" @change=${this._handleFileSelect} />
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" @click=${this.close}>Cancelar</button>
