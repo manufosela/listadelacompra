@@ -12,10 +12,19 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
 
+  // Timeout más largo para dar tiempo a cargar
+  timeout: 60000,
+  expect: {
+    timeout: 10000
+  },
+
   use: {
     baseURL: 'http://localhost:4321',
     trace: 'on-first-retry',
-    screenshot: 'only-on-failure'
+    screenshot: 'only-on-failure',
+    // Configuración adicional para estabilidad
+    actionTimeout: 15000,
+    navigationTimeout: 30000
   },
 
   projects: [
@@ -29,10 +38,17 @@ export default defineConfig({
     }
   ],
 
+  // Configuración del servidor web para tests
   webServer: {
-    command: 'pnpm dev',
+    // Usa el script que genera config de test y arranca el servidor
+    command: 'node scripts/start-test-server.js',
     url: 'http://localhost:4321',
     reuseExistingServer: !process.env.CI,
-    timeout: 120000
+    timeout: 120000,
+    // Variables de entorno para el servidor
+    env: {
+      NODE_ENV: 'test',
+      USE_EMULATORS: 'true'
+    }
   }
 });
