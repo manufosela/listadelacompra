@@ -14,13 +14,19 @@ import AppLayout from '../../layouts/AppLayout.astro';
       </div>
     </header>
 
-    <!-- Tabs -->
-    <div class="tabs">
-      <button id="tab-mine" class="tab active">Mis listas</button>
-      <button id="tab-shared" class="tab">
-        Compartidas
-        <span id="shared-count" class="tab-badge" hidden>0</span>
-      </button>
+    <!-- Tabs y controles -->
+    <div class="tabs-row">
+      <div class="tabs">
+        <button id="tab-mine" class="tab active">Mis listas</button>
+        <button id="tab-shared" class="tab">
+          Compartidas
+          <span id="shared-count" class="tab-badge" hidden>0</span>
+        </button>
+      </div>
+      <div class="view-toggle">
+        <button id="view-grid" class="view-toggle-btn" title="Vista iconos">☷</button>
+        <button id="view-list" class="view-toggle-btn active" title="Vista lista">☰</button>
+      </div>
     </div>
 
     <div id="lists-container" class="lists-container">
@@ -36,6 +42,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
   import { collection, query, onSnapshot, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
   let currentTab = 'mine';
+  let viewMode = localStorage.getItem('listsViewMode') || 'list'; // 'grid' o 'list', default lista
   let myLists = [];
   let sharedLists = [];
   let unsubscribe = null;
@@ -47,12 +54,14 @@ import AppLayout from '../../layouts/AppLayout.astro';
       tabMine: document.getElementById('tab-mine'),
       tabShared: document.getElementById('tab-shared'),
       sharedCount: document.getElementById('shared-count'),
-      greeting: document.getElementById('user-greeting')
+      greeting: document.getElementById('user-greeting'),
+      viewGrid: document.getElementById('view-grid'),
+      viewList: document.getElementById('view-list')
     };
   }
 
   function setupTabs() {
-    const { tabMine, tabShared } = getElements();
+    const { tabMine, tabShared, viewGrid, viewList } = getElements();
 
     tabMine?.addEventListener('click', () => {
       currentTab = 'mine';
@@ -67,6 +76,32 @@ import AppLayout from '../../layouts/AppLayout.astro';
       tabMine?.classList.remove('active');
       renderLists();
     });
+
+    // View toggle
+    viewGrid?.addEventListener('click', () => {
+      viewMode = 'grid';
+      localStorage.setItem('listsViewMode', 'grid');
+      viewGrid.classList.add('active');
+      viewList?.classList.remove('active');
+      renderLists();
+    });
+
+    viewList?.addEventListener('click', () => {
+      viewMode = 'list';
+      localStorage.setItem('listsViewMode', 'list');
+      viewList.classList.add('active');
+      viewGrid?.classList.remove('active');
+      renderLists();
+    });
+
+    // Aplicar estado inicial del toggle
+    if (viewMode === 'list') {
+      viewList?.classList.add('active');
+      viewGrid?.classList.remove('active');
+    } else {
+      viewGrid?.classList.add('active');
+      viewList?.classList.remove('active');
+    }
   }
 
   async function loadSharedLists() {
@@ -166,32 +201,69 @@ import AppLayout from '../../layouts/AppLayout.astro';
       return;
     }
 
-    container.innerHTML = `
-      <div class="lists-grid">
-        ${lists.map(list => {
-          // Para listas compartidas, construir URL con ownerId
-          const listUrl = isSharedTab
-            ? `/app/list?id=${list.listId}&owner=${list.ownerId}`
-            : `/app/list?id=${list.id}`;
+    if (viewMode === 'list') {
+      // Vista lista/tabla
+      container.innerHTML = `
+        <div class="lists-table-wrapper">
+          <table class="lists-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Nombre</th>
+                <th>Elementos</th>
+                ${isSharedTab ? '<th>Propietario</th>' : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${lists.map(list => {
+                const listUrl = isSharedTab
+                  ? `/app/list?id=${list.listId}&owner=${list.ownerId}`
+                  : `/app/list?id=${list.id}`;
 
-          return `
-            <a href="${listUrl}" class="list-card">
-              <div class="list-card-icon">${list.icon || '🛒'}</div>
-              <div class="list-card-name">${list.name}</div>
-              ${isSharedTab ? `
-                <div class="list-card-owner">
-                  <span class="owner-badge">De ${list.ownerName}</span>
+                return `
+                  <tr onclick="window.location.href='${listUrl}'">
+                    <td class="icon-cell">${list.icon || '🛒'}</td>
+                    <td class="name-cell">
+                      ${list.name}
+                      ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
+                    </td>
+                    <td class="count-cell">${list.itemCount || 0}</td>
+                    ${isSharedTab ? `<td class="owner-cell">${list.ownerName || ''}</td>` : ''}
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      // Vista grid (iconos)
+      container.innerHTML = `
+        <div class="lists-grid">
+          ${lists.map(list => {
+            const listUrl = isSharedTab
+              ? `/app/list?id=${list.listId}&owner=${list.ownerId}`
+              : `/app/list?id=${list.id}`;
+
+            return `
+              <a href="${listUrl}" class="list-card">
+                <div class="list-card-icon">${list.icon || '🛒'}</div>
+                <div class="list-card-name">${list.name}</div>
+                ${isSharedTab ? `
+                  <div class="list-card-owner">
+                    <span class="owner-badge">De ${list.ownerName}</span>
+                  </div>
+                ` : ''}
+                <div class="list-card-meta">
+                  ${!isSharedTab ? `<span>${list.itemCount || 0} elementos</span>` : ''}
+                  ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
                 </div>
-              ` : ''}
-              <div class="list-card-meta">
-                ${!isSharedTab ? `<span>${list.itemCount || 0} elementos</span>` : ''}
-                ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
-              </div>
-            </a>
-          `;
-        }).join('')}
-      </div>
-    `;
+              </a>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
   }
 </script>
 
@@ -218,12 +290,50 @@ import AppLayout from '../../layouts/AppLayout.astro';
     font-size: var(--font-size-sm);
   }
 
+  /* Tabs row */
+  .tabs-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
   /* Tabs */
   .tabs {
     display: flex;
     gap: var(--space-xs);
-    margin-bottom: var(--space-lg);
-    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* View toggle */
+  .view-toggle {
+    display: flex;
+    background: var(--color-bg-secondary);
+    border-radius: 0.375rem;
+    padding: 0.125rem;
+    margin-bottom: -1px;
+  }
+
+  .view-toggle-btn {
+    padding: 0.375rem 0.5rem;
+    border: none;
+    background: transparent;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    transition: all 0.15s ease;
+    line-height: 1;
+  }
+
+  .view-toggle-btn:hover {
+    color: var(--color-text);
+  }
+
+  .view-toggle-btn.active {
+    background: var(--color-bg);
+    color: var(--color-primary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 
   .tab {
@@ -353,6 +463,80 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
     .list-card-icon {
       font-size: 2rem;
+    }
+  }
+
+  /* Table view styles */
+  .lists-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .lists-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .lists-table th,
+  .lists-table td {
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .lists-table th {
+    font-weight: 500;
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+  }
+
+  .lists-table tbody tr {
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .lists-table tbody tr:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .lists-table .icon-cell {
+    width: 50px;
+    font-size: 1.5rem;
+    text-align: center;
+  }
+
+  .lists-table .name-cell {
+    font-weight: 500;
+  }
+
+  .lists-table .name-cell .members-badge {
+    margin-left: var(--space-sm);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  .lists-table .count-cell {
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  .lists-table .owner-cell {
+    color: var(--color-text-secondary);
+  }
+
+  @media (max-width: 480px) {
+    .tabs-row {
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .view-toggle {
+      order: -1;
+      width: 100%;
+      justify-content: flex-end;
+      margin-bottom: var(--space-sm);
     }
   }
 </style>
