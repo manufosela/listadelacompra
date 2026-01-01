@@ -3,11 +3,10 @@
  * AuthGuard Component
  * Protege páginas que requieren autenticación.
  *
- * - Consulta el estado de auth desde auth.js
- * - Si ya hay sesión, muestra contenido inmediatamente
- * - Si no hay sesión resuelta, espera evento 'auth-ready' (que se dispara UNA vez)
- * - Si no hay usuario, redirige a login
- * - Compatible con Astro View Transitions
+ * Estrategia optimizada para View Transitions:
+ * - Si hay sesión cacheada (window.__authUser): contenido visible inmediatamente
+ * - Si no hay sesión cacheada: muestra spinner mientras verifica
+ * - Si no hay usuario: redirige a login
  */
 
 interface Props {
@@ -33,6 +32,8 @@ const { redirectTo = '/login' } = Astro.props;
 </div>
 
 <style>
+  /* Por defecto: guard oculto, contenido visible */
+  /* Esto evita flash en View Transitions cuando ya hay sesión */
   .auth-guard {
     position: fixed;
     top: 0;
@@ -42,19 +43,16 @@ const { redirectTo = '/login' } = Astro.props;
     width: 100%;
     height: 100%;
     background: var(--color-bg, white);
-    display: flex;
+    display: none; /* Oculto por defecto */
     align-items: center;
     justify-content: center;
     z-index: 99999;
     margin: 0;
     padding: 0;
-    transition: opacity 0.15s ease;
   }
 
-  .auth-guard.hidden {
-    opacity: 0;
-    pointer-events: none;
-    display: none;
+  .auth-guard.checking {
+    display: flex; /* Solo visible cuando verificamos */
   }
 
   .auth-guard-content {
@@ -78,11 +76,11 @@ const { redirectTo = '/login' } = Astro.props;
   }
 
   .auth-content {
-    display: none;
+    display: block; /* Visible por defecto */
   }
 
-  .auth-content.visible {
-    display: block;
+  .auth-content.hidden {
+    display: none;
   }
 
   @keyframes auth-spin {
@@ -91,69 +89,94 @@ const { redirectTo = '/login' } = Astro.props;
 </style>
 
 <script is:inline>
-  // Registrar listeners globales solo una vez
-  if (!window.__authGuardInitialized) {
-    window.__authGuardInitialized = true;
+  // Ejecución síncrona inmediata - antes de cualquier render
+  (function() {
+    var authGuard = document.getElementById('auth-guard');
+    var authContent = document.getElementById('auth-content');
+    if (!authGuard || !authContent) return;
 
-    function showContent() {
-      const authGuard = document.getElementById('auth-guard');
-      const authContent = document.getElementById('auth-content');
-      if (authGuard && authContent) {
-        authGuard.classList.add('hidden');
-        authContent.classList.add('visible');
-      }
+    // Si ya hay usuario cacheado, no hacer nada (defaults ya muestran contenido)
+    if (window.__authUser) {
+      return;
     }
 
-    function redirectToLogin() {
-      const authGuard = document.getElementById('auth-guard');
-      const redirectTo = authGuard?.dataset.redirect || '/login';
-      window.location.href = redirectTo;
-    }
+    // Si no hay usuario cacheado, mostrar guard y ocultar contenido mientras verificamos
+    authGuard.classList.add('checking');
+    authContent.classList.add('hidden');
+  })();
 
-    async function runAuthGuard() {
-      const authGuard = document.getElementById('auth-guard');
-      const authContent = document.getElementById('auth-content');
+  // Lógica de verificación de auth (solo se registra una vez)
+  if (!window.__authGuardListenerRegistered) {
+    window.__authGuardListenerRegistered = true;
 
+    function completeAuth(user) {
+      var authGuard = document.getElementById('auth-guard');
+      var authContent = document.getElementById('auth-content');
       if (!authGuard || !authContent) return;
-      if (authContent.classList.contains('visible')) return;
 
-      const { isAuthResolved, getCurrentUser } = await import('/js/auth.js');
-
-      if (isAuthResolved()) {
-        const user = getCurrentUser();
-        if (user) {
-          showContent();
-        } else {
-          redirectToLogin();
-        }
+      if (user) {
+        window.__authUser = user;
+        authGuard.classList.remove('checking');
+        authContent.classList.remove('hidden');
       } else {
-        window.addEventListener('auth-ready', (e) => {
-          if (e.detail.user) {
-            showContent();
-          } else {
-            redirectToLogin();
-          }
-        }, { once: true });
+        window.__authUser = null;
+        var redirectTo = authGuard.dataset.redirect || '/login';
+        window.location.href = redirectTo;
       }
     }
 
-    // Listener para View Transitions
-    document.addEventListener('astro:page-load', runAuthGuard);
+    async function checkAuth() {
+      // Si ya verificamos y hay usuario, no hacer nada
+      if (window.__authUser) return;
 
-    // Ejecutar inmediatamente
-    runAuthGuard();
+      var authGuard = document.getElementById('auth-guard');
+      if (!authGuard) return;
+
+      // Si el guard no está mostrando "checking", no necesitamos verificar
+      if (!authGuard.classList.contains('checking')) return;
+
+      try {
+        var auth = await import('/js/auth.js');
+
+        if (auth.isAuthResolved()) {
+          completeAuth(auth.getCurrentUser());
+        } else {
+          window.addEventListener('auth-ready', function(e) {
+            completeAuth(e.detail.user);
+          }, { once: true });
+        }
+      } catch (e) {
+        console.error('Error checking auth:', e);
+        completeAuth(null);
+      }
+    }
+
+    // Verificar en carga inicial y en cada View Transition
+    checkAuth();
+    document.addEventListener('astro:page-load', checkAuth);
   } else {
-    // En navegaciones subsiguientes, ejecutar directamente
+    // En navegaciones subsiguientes, verificar si necesitamos chequear
     (async function() {
-      const authGuard = document.getElementById('auth-guard');
-      const authContent = document.getElementById('auth-content');
-      if (!authGuard || !authContent) return;
-      if (authContent.classList.contains('visible')) return;
+      if (window.__authUser) return; // Ya autenticado
 
-      const { isAuthResolved, getCurrentUser } = await import('/js/auth.js');
-      if (isAuthResolved() && getCurrentUser()) {
-        authGuard.classList.add('hidden');
-        authContent.classList.add('visible');
+      var authGuard = document.getElementById('auth-guard');
+      if (!authGuard || !authGuard.classList.contains('checking')) return;
+
+      try {
+        var auth = await import('/js/auth.js');
+        if (auth.isAuthResolved()) {
+          var user = auth.getCurrentUser();
+          if (user) {
+            window.__authUser = user;
+            authGuard.classList.remove('checking');
+            var authContent = document.getElementById('auth-content');
+            if (authContent) authContent.classList.remove('hidden');
+          } else {
+            window.location.href = authGuard.dataset.redirect || '/login';
+          }
+        }
+      } catch (e) {
+        console.error('Error in subsequent auth check:', e);
       }
     })();
   }

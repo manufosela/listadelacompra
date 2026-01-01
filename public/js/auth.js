@@ -13,6 +13,8 @@ import { auth, db } from './firebase-config.js';
 import {
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -40,6 +42,7 @@ let authReadyFired = false;
 
 /**
  * Inicia sesión con Google
+ * Intenta popup primero, si el navegador lo bloquea usa redirect
  * @returns {Promise<User>} Usuario autenticado
  */
 export async function signInWithGoogle() {
@@ -52,7 +55,33 @@ export async function signInWithGoogle() {
 
     return user;
   } catch (error) {
+    // Si el popup está bloqueado, usar redirect como fallback
+    if (error.code === 'auth/popup-blocked') {
+      console.log('Popup bloqueado, usando redirect...');
+      await signInWithRedirect(auth, googleProvider);
+      // El resultado se procesará cuando la página recargue
+      return null;
+    }
     console.error('Error signing in with Google:', error);
+    throw error;
+  }
+}
+
+/**
+ * Procesa el resultado del redirect de Google (si existe)
+ * Debe llamarse al cargar la página de login
+ * @returns {Promise<User|null>}
+ */
+export async function handleGoogleRedirectResult() {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      await createOrUpdateUserProfile(result.user);
+      return result.user;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error processing Google redirect:', error);
     throw error;
   }
 }

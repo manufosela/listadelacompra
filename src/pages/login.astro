@@ -103,12 +103,17 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 </BaseLayout>
 
 <script type="module">
-  import { signInWithGoogle, signInWithEmail, onAuthStateChanged } from '/js/auth.js';
+  import { signInWithGoogle, signInWithEmail, onAuthStateChanged, handleGoogleRedirectResult } from '/js/auth.js';
 
   const googleBtn = document.getElementById('google-signin-btn');
   const emailToggle = document.getElementById('email-toggle');
   const emailForm = document.getElementById('email-form');
   const errorMessage = document.getElementById('error-message');
+
+  // Procesar resultado de redirect (si viene de un popup bloqueado)
+  handleGoogleRedirectResult().catch((error) => {
+    console.error('Error processing redirect:', error);
+  });
 
   // Verificar si ya está autenticado
   onAuthStateChanged((user) => {
@@ -166,6 +171,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
     const errorMessages = {
       'auth/popup-closed-by-user': 'Has cerrado la ventana de login.',
+      'auth/popup-blocked': 'Popup bloqueado. Redirigiendo...',
       'auth/network-request-failed': 'Error de conexión. Verifica tu internet.',
       'auth/user-not-found': 'No existe una cuenta con este email.',
       'auth/wrong-password': 'Contraseña incorrecta.',

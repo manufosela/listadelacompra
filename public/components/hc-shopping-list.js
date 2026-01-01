@@ -36,6 +36,7 @@ export class HcShoppingList extends LitElement {
     groupByCategory: { type: Boolean, state: true },
     showCompleted: { type: Boolean, state: true },
     filterByAssignee: { type: String, state: true },
+    viewMode: { type: String, state: true }, // 'list' or 'table'
     loading: { type: Boolean, state: true },
     newItemName: { type: String, state: true },
     newItemQuantity: { type: Number, state: true },
@@ -67,7 +68,10 @@ export class HcShoppingList extends LitElement {
     _newCategoryName: { type: String, state: true },
     _newCategoryIcon: { type: String, state: true },
     _newCategoryBgColor: { type: String, state: true },
-    _newCategoryTextColor: { type: String, state: true }
+    _newCategoryTextColor: { type: String, state: true },
+    // Quick add
+    _quickAddValue: { type: String, state: true },
+    _duplicateWarnings: { type: Array, state: true }
   };
 
   static styles = css`
@@ -419,6 +423,312 @@ export class HcShoppingList extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+    }
+
+    /* View toggle buttons */
+    .view-toggle {
+      display: flex;
+      background: #f1f5f9;
+      border-radius: 0.375rem;
+      padding: 0.125rem;
+    }
+
+    .view-toggle-btn {
+      padding: 0.375rem 0.5rem;
+      border: none;
+      background: transparent;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      font-size: 1rem;
+      color: #64748b;
+      transition: all 0.15s ease;
+      line-height: 1;
+    }
+
+    .view-toggle-btn:hover {
+      color: #334155;
+    }
+
+    .view-toggle-btn.active {
+      background: white;
+      color: #2563eb;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .view-toggle {
+        background: #334155;
+      }
+
+      .view-toggle-btn {
+        color: #94a3b8;
+      }
+
+      .view-toggle-btn:hover {
+        color: #f1f5f9;
+      }
+
+      .view-toggle-btn.active {
+        background: #1e293b;
+        color: #3b82f6;
+      }
+    }
+
+    /* Table view styles */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    .items-table th,
+    .items-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .items-table th {
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      background: #f8fafc;
+    }
+
+    .items-table tbody tr {
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+
+    .items-table tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .items-table tbody tr.checked {
+      background: transparent;
+    }
+
+    .items-table tbody tr.checked td {
+      text-decoration: line-through;
+    }
+
+    .items-table .checkbox-cell {
+      width: 40px;
+      text-align: center;
+    }
+
+    .table-checkbox {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #cbd5e1;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-size: 0.75rem;
+      background: white;
+    }
+
+    .table-checkbox:hover {
+      border-color: #22c55e;
+    }
+
+    .table-checkbox.checked {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: white;
+    }
+
+    .table-quantity {
+      white-space: nowrap;
+    }
+
+    .table-actions {
+      width: 80px;
+      text-align: right;
+    }
+
+    .table-actions button {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: all 0.15s ease;
+    }
+
+    .items-table tbody tr:hover .table-actions button {
+      opacity: 1;
+    }
+
+    .table-actions button:hover {
+      background: #f1f5f9;
+    }
+
+    .table-actions button.danger:hover {
+      background: #fef2f2;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .items-table th,
+      .items-table td {
+        border-color: #334155;
+      }
+
+      .items-table th {
+        background: #1e293b;
+        color: #94a3b8;
+      }
+
+      .items-table tbody tr:hover {
+        background: #334155;
+      }
+
+      .table-checkbox {
+        background: #1e293b;
+        border-color: #475569;
+      }
+
+      .table-actions button:hover {
+        background: #334155;
+      }
+
+      .table-actions button.danger:hover {
+        background: #450a0a;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .items-table th,
+      .items-table td {
+        padding: 0.5rem;
+      }
+
+      .items-table .hide-mobile {
+        display: none;
+      }
+    }
+
+    /* Quick add styles */
+    .quick-add-section {
+      margin-bottom: 1rem;
+    }
+
+    .quick-add-form {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .quick-add-input {
+      flex: 1;
+      padding: 0.625rem 1rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      background: white;
+      color: #1e293b;
+      transition: border-color 0.15s ease;
+    }
+
+    .quick-add-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .quick-add-input:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .quick-add-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      border-radius: 0.5rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .quick-add-btn:hover {
+      background: #1d4ed8;
+    }
+
+    .quick-add-btn:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .quick-add-input {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #334155;
+      }
+
+      .quick-add-input::placeholder {
+        color: #64748b;
+      }
+
+      .quick-add-input:focus {
+        border-color: #3b82f6;
+      }
+    }
+
+    /* Duplicate warning styles */
+    .duplicate-warning {
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      border-radius: 0.375rem;
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: #92400e;
+    }
+
+    .duplicate-warning-title {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .duplicate-warning-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    .duplicate-warning-item {
+      background: rgba(245, 158, 11, 0.2);
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.6875rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .duplicate-warning {
+        background: #451a03;
+        border-color: #b45309;
+        color: #fcd34d;
+      }
+
+      .duplicate-warning-item {
+        background: rgba(251, 191, 36, 0.2);
+      }
     }
 
     .progress-bar {
@@ -992,6 +1302,7 @@ export class HcShoppingList extends LitElement {
     this.groupByCategory = true;
     this.showCompleted = true;
     this.filterByAssignee = '';
+    this.viewMode = 'table'; // 'table' por defecto
     this.loading = true;
     this.newItemName = '';
     this.newItemQuantity = 1;
@@ -1027,6 +1338,8 @@ export class HcShoppingList extends LitElement {
     this._newCategoryIcon = '📦';
     this._newCategoryBgColor = CATEGORY_COLORS[0].bgColor;
     this._newCategoryTextColor = CATEGORY_COLORS[0].textColor;
+    this._quickAddValue = '';
+    this._duplicateWarnings = [];
   }
 
   connectedCallback() {
@@ -1271,6 +1584,7 @@ export class HcShoppingList extends LitElement {
       this.suggestions = [];
       this.showSuggestions = false;
       this._selectedProduct = null;
+      this._duplicateWarnings = [];
     } catch (error) {
       console.error('Error adding item:', error);
     }
@@ -1543,6 +1857,23 @@ export class HcShoppingList extends LitElement {
     this.filterByAssignee = e.target.value;
   }
 
+  _findDuplicates(searchText) {
+    if (!searchText || searchText.length < 2) {
+      return [];
+    }
+
+    const normalizedSearch = searchText.toLowerCase().trim();
+    const duplicates = this.items.filter(item => {
+      const normalizedName = (item.name || '').toLowerCase();
+      // Coincidencia exacta o si el nombre contiene el texto de búsqueda
+      return normalizedName === normalizedSearch ||
+             normalizedName.includes(normalizedSearch) ||
+             normalizedSearch.includes(normalizedName);
+    });
+
+    return duplicates.slice(0, 3); // Máximo 3 sugerencias
+  }
+
   _getCategoryIcon(categoryId) {
     const cat = this._categories.find(c => c.id === categoryId);
     if (cat) return cat.icon || '📦';
@@ -1723,6 +2054,9 @@ export class HcShoppingList extends LitElement {
     this.newItemName = e.target.value;
     this._selectedProduct = null;
 
+    // Buscar duplicados en la lista actual
+    this._duplicateWarnings = this._findDuplicates(e.target.value);
+
     // Debounce search
     if (this._searchTimeout) {
       clearTimeout(this._searchTimeout);
@@ -1748,6 +2082,11 @@ export class HcShoppingList extends LitElement {
         console.warn('Error searching products:', error);
       }
     }, 200);
+  }
+
+  _handleQuickAddInput(e) {
+    this._quickAddValue = e.target.value;
+    this._duplicateWarnings = this._findDuplicates(e.target.value);
   }
 
   _handleKeyDown(e) {
@@ -1817,6 +2156,111 @@ export class HcShoppingList extends LitElement {
     this.mode = newMode;
   }
 
+  async _handleQuickAdd(e) {
+    e.preventDefault();
+    const name = (this._quickAddValue || '').trim();
+    if (!name || !this.userId || !this.listId) return;
+
+    const isAgnostic = this.listType === 'agnostic';
+
+    try {
+      const itemsRef = collection(db, 'users', this.userId, 'lists', this.listId, 'items');
+
+      const itemData = {
+        name,
+        category: null,
+        checked: false,
+        createdAt: serverTimestamp(),
+        createdBy: this.userId,
+        itemType: isAgnostic ? 'general' : 'shopping'
+      };
+
+      if (!isAgnostic) {
+        itemData.quantity = 1;
+        itemData.unit = 'unidad';
+      }
+
+      await addDoc(itemsRef, itemData);
+
+      // Actualizar contador de la lista
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, {
+        itemCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
+
+      this._quickAddValue = '';
+      this._duplicateWarnings = [];
+    } catch (error) {
+      console.error('Error adding quick item:', error);
+    }
+  }
+
+  _handleTableRowClick(item, e) {
+    // No hacer toggle si se clickea en botones de acción
+    if (e.target.closest('.table-actions')) {
+      return;
+    }
+    if (this.mode === 'shopping') {
+      this._handleToggleItem({ detail: { itemId: item.id, checked: !item.checked } });
+    }
+  }
+
+  _renderTableView() {
+    const isAgnostic = this.listType === 'agnostic';
+    const isShoppingMode = this.mode === 'shopping';
+    const isEditMode = this.mode === 'edit';
+
+    return html`
+      <table class="items-table">
+        <thead>
+          <tr>
+            ${isShoppingMode ? html`<th class="checkbox-cell"></th>` : ''}
+            <th>Nombre</th>
+            ${!isAgnostic ? html`<th class="hide-mobile">Cantidad</th>` : ''}
+            ${this.groupByCategory ? html`<th class="hide-mobile">Categoría</th>` : ''}
+            ${isEditMode ? html`<th class="table-actions"></th>` : ''}
+          </tr>
+        </thead>
+        <tbody>
+          ${this._filteredItems.map(item => {
+            const cat = this._getCategoryById(item.category);
+            return html`
+              <tr
+                class="${item.checked && isShoppingMode ? 'checked' : ''}"
+                @click=${(e) => this._handleTableRowClick(item, e)}
+              >
+                ${isShoppingMode ? html`
+                  <td class="checkbox-cell">
+                    <div
+                      class="table-checkbox ${item.checked ? 'checked' : ''}"
+                      @click=${(e) => e.stopPropagation()}
+                    >
+                      ${item.checked ? '✓' : ''}
+                    </div>
+                  </td>
+                ` : ''}
+                <td>${item.name}</td>
+                ${!isAgnostic ? html`<td class="table-quantity hide-mobile">${item.quantity} ${item.unit}</td>` : ''}
+                ${this.groupByCategory ? html`
+                  <td class="hide-mobile">
+                    ${cat ? html`<span>${cat.icon || ''} ${cat.name}</span>` : '—'}
+                  </td>
+                ` : ''}
+                ${isEditMode ? html`
+                  <td class="table-actions">
+                    <button @click=${() => this._handleEditItem({ detail: { item } })} title="Editar">✏️</button>
+                    <button class="danger" @click=${() => this._handleRemoveItem({ detail: { itemId: item.id } })} title="Eliminar">🗑️</button>
+                  </td>
+                ` : ''}
+              </tr>
+            `;
+          })}
+        </tbody>
+      </table>
+    `;
+  }
+
   render() {
     if (this.loading) {
       return html`<div class="loading">Cargando items...</div>`;
@@ -1841,6 +2285,34 @@ export class HcShoppingList extends LitElement {
         </button>
       </div>
 
+      <!-- Quick add in shopping mode -->
+      ${this.mode === 'shopping' ? html`
+        <div class="quick-add-section">
+          <form class="quick-add-form" @submit=${this._handleQuickAdd}>
+            <input
+              type="text"
+              class="quick-add-input"
+              placeholder="${isAgnostic ? '+ Añadir item rápido...' : '+ Añadir producto rápido...'}"
+              .value=${this._quickAddValue || ''}
+              @input=${this._handleQuickAddInput}
+            />
+            <button type="submit" class="quick-add-btn" ?disabled=${!this._quickAddValue?.trim()}>
+              +
+            </button>
+          </form>
+          ${this._duplicateWarnings.length > 0 ? html`
+            <div class="duplicate-warning">
+              <div class="duplicate-warning-title">⚠️ Ya existe en la lista:</div>
+              <div class="duplicate-warning-items">
+                ${this._duplicateWarnings.map(item => html`
+                  <span class="duplicate-warning-item">${item.name}</span>
+                `)}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
       <!-- Progress (only in shopping mode) -->
       ${this.mode === 'shopping' ? html`
         <div class="progress-text">
@@ -1852,6 +2324,18 @@ export class HcShoppingList extends LitElement {
       ` : ''}
 
       <div class="list-controls">
+        <div class="view-toggle">
+          <button
+            class="view-toggle-btn ${this.viewMode === 'table' ? 'active' : ''}"
+            @click=${() => this.viewMode = 'table'}
+            title="Vista tabla"
+          >☰</button>
+          <button
+            class="view-toggle-btn ${this.viewMode === 'list' ? 'active' : ''}"
+            @click=${() => this.viewMode = 'list'}
+            title="Vista lista"
+          >▤</button>
+        </div>
         <button
           class="control-btn ${this.groupByCategory ? 'active' : ''}"
           @click=${() => this.groupByCategory = !this.groupByCategory}
@@ -1915,6 +2399,16 @@ export class HcShoppingList extends LitElement {
                     </div>
                   `;
                 })}
+              </div>
+            ` : ''}
+            ${this._duplicateWarnings.length > 0 ? html`
+              <div class="duplicate-warning" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 50;">
+                <div class="duplicate-warning-title">⚠️ Ya existe en la lista:</div>
+                <div class="duplicate-warning-items">
+                  ${this._duplicateWarnings.map(item => html`
+                    <span class="duplicate-warning-item">${item.name}</span>
+                  `)}
+                </div>
               </div>
             ` : ''}
           </div>
@@ -2054,6 +2548,8 @@ export class HcShoppingList extends LitElement {
           <div class="empty-state-icon">${this.mode === 'edit' ? '📝' : (isAgnostic ? '✅' : '🛒')}</div>
           <p>${this.mode === 'edit' ? (isAgnostic ? '¡Añade items a la lista!' : '¡Añade productos a la lista!') : 'La lista está vacía.'}</p>
         </div>
+      ` : this.viewMode === 'table' ? html`
+        ${this._renderTableView()}
       ` : html`
         ${Object.entries(this._groupedItems).map(([category, items]) => {
           const cat = this._getCategoryById(category);

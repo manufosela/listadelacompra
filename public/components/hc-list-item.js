@@ -33,14 +33,12 @@ export class HcListItem extends LitElement {
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
-    .item.checked {
-      background: #f8fafc;
-      opacity: 0.7;
-    }
-
     .item.checked .item-name {
       text-decoration: line-through;
-      color: #94a3b8;
+    }
+
+    .item.clickable {
+      cursor: pointer;
     }
 
     .checkbox {
@@ -533,13 +531,8 @@ export class HcListItem extends LitElement {
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
       }
 
-      .item.checked {
-        background: #0f172a;
-        opacity: 0.7;
-      }
-
       .item.checked .item-name {
-        color: #64748b;
+        text-decoration: line-through;
       }
 
       .item-name {
@@ -736,6 +729,14 @@ export class HcListItem extends LitElement {
       bubbles: true,
       composed: true
     }));
+  }
+
+  _handleItemClick(e) {
+    // No hacer toggle si se clickea en botones de acción o menú de asignación
+    if (e.target.closest('.item-actions') || e.target.closest('.assign-menu')) {
+      return;
+    }
+    this._handleToggle();
   }
 
   _handleRemove() {
@@ -983,12 +984,15 @@ export class HcListItem extends LitElement {
 
       // Si es un item normal, usar checkbox
       return html`
-        <div class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass}">
+        <div
+          class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass} ${isShoppingMode ? 'clickable' : ''}"
+          @click=${isShoppingMode ? this._handleItemClick : null}
+        >
           <!-- Checkbox solo en modo usar, no en modo edición -->
           ${isShoppingMode ? html`
             <div
               class="checkbox-square ${item.checked ? 'checked' : ''}"
-              @click=${this._handleToggle}
+              @click=${(e) => e.stopPropagation()}
               role="checkbox"
               aria-checked="${item.checked}"
               tabindex="0"
@@ -1073,12 +1077,15 @@ export class HcListItem extends LitElement {
 
     // Render para listas de compra (comportamiento original)
     return html`
-      <div class="item ${item.checked && isShoppingMode ? 'checked' : ''}">
+      <div
+        class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''}"
+        @click=${isShoppingMode ? this._handleItemClick : null}
+      >
         <!-- Checkbox only in shopping mode -->
         ${isShoppingMode ? html`
           <div
             class="checkbox ${item.checked ? 'checked' : ''}"
-            @click=${this._handleToggle}
+            @click=${(e) => e.stopPropagation()}
             role="checkbox"
             aria-checked="${item.checked}"
             tabindex="0"
@@ -1088,7 +1095,7 @@ export class HcListItem extends LitElement {
           </div>
         ` : ''}
 
-        <div class="item-content" @click=${this._toggleExpanded}>
+        <div class="item-content">
           <div class="item-main">
             <span class="item-name">${item.name || item.productName}</span>
             <span class="item-quantity">
