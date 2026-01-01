@@ -24,6 +24,8 @@ Conventional commits obligatorio (commitlint configurado):
 ```
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`
 
+**NUNCA mencionar IA/AI en commits ni comentarios de código.**
+
 ## Descripción del Proyecto
 
 HomeCart (lista-de-mi-compra) es una aplicación colaborativa de listas de la compra construida con Astro (output estático) y Firebase. Usa componentes web Lit para interactividad client-side.

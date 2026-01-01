@@ -542,22 +542,22 @@ export class HcTicketScanner extends LitElement {
   _renderUploadStep() {
     return html`
       <div class="modal-body">
-        \${this._error ? html`<div class="error">\${this._error}</div>` : ''}
+        ${this._error ? html`<div class="error">${this._error}</div>` : ''}
         <div
           class="upload-zone"
-          @click=\${() => this.shadowRoot.getElementById('file-input').click()}
-          @dragover=\${this._handleDragOver}
-          @dragleave=\${this._handleDragLeave}
-          @drop=\${this._handleDrop}
+          @click=${() => this.shadowRoot.getElementById('file-input').click()}
+          @dragover=${this._handleDragOver}
+          @dragleave=${this._handleDragLeave}
+          @drop=${this._handleDrop}
         >
           <div class="upload-icon">📷</div>
           <div class="upload-text">Haz clic o arrastra una foto del ticket</div>
           <div class="upload-hint">JPG, PNG - Se procesará con IA</div>
         </div>
-        <input type="file" id="file-input" class="hidden-input" accept="image/*" capture="environment" @change=\${this._handleFileSelect} />
+        <input type="file" id="file-input" class="hidden-input" accept="image/*" capture="environment" @change=${this._handleFileSelect} />
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click=\${this.close}>Cancelar</button>
+        <button class="btn btn-secondary" @click=${this.close}>Cancelar</button>
       </div>
     `;
   }
@@ -580,21 +580,21 @@ export class HcTicketScanner extends LitElement {
 
     return html`
       <div class="modal-body">
-        \${this._error ? html`<div class="error">\${this._error}</div>` : ''}
+        ${this._error ? html`<div class="error">${this._error}</div>` : ''}
         <div class="ticket-summary">
-          \${data.store ? html`<div class="summary-row"><span class="summary-label">Tienda</span><span class="summary-value">\${data.store}</span></div>` : ''}
-          \${data.date ? html`<div class="summary-row"><span class="summary-label">Fecha</span><span class="summary-value">\${data.date}</span></div>` : ''}
-          <div class="summary-row"><span class="summary-label">Total</span><span class="summary-value">\${data.total?.toFixed(2) || '?'} €</span></div>
+          ${data.store ? html`<div class="summary-row"><span class="summary-label">Tienda</span><span class="summary-value">${data.store}</span></div>` : ''}
+          ${data.date ? html`<div class="summary-row"><span class="summary-label">Fecha</span><span class="summary-value">${data.date}</span></div>` : ''}
+          <div class="summary-row"><span class="summary-label">Total</span><span class="summary-value">${data.total?.toFixed(2) || '?'} €</span></div>
         </div>
-        <div class="items-header"><h3>Productos detectados (\${activeItems.length})</h3></div>
+        <div class="items-header"><h3>Productos detectados (${activeItems.length})</h3></div>
         <div class="ticket-items">
-          \${data.items.map((item, index) => this._renderTicketItem(item, index))}
+          ${data.items.map((item, index) => this._renderTicketItem(item, index))}
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click=\${() => { this._step = 'upload'; }}>Volver</button>
-        <button class="btn btn-primary" @click=\${this._applyTicket} ?disabled=\${activeItems.length === 0}>
-          Aplicar \${activeItems.length} productos
+        <button class="btn btn-secondary" @click=${() => { this._step = 'upload'; }}>Volver</button>
+        <button class="btn btn-primary" @click=${this._applyTicket} ?disabled=${activeItems.length === 0}>
+          Aplicar ${activeItems.length} productos
         </button>
       </div>
     `;
@@ -604,24 +604,24 @@ export class HcTicketScanner extends LitElement {
     const statusIcons = { matched: '✓', unmatched: '?', new: '+', ignored: '✕' };
     return html`
       <div class="ticket-item">
-        <div class="item-status status-\${item.status}">\${statusIcons[item.status]}</div>
+        <div class="item-status status-${item.status}">${statusIcons[item.status]}</div>
         <div class="item-info">
-          <div class="item-name">\${item.name}</div>
-          \${item.status === 'matched' ? html`<div class="item-match">→ <span class="item-match-name">\${item.matchedListItemName}</span></div>` : ''}
-          \${item.status === 'new' ? html`<div class="item-match">Se añadirá como nuevo</div>` : ''}
-          \${item.status === 'unmatched' && this.listItems.length > 0 ? html`
+          <div class="item-name">${item.name}</div>
+          ${item.status === 'matched' ? html`<div class="item-match">→ <span class="item-match-name">${item.matchedListItemName}</span></div>` : ''}
+          ${item.status === 'new' ? html`<div class="item-match">Se añadirá como nuevo</div>` : ''}
+          ${item.status === 'unmatched' && this.listItems.length > 0 ? html`
             <div class="match-selector">
-              <select @change=\${(e) => this._handleMatchChange(index, e.target.value)}>
+              <select @change=${(e) => this._handleMatchChange(index, e.target.value)}>
                 <option value="">Añadir como nuevo</option>
-                \${this.listItems.map(li => html`<option value="\${li.id}">\${li.name}</option>`)}
+                ${this.listItems.map(li => html`<option value="${li.id}">${li.name}</option>`)}
               </select>
             </div>
           ` : ''}
         </div>
-        <div class="item-price">\${item.totalPrice?.toFixed(2) || item.unitPrice?.toFixed(2) || '?'} €</div>
+        <div class="item-price">${item.totalPrice?.toFixed(2) || item.unitPrice?.toFixed(2) || '?'} €</div>
         <div class="item-actions">
-          <button class="item-action-btn" @click=\${() => this._toggleItemStatus(index)} title="\${item.status === 'ignored' ? 'Incluir' : 'Excluir'}">
-            \${item.status === 'ignored' ? '↩' : '🗑'}
+          <button class="item-action-btn" @click=${() => this._toggleItemStatus(index)} title="${item.status === 'ignored' ? 'Incluir' : 'Excluir'}">
+            ${item.status === 'ignored' ? '↩' : '🗑'}
           </button>
         </div>
       </div>
@@ -647,39 +647,39 @@ export class HcTicketScanner extends LitElement {
           <div class="done-icon">✅</div>
           <div class="done-title">Ticket procesado</div>
           <div class="done-stats">
-            \${r.updated > 0 ? html`<div>\${r.updated} productos actualizados</div>` : ''}
-            \${r.created > 0 ? html`<div>\${r.created} productos añadidos</div>` : ''}
-            \${r.ignored > 0 ? html`<div>\${r.ignored} productos ignorados</div>` : ''}
+            ${r.updated > 0 ? html`<div>${r.updated} productos actualizados</div>` : ''}
+            ${r.created > 0 ? html`<div>${r.created} productos añadidos</div>` : ''}
+            ${r.ignored > 0 ? html`<div>${r.ignored} productos ignorados</div>` : ''}
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary" @click=\${this.close}>Cerrar</button>
+        <button class="btn btn-primary" @click=${this.close}>Cerrar</button>
       </div>
     `;
   }
 
   render() {
     return html`
-      <button class="scan-button" @click=\${this.open}>📷 Escanear ticket</button>
-      \${this._isOpen ? html`
-        <div class="modal-backdrop" @click=\${(e) => e.target === e.currentTarget && this.close()}>
+      <button class="scan-button" @click=${this.open}>📷 Escanear ticket</button>
+      ${this._isOpen ? html`
+        <div class="modal-backdrop" @click=${(e) => e.target === e.currentTarget && this.close()}>
           <div class="modal">
             <div class="modal-header">
               <h2>
-                \${this._step === 'upload' ? 'Escanear ticket' : ''}
-                \${this._step === 'processing' ? 'Procesando...' : ''}
-                \${this._step === 'review' ? 'Revisar productos' : ''}
-                \${this._step === 'applying' ? 'Aplicando...' : ''}
-                \${this._step === 'done' ? 'Completado' : ''}
+                ${this._step === 'upload' ? 'Escanear ticket' : ''}
+                ${this._step === 'processing' ? 'Procesando...' : ''}
+                ${this._step === 'review' ? 'Revisar productos' : ''}
+                ${this._step === 'applying' ? 'Aplicando...' : ''}
+                ${this._step === 'done' ? 'Completado' : ''}
               </h2>
-              <button class="close-btn" @click=\${this.close}>×</button>
+              <button class="close-btn" @click=${this.close}>×</button>
             </div>
-            \${this._step === 'upload' ? this._renderUploadStep() : ''}
-            \${this._step === 'processing' ? this._renderProcessingStep() : ''}
-            \${this._step === 'review' ? this._renderReviewStep() : ''}
-            \${this._step === 'applying' ? this._renderApplyingStep() : ''}
-            \${this._step === 'done' ? this._renderDoneStep() : ''}
+            ${this._step === 'upload' ? this._renderUploadStep() : ''}
+            ${this._step === 'processing' ? this._renderProcessingStep() : ''}
+            ${this._step === 'review' ? this._renderReviewStep() : ''}
+            ${this._step === 'applying' ? this._renderApplyingStep() : ''}
+            ${this._step === 'done' ? this._renderDoneStep() : ''}
           </div>
         </div>
       ` : ''}
