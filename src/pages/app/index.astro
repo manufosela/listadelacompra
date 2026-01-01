@@ -18,6 +18,10 @@ import AppLayout from '../../layouts/AppLayout.astro';
     <div class="tabs-row">
       <div class="tabs">
         <button id="tab-mine" class="tab active">Mis listas</button>
+        <button id="tab-archived" class="tab">
+          Archivadas
+          <span id="archived-count" class="tab-badge" hidden>0</span>
+        </button>
         <button id="tab-shared" class="tab">
           Compartidas
           <span id="shared-count" class="tab-badge" hidden>0</span>
@@ -52,7 +56,9 @@ import AppLayout from '../../layouts/AppLayout.astro';
     return {
       container: document.getElementById('lists-container'),
       tabMine: document.getElementById('tab-mine'),
+      tabArchived: document.getElementById('tab-archived'),
       tabShared: document.getElementById('tab-shared'),
+      archivedCount: document.getElementById('archived-count'),
       sharedCount: document.getElementById('shared-count'),
       greeting: document.getElementById('user-greeting'),
       viewGrid: document.getElementById('view-grid'),
@@ -61,19 +67,30 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   function setupTabs() {
-    const { tabMine, tabShared, viewGrid, viewList } = getElements();
+    const { tabMine, tabArchived, tabShared, viewGrid, viewList } = getElements();
+
+    function setActiveTab(tab) {
+      tabMine?.classList.remove('active');
+      tabArchived?.classList.remove('active');
+      tabShared?.classList.remove('active');
+      tab?.classList.add('active');
+    }
 
     tabMine?.addEventListener('click', () => {
       currentTab = 'mine';
-      tabMine.classList.add('active');
-      tabShared?.classList.remove('active');
+      setActiveTab(tabMine);
+      renderLists();
+    });
+
+    tabArchived?.addEventListener('click', () => {
+      currentTab = 'archived';
+      setActiveTab(tabArchived);
       renderLists();
     });
 
     tabShared?.addEventListener('click', () => {
       currentTab = 'shared';
-      tabShared.classList.add('active');
-      tabMine?.classList.remove('active');
+      setActiveTab(tabShared);
       renderLists();
     });
 
@@ -185,17 +202,47 @@ import AppLayout from '../../layouts/AppLayout.astro';
   });
 
   function renderLists() {
-    const { container } = getElements();
+    const { container, archivedCount } = getElements();
     if (!container) return;
 
-    const lists = currentTab === 'mine' ? myLists : sharedLists;
+    // Filtrar listas abiertas y cerradas
+    const openLists = myLists.filter(l => !l.closed);
+    const archivedLists = myLists.filter(l => l.closed);
+
+    // Actualizar badge de archivadas
+    if (archivedCount) {
+      if (archivedLists.length > 0) {
+        archivedCount.textContent = archivedLists.length;
+        archivedCount.hidden = false;
+      } else {
+        archivedCount.hidden = true;
+      }
+    }
+
+    let lists;
+    if (currentTab === 'mine') {
+      lists = openLists;
+    } else if (currentTab === 'archived') {
+      lists = archivedLists;
+    } else {
+      lists = sharedLists;
+    }
+
     const isSharedTab = currentTab === 'shared';
+    const isArchivedTab = currentTab === 'archived';
 
     if (lists.length === 0) {
+      let emptyMessage = 'No tienes listas todavía';
+      if (isSharedTab) {
+        emptyMessage = 'No tienes listas compartidas contigo';
+      } else if (isArchivedTab) {
+        emptyMessage = 'No tienes listas archivadas';
+      }
+
       container.innerHTML = `
         <div class="empty-state">
-          <p>${isSharedTab ? 'No tienes listas compartidas contigo' : 'No tienes listas todavía'}</p>
-          ${!isSharedTab ? '<a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>' : ''}
+          <p>${emptyMessage}</p>
+          ${!isSharedTab && !isArchivedTab ? '<a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>' : ''}
         </div>
       `;
       return;

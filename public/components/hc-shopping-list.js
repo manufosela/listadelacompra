@@ -31,6 +31,7 @@ export class HcShoppingList extends LitElement {
     listId: { type: String, attribute: 'list-id' },
     userId: { type: String, attribute: 'user-id' },
     listType: { type: String, attribute: 'list-type' }, // 'shopping' or 'agnostic'
+    readonly: { type: Boolean, attribute: 'readonly' }, // Lista cerrada = solo lectura
     items: { type: Array, state: true },
     members: { type: Array, state: true },
     groupByCategory: { type: Boolean, state: true },
@@ -1299,6 +1300,7 @@ export class HcShoppingList extends LitElement {
     this.items = [];
     this.members = [];
     this.listType = 'shopping';
+    this.readonly = false;
     this.groupByCategory = true;
     this.showCompleted = true;
     this.filterByAssignee = '';
@@ -2153,6 +2155,10 @@ export class HcShoppingList extends LitElement {
   }
 
   _setMode(newMode) {
+    // Si es readonly, forzar modo shopping
+    if (this.readonly && newMode === 'edit') {
+      return;
+    }
     this.mode = newMode;
   }
 
@@ -2277,16 +2283,18 @@ export class HcShoppingList extends LitElement {
         >
           ${isAgnostic ? '✅ Usar' : '🛒 Comprar'}
         </button>
-        <button
-          class="mode-btn ${this.mode === 'edit' ? 'active' : ''}"
-          @click=${() => this._setMode('edit')}
-        >
-          ✏️ Editar
-        </button>
+        ${!this.readonly ? html`
+          <button
+            class="mode-btn ${this.mode === 'edit' ? 'active' : ''}"
+            @click=${() => this._setMode('edit')}
+          >
+            ✏️ Editar
+          </button>
+        ` : ''}
       </div>
 
-      <!-- Quick add in shopping mode -->
-      ${this.mode === 'shopping' ? html`
+      <!-- Quick add in shopping mode (solo si no es readonly) -->
+      ${this.mode === 'shopping' && !this.readonly ? html`
         <div class="quick-add-section">
           <form class="quick-add-form" @submit=${this._handleQuickAdd}>
             <input

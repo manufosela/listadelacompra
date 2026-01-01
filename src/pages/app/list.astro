@@ -173,7 +173,20 @@ import AppLayout from '../../layouts/AppLayout.astro';
         listComponent.setAttribute('list-id', listId);
         listComponent.setAttribute('user-id', ownerId); // Usar ownerId para items
         listComponent.setAttribute('list-type', list.listType || 'shopping');
+        if (list.closed) {
+          listComponent.setAttribute('readonly', 'true');
+        }
         container.appendChild(listComponent);
+      } else if (container) {
+        // Actualizar readonly si la lista ya existe
+        const existingComponent = container.querySelector('hc-shopping-list');
+        if (existingComponent) {
+          if (list.closed) {
+            existingComponent.setAttribute('readonly', 'true');
+          } else {
+            existingComponent.removeAttribute('readonly');
+          }
+        }
       }
     }, (error) => {
       console.error('Error loading list:', error);
