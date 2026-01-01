@@ -752,6 +752,47 @@ export class HcShoppingList extends LitElement {
       margin-bottom: 0.5rem;
     }
 
+    .bulk-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .bulk-btn {
+      padding: 0.375rem 0.75rem;
+      background: transparent;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.375rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: #64748b;
+    }
+
+    .bulk-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      color: #334155;
+    }
+
+    .bulk-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .bulk-btn {
+        border-color: #475569;
+        color: #94a3b8;
+      }
+
+      .bulk-btn:hover {
+        background: #334155;
+        border-color: #64748b;
+        color: #f1f5f9;
+      }
+    }
+
     .empty-state {
       text-align: center;
       padding: 3rem;
@@ -2162,6 +2203,57 @@ export class HcShoppingList extends LitElement {
     this.mode = newMode;
   }
 
+  async _markAllItems() {
+    if (!this.userId || !this.listId || this.items.length === 0) return;
+
+    const user = getCurrentUser();
+    const uncheckedItems = this.items.filter(i => !i.checked);
+
+    try {
+      const promises = uncheckedItems.map(item => {
+        const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', item.id);
+        return updateDoc(itemRef, {
+          checked: true,
+          checkedBy: user?.uid || null,
+          checkedAt: serverTimestamp()
+        });
+      });
+
+      await Promise.all(promises);
+
+      // Actualizar timestamp de la lista
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+    } catch (error) {
+      console.error('Error marking all items:', error);
+    }
+  }
+
+  async _unmarkAllItems() {
+    if (!this.userId || !this.listId || this.items.length === 0) return;
+
+    const checkedItems = this.items.filter(i => i.checked);
+
+    try {
+      const promises = checkedItems.map(item => {
+        const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', item.id);
+        return updateDoc(itemRef, {
+          checked: false,
+          checkedBy: null,
+          checkedAt: null
+        });
+      });
+
+      await Promise.all(promises);
+
+      // Actualizar timestamp de la lista
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+    } catch (error) {
+      console.error('Error unmarking all items:', error);
+    }
+  }
+
   async _handleQuickAdd(e) {
     e.preventDefault();
     const name = (this._quickAddValue || '').trim();
@@ -2329,6 +2421,26 @@ export class HcShoppingList extends LitElement {
         <div class="progress-bar">
           <div class="progress-fill" style="width: ${this._progress}%"></div>
         </div>
+        ${this.items.length > 0 ? html`
+          <div class="bulk-actions">
+            <button
+              class="bulk-btn"
+              @click=${this._unmarkAllItems}
+              ?disabled=${this._checkedCount === 0}
+              title="Desmarcar todos los elementos"
+            >
+              ↺ Desmarcar todos
+            </button>
+            <button
+              class="bulk-btn"
+              @click=${this._markAllItems}
+              ?disabled=${this._checkedCount === this.items.length}
+              title="Marcar todos los elementos"
+            >
+              ✓ Marcar todos
+            </button>
+          </div>
+        ` : ''}
       ` : ''}
 
       <div class="list-controls">
