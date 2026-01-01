@@ -165,6 +165,69 @@ export class HcGroupSelector extends LitElement {
       padding: 0.5rem 1rem;
       color: #64748b;
     }
+
+    @media (prefers-color-scheme: dark) {
+      .selector-button {
+        color: #f1f5f9;
+        border-color: #475569;
+      }
+
+      .selector-button:hover {
+        background: #334155;
+        border-color: #64748b;
+      }
+
+      .dropdown {
+        background: #1e293b;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+
+      .dropdown-header {
+        border-color: #334155;
+        color: #94a3b8;
+      }
+
+      .group-item {
+        color: #f1f5f9;
+      }
+
+      .group-item:hover {
+        background: #334155;
+      }
+
+      .group-item.active {
+        background: #1e3a5f;
+      }
+
+      .group-role {
+        color: #94a3b8;
+        background: #334155;
+      }
+
+      .check-icon {
+        color: #60a5fa;
+      }
+
+      .dropdown-footer {
+        border-color: #334155;
+      }
+
+      .create-button {
+        color: #60a5fa;
+      }
+
+      .create-button:hover {
+        background: #1e3a5f;
+      }
+
+      .empty-state {
+        color: #94a3b8;
+      }
+
+      .loading {
+        color: #94a3b8;
+      }
+    }
   `;
 
   constructor() {

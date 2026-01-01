@@ -992,7 +992,7 @@ export class HcListItem extends LitElement {
           ${isShoppingMode ? html`
             <div
               class="checkbox-square ${item.checked ? 'checked' : ''}"
-              @click=${(e) => e.stopPropagation()}
+              @click=${(e) => { e.stopPropagation(); this._handleToggle(); }}
               role="checkbox"
               aria-checked="${item.checked}"
               tabindex="0"
@@ -1085,7 +1085,7 @@ export class HcListItem extends LitElement {
         ${isShoppingMode ? html`
           <div
             class="checkbox ${item.checked ? 'checked' : ''}"
-            @click=${(e) => e.stopPropagation()}
+            @click=${(e) => { e.stopPropagation(); this._handleToggle(); }}
             role="checkbox"
             aria-checked="${item.checked}"
             tabindex="0"
