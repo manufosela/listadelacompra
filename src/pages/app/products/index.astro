@@ -51,18 +51,35 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
   import { modal as confirmModal } from '/js/modal.js';
   import { toast } from '/js/toast.js';
-  import { getAllProducts, createProduct, updateProduct, deleteProduct, PRODUCT_CATEGORIES } from '/js/db.js';
+  import { getAllProducts, createProduct, updateProduct, deleteProduct } from '/js/db.js';
   import { getCurrentGroupId } from '/js/group.js';
+  import { getCategoriesForList } from '/js/categories.js';
 
   let allProducts = [];
+  let allCategories = []; // Incluye default + custom
   const productModal = document.getElementById('product-modal');
   const productCategory = document.getElementById('product-category');
 
-  // Poblar select de categorías
-  if (productCategory) {
-    PRODUCT_CATEGORIES.forEach(cat => {
-      productCategory.innerHTML += `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`;
-    });
+  async function loadCategories(groupId) {
+    try {
+      allCategories = await getCategoriesForList(groupId, 'shopping');
+
+      // Poblar select de categorías
+      if (productCategory) {
+        productCategory.innerHTML = '<option value="">Sin categoría</option>';
+        allCategories.forEach(cat => {
+          productCategory.innerHTML += `<option value="${cat.id}">${cat.icon || '📦'} ${cat.name}</option>`;
+        });
+      }
+    } catch (error) {
+      console.warn('Error loading categories:', error);
+    }
+  }
+
+  function getCategoryDisplay(categoryId) {
+    if (!categoryId) return '-';
+    const cat = allCategories.find(c => c.id === categoryId);
+    return cat ? `${cat.icon || '📦'} ${cat.name}` : categoryId;
   }
 
   async function loadProducts() {
@@ -81,6 +98,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
 
     try {
+      // Cargar categorías primero (incluye custom del grupo)
+      await loadCategories(groupId);
+
       allProducts = await getAllProducts(groupId);
       renderProducts(allProducts);
     } catch (error) {
@@ -114,18 +134,15 @@ import AppLayout from '../../../layouts/AppLayout.astro';
           </tr>
         </thead>
         <tbody>
-          ${products.map(p => {
-            const cat = PRODUCT_CATEGORIES.find(c => c.id === p.category);
-            return `
-              <tr data-id="${p.id}">
-                <td class="product-name">${p.name}</td>
-                <td class="product-category">${cat ? `${cat.icon} ${cat.name}` : '-'}</td>
-                <td class="product-actions">
-                  <button class="btn btn-sm btn-ghost edit-btn">Editar</button>
-                </td>
-              </tr>
-            `;
-          }).join('')}
+          ${products.map(p => `
+            <tr data-id="${p.id}">
+              <td class="product-name">${p.name}</td>
+              <td class="product-category">${getCategoryDisplay(p.category)}</td>
+              <td class="product-actions">
+                <button class="btn btn-sm btn-ghost edit-btn">Editar</button>
+              </td>
+            </tr>
+          `).join('')}
         </tbody>
       </table>
     `;
