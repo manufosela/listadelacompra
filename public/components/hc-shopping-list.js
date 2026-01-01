@@ -16,7 +16,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { getCurrentUser } from '/js/auth.js';
 import { getCurrentGroupId } from '/js/group.js';
-import { searchProducts, UNITS, PRIORITIES } from '/js/db.js';
+import { searchProducts, UNITS, PRIORITIES, incrementProductPurchaseByName, normalizeProductName } from '/js/db.js';
 import {
   DEFAULT_SHOPPING_CATEGORIES,
   CATEGORY_COLORS,
@@ -1610,7 +1610,7 @@ export class HcShoppingList extends LitElement {
       if (!isAgnostic) {
         const groupId = getCurrentGroupId();
         if (groupId && !this._selectedProduct) {
-          this._addToProductCatalog(groupId, name.toLowerCase(), category);
+          this._addToProductCatalog(groupId, name, category);
         }
       }
 
@@ -1635,17 +1635,20 @@ export class HcShoppingList extends LitElement {
 
   async _addToProductCatalog(groupId, name, category) {
     try {
+      const normalizedName = normalizeProductName(name);
+      if (!normalizedName) return;
+
       // Verificar si el producto ya existe en el catálogo
       const productsRef = collection(db, 'groups', groupId, 'products');
       const { getDocs, query: firestoreQuery, where } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
-      const q = firestoreQuery(productsRef, where('normalizedName', '==', name));
+      const q = firestoreQuery(productsRef, where('normalizedName', '==', normalizedName));
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
         // Producto no existe, añadirlo al catálogo
         await addDoc(productsRef, {
-          name,
-          normalizedName: name,
+          name: name.trim(),
+          normalizedName,
           category: category || 'otros',
           createdAt: serverTimestamp(),
           createdBy: this.userId
@@ -1675,6 +1678,20 @@ export class HcShoppingList extends LitElement {
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
       await updateDoc(listRef, { updatedAt: serverTimestamp() });
+
+      // Incrementar contador de compras del producto (solo listas de compra, solo al marcar)
+      if (checked && this.listType !== 'agnostic') {
+        const item = this.items.find(i => i.id === itemId);
+        if (item?.name) {
+          const groupId = getCurrentGroupId();
+          if (groupId) {
+            // No bloquear, ejecutar en background
+            incrementProductPurchaseByName(groupId, item.name).catch(err => {
+              console.warn('Error incrementando purchaseCount:', err);
+            });
+          }
+        }
+      }
     } catch (error) {
       console.error('Error toggling item:', error);
     }

@@ -92,6 +92,62 @@ export const UNITS = [
 ];
 
 // ============================================
+// HELPERS DE NORMALIZACIÓN
+// ============================================
+
+/**
+ * Normaliza un nombre de producto para búsqueda y comparación
+ * - Convierte a minúsculas
+ * - Quita acentos y diacríticos
+ * - Elimina espacios extra
+ */
+export function normalizeProductName(name) {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
+    .replace(/\s+/g, ' '); // Espacios múltiples a uno
+}
+
+/**
+ * Calcula similitud entre dos strings (0-1)
+ * Usa una combinación de: coincidencia de palabras + distancia de edición simplificada
+ */
+export function calculateSimilarity(str1, str2) {
+  const a = normalizeProductName(str1);
+  const b = normalizeProductName(str2);
+
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+
+  // Coincidencia exacta de inicio
+  if (b.startsWith(a) || a.startsWith(b)) return 0.9;
+
+  // Todas las palabras del query están en el producto
+  const queryWords = a.split(' ').filter(w => w.length > 1);
+  const productWords = b.split(' ');
+  const allWordsMatch = queryWords.every(qw =>
+    productWords.some(pw => pw.includes(qw) || qw.includes(pw))
+  );
+  if (allWordsMatch && queryWords.length > 0) return 0.8;
+
+  // Una palabra contiene a la otra
+  if (b.includes(a) || a.includes(b)) return 0.7;
+
+  // Coincidencia parcial de palabras
+  const matchingWords = queryWords.filter(qw =>
+    productWords.some(pw => pw.includes(qw) || qw.includes(pw))
+  );
+  if (matchingWords.length > 0) {
+    return 0.5 * (matchingWords.length / queryWords.length);
+  }
+
+  return 0;
+}
+
+// ============================================
 // PRODUCTOS
 // ============================================
 
@@ -100,7 +156,7 @@ export const UNITS = [
  */
 export async function createProduct(groupId, productData) {
   const productsRef = collection(db, 'groups', groupId, 'products');
-  const normalizedName = productData.name.toLowerCase().trim();
+  const normalizedName = normalizeProductName(productData.name);
 
   const docRef = await addDoc(productsRef, {
     name: productData.name.trim(),
@@ -144,22 +200,71 @@ export async function getAllProducts(groupId) {
 }
 
 /**
- * Busca productos por nombre
+ * Busca productos por nombre con fuzzy matching
+ * Combina búsqueda por prefijo + fuzzy matching, ordenado por relevancia
  */
 export async function searchProducts(groupId, searchQuery, maxResults = 10) {
-  const normalizedQuery = searchQuery.toLowerCase().trim();
+  const normalizedQuery = normalizeProductName(searchQuery);
   if (!normalizedQuery) return [];
 
   const productsRef = collection(db, 'groups', groupId, 'products');
-  const q = query(
+  const results = new Map(); // Usar Map para evitar duplicados
+
+  // 1. Búsqueda por prefijo (más eficiente, resultados más relevantes)
+  const prefixQ = query(
     productsRef,
     where('normalizedName', '>=', normalizedQuery),
     where('normalizedName', '<=', normalizedQuery + '\uf8ff'),
     limit(maxResults)
   );
+  const prefixSnapshot = await getDocs(prefixQ);
 
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  prefixSnapshot.docs.forEach(doc => {
+    const data = { id: doc.id, ...doc.data() };
+    data._similarity = calculateSimilarity(normalizedQuery, data.normalizedName);
+    results.set(doc.id, data);
+  });
+
+  // 2. Si no tenemos suficientes resultados, buscar fuzzy en más productos
+  if (results.size < maxResults) {
+    // Cargar productos más usados para fuzzy matching
+    const fuzzyQ = query(
+      productsRef,
+      orderBy('purchaseCount', 'desc'),
+      limit(50) // Limitar para no cargar demasiados
+    );
+    const fuzzySnapshot = await getDocs(fuzzyQ);
+
+    fuzzySnapshot.docs.forEach(doc => {
+      if (results.has(doc.id)) return; // Ya está en resultados
+
+      const data = { id: doc.id, ...doc.data() };
+      const similarity = calculateSimilarity(normalizedQuery, data.normalizedName);
+
+      // Solo incluir si hay alguna similitud
+      if (similarity >= 0.3) {
+        data._similarity = similarity;
+        results.set(doc.id, data);
+      }
+    });
+  }
+
+  // 3. Ordenar por similitud (descendente) y luego por purchaseCount
+  const sortedResults = Array.from(results.values())
+    .sort((a, b) => {
+      // Primero por similitud
+      if (b._similarity !== a._similarity) {
+        return b._similarity - a._similarity;
+      }
+      // Luego por frecuencia de uso
+      return (b.purchaseCount || 0) - (a.purchaseCount || 0);
+    })
+    .slice(0, maxResults);
+
+  // Limpiar campo interno
+  sortedResults.forEach(r => delete r._similarity);
+
+  return sortedResults;
 }
 
 /**
@@ -189,7 +294,7 @@ export async function updateProduct(groupId, productId, updates) {
   const productRef = doc(db, 'groups', groupId, 'products', productId);
 
   if (updates.name) {
-    updates.normalizedName = updates.name.toLowerCase().trim();
+    updates.normalizedName = normalizeProductName(updates.name);
     updates.name = updates.name.trim();
   }
 
@@ -216,10 +321,31 @@ export async function incrementProductPurchase(groupId, productId) {
 }
 
 /**
+ * Incrementa el contador de compras buscando por nombre
+ * Útil cuando no tenemos el productId pero sí el nombre del item
+ */
+export async function incrementProductPurchaseByName(groupId, itemName) {
+  if (!groupId || !itemName) return;
+
+  const normalizedName = normalizeProductName(itemName);
+  const productsRef = collection(db, 'groups', groupId, 'products');
+  const q = query(productsRef, where('normalizedName', '==', normalizedName), limit(1));
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+    const productDoc = snapshot.docs[0];
+    await updateDoc(productDoc.ref, {
+      purchaseCount: increment(1),
+      lastPurchasedAt: serverTimestamp()
+    });
+  }
+}
+
+/**
  * Busca o crea un producto por nombre
  */
 export async function findOrCreateProduct(groupId, name, defaults = {}) {
-  const normalizedName = name.toLowerCase().trim();
+  const normalizedName = normalizeProductName(name);
 
   const productsRef = collection(db, 'groups', groupId, 'products');
   const q = query(productsRef, where('normalizedName', '==', normalizedName), limit(1));
@@ -232,6 +358,97 @@ export async function findOrCreateProduct(groupId, name, defaults = {}) {
 
   const productId = await createProduct(groupId, { name, ...defaults });
   return getProduct(groupId, productId);
+}
+
+// ============================================
+// MIGRACIÓN DE PRODUCTOS
+// ============================================
+
+/**
+ * Migra productos de las listas de un usuario al catálogo del grupo
+ * Extrae todos los items únicos de las listas de compra y los añade al catálogo
+ * @param {string} userId - ID del usuario
+ * @param {string} groupId - ID del grupo
+ * @returns {Object} - Estadísticas de la migración
+ */
+export async function migrateUserProductsToCatalog(userId, groupId) {
+  if (!userId || !groupId) {
+    throw new Error('userId y groupId son requeridos');
+  }
+
+  const stats = {
+    listsProcessed: 0,
+    itemsProcessed: 0,
+    productsCreated: 0,
+    productsUpdated: 0,
+    duplicatesSkipped: 0
+  };
+
+  try {
+    // 1. Obtener todas las listas de compra del usuario
+    const listsRef = collection(db, 'users', userId, 'lists');
+    const listsSnapshot = await getDocs(listsRef);
+
+    for (const listDoc of listsSnapshot.docs) {
+      const listData = listDoc.data();
+
+      // Solo procesar listas de compra (no agnostic)
+      if (listData.listType === 'agnostic') continue;
+
+      stats.listsProcessed++;
+
+      // 2. Obtener items de la lista
+      const itemsRef = collection(db, 'users', userId, 'lists', listDoc.id, 'items');
+      const itemsSnapshot = await getDocs(itemsRef);
+
+      for (const itemDoc of itemsSnapshot.docs) {
+        const item = itemDoc.data();
+        if (!item.name) continue;
+
+        stats.itemsProcessed++;
+
+        const normalizedName = normalizeProductName(item.name);
+        if (!normalizedName) continue;
+
+        // 3. Verificar si el producto ya existe en el catálogo
+        const productsRef = collection(db, 'groups', groupId, 'products');
+        const q = query(productsRef, where('normalizedName', '==', normalizedName), limit(1));
+        const productSnapshot = await getDocs(q);
+
+        if (productSnapshot.empty) {
+          // Crear nuevo producto
+          await addDoc(productsRef, {
+            name: item.name.trim(),
+            normalizedName,
+            category: item.category || 'otros',
+            purchaseCount: item.checked ? 1 : 0,
+            lastPurchasedAt: item.checked && item.checkedAt ? item.checkedAt : null,
+            createdAt: serverTimestamp(),
+            createdBy: userId
+          });
+          stats.productsCreated++;
+        } else {
+          // Si el item estaba marcado como comprado, incrementar contador
+          if (item.checked) {
+            const productDoc = productSnapshot.docs[0];
+            await updateDoc(productDoc.ref, {
+              purchaseCount: increment(1),
+              lastPurchasedAt: serverTimestamp()
+            });
+            stats.productsUpdated++;
+          } else {
+            stats.duplicatesSkipped++;
+          }
+        }
+      }
+    }
+
+    console.log('✅ Migración completada:', stats);
+    return stats;
+  } catch (error) {
+    console.error('Error en migración:', error);
+    throw error;
+  }
 }
 
 // ============================================
