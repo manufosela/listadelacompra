@@ -97,6 +97,7 @@ export const processTicket = onCall(
     memory: '512MiB',
     timeoutSeconds: 120,
     cors: true,
+    secrets: ['OPENAI_API_KEY'],
   },
   async (request) => {
     // Verify authentication
