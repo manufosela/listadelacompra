@@ -144,6 +144,15 @@ service cloud.firestore {
       // Solo el creador puede eliminar el grupo
       allow delete: if isAuthenticated() && isGroupCreator(groupId);
 
+      // ==================== CATEGORIES ====================
+      // Categorías custom por grupo (para listas de compra y generales)
+      match /categories/{categoryId} {
+        allow read: if isAuthenticated() && isGroupMember(groupId);
+        allow create: if isAuthenticated() && isGroupMember(groupId);
+        allow update: if isAuthenticated() && isGroupMember(groupId);
+        allow delete: if isAuthenticated() && isGroupAdmin(groupId);
+      }
+
       // ==================== PRODUCTS ====================
 
       match /products/{productId} {

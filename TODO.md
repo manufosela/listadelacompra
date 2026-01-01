@@ -4,7 +4,58 @@ Tareas pendientes y features planificadas para desarrollo futuro.
 
 ---
 
-## Sesión actual (01/01/2026) - Sublistas v2 ✅ COMPLETADO
+## Sesión actual (01/01/2026) - Sistema de Categorías ✅ EN PROGRESO
+
+### Gestión de Categorías por Tipo de Lista ✅
+
+Se ha implementado un sistema flexible de categorías independiente por tipo de lista:
+- **Listas de compra**: categorías globales por defecto (14 categorías con emoji) + custom por grupo
+- **Listas generales**: sin categorías por defecto, solo custom por grupo (con colores)
+
+**Archivos creados:**
+- `public/js/categories.js`: Servicio de categorías con CRUD y helpers
+- `public/components/hc-categories-manager.js`: Componente Lit para gestionar categorías
+- `src/pages/app/categories.astro`: Página de gestión de categorías
+
+**Archivos modificados:**
+- `public/components/hc-shopping-list.js`:
+  - Selector de categoría en formulario de creación y edición
+  - Formulario inline para crear nuevas categorías
+  - Carga dinámica de categorías desde Firestore
+- `firebase/firestore.rules`:
+  - Añadida colección `groups/{groupId}/categories` con permisos
+
+**Modelo de datos:**
+```javascript
+// groups/{groupId}/categories/{categoryId}
+{
+  name: "Camping",
+  icon: "⛺",         // Solo para listas de compra
+  bgColor: "#DCFCE7",
+  textColor: "#16A34A",
+  listType: "shopping" | "agnostic",
+  order: 1,
+  createdAt: timestamp,
+  createdBy: "uid"
+}
+```
+
+**Características:**
+- [x] Categorías por defecto para shopping (no editables/borrables)
+- [x] Categorías custom por grupo
+- [x] Selector de categoría al crear/editar items
+- [x] Opción "+ Nueva categoría" inline
+- [x] Selector de colores para categorías
+- [x] Dark mode completo
+- [x] Página `/app/categories` con tabs por tipo de lista
+
+**Pendiente:**
+- [ ] Script de migración de items con categorías antiguas
+- [ ] Añadir enlace a categorías en navegación o ajustes
+
+---
+
+## Sesión anterior - Sublistas v2 ✅ COMPLETADO
 
 ### Sublistas con details/summary ✅
 
@@ -152,7 +203,7 @@ Este comando:
 
 ---
 
-### 2. Gestión de Categorías por Tipo de Lista
+### 2. Gestión de Categorías por Tipo de Lista ✅ IMPLEMENTADO
 
 **Contexto:** Las categorías actuales están hardcodeadas. Se necesita un sistema flexible donde:
 - Listas de compra: categorías típicas de supermercado (lácteos, carnes, etc.) con emoji
@@ -161,50 +212,51 @@ Este comando:
 **Requisitos:**
 
 #### Almacenamiento
-- [ ] Categorías por grupo (no por usuario individual)
-- [ ] Listas de compra: categorías globales por defecto + personalizadas del grupo
-- [ ] Listas generales: sin categorías por defecto, se crean según necesidad
-- [ ] Categorías referenciadas por ID (para soportar renombrado)
+- [x] Categorías por grupo (no por usuario individual)
+- [x] Listas de compra: categorías globales por defecto + personalizadas del grupo
+- [x] Listas generales: sin categorías por defecto, se crean según necesidad
+- [x] Categorías referenciadas por ID (para soportar renombrado)
 
 #### Categorías por defecto (listas de compra)
-- [ ] Crear colección `defaultCategories/shopping` con categorías típicas:
+- [x] Crear colección `defaultCategories/shopping` con categorías típicas:
   - 🥛 Lácteos, 🥩 Carnes, 🐟 Pescados, 🥬 Verduras, 🍎 Frutas
   - 🍞 Panadería, 🥫 Despensa, 🧊 Congelados, 🧴 Limpieza, 🧼 Higiene
   - 🐕 Mascotas, 🍺 Bebidas, 📦 Otros
-- [ ] Categorías por defecto: NO borrables, NO editables (excepto colores)
+  - *Nota: Implementado como constante en `categories.js`, no en Firestore*
+- [x] Categorías por defecto: NO borrables, NO editables (excepto colores)
 
 #### Categorías personalizadas
-- [ ] Crear categorías custom por grupo: `groups/{groupId}/categories/{categoryId}`
-- [ ] Campos: `name`, `icon` (emoji, solo shopping), `bgColor`, `textColor`, `listType`, `isDefault`, `order`
-- [ ] Poder editar nombre, colores
-- [ ] Poder borrar (solo las custom)
+- [x] Crear categorías custom por grupo: `groups/{groupId}/categories/{categoryId}`
+- [x] Campos: `name`, `icon` (emoji, solo shopping), `bgColor`, `textColor`, `listType`, `isDefault`, `order`
+- [x] Poder editar nombre, colores
+- [x] Poder borrar (solo las custom)
 - [ ] Al borrar categoría: quitar categoryId de todos los items que la usen
 
 #### Apariencia
-- [ ] Listas de compra: emoji + nombre
-- [ ] Listas generales: badge con color de fondo + texto (sin emoji)
-- [ ] Selector de color en edición de categoría
+- [x] Listas de compra: emoji + nombre
+- [x] Listas generales: badge con color de fondo + texto (sin emoji)
+- [x] Selector de color en edición de categoría
 
 #### UI - Sección Categorías (`/app/categories`)
-- [ ] Crear página `/app/categories`
-- [ ] Tabs: "Listas de Compra" | "Listas Generales"
-- [ ] Mostrar categorías por defecto (con candado visual)
-- [ ] Mostrar categorías custom del grupo (editables/borrables)
-- [ ] Botón "+ Nueva categoría"
-- [ ] Modal/inline para crear/editar: nombre, emoji (si shopping), colores
-- [ ] Confirmar antes de borrar (mostrar cuántos items afectados)
+- [x] Crear página `/app/categories`
+- [x] Tabs: "Listas de Compra" | "Listas Generales"
+- [x] Mostrar categorías por defecto (con candado visual)
+- [x] Mostrar categorías custom del grupo (editables/borrables)
+- [x] Botón "+ Nueva categoría"
+- [x] Modal/inline para crear/editar: nombre, emoji (si shopping), colores
+- [x] Confirmar antes de borrar (mostrar cuántos items afectados)
 
 #### UI - Selector en creación de item
-- [ ] Dropdown con categorías disponibles según tipo de lista
-- [ ] Opción "+ Nueva categoría" al final del dropdown
-- [ ] Al seleccionar "+ Nueva categoría":
+- [x] Dropdown con categorías disponibles según tipo de lista
+- [x] Opción "+ Nueva categoría" al final del dropdown
+- [x] Al seleccionar "+ Nueva categoría":
   - Expandir inline un mini-form (nombre, color)
   - O abrir modal rápido
   - Crear categoría y seleccionarla automáticamente
 
 #### Extensibilidad
-- [ ] Estructura preparada para nuevos tipos de lista en el futuro
-- [ ] Categorías por defecto definidas por `listType`
+- [x] Estructura preparada para nuevos tipos de lista en el futuro
+- [x] Categorías por defecto definidas por `listType`
 
 **Modelo de datos:**
 ```javascript
@@ -422,7 +474,7 @@ function calculateSimilarity(a, b) {
 ## Prioridad sugerida
 
 1. ~~**Alta** - Sublistas/checklists~~ ✅ COMPLETADO
-2. **Alta** - Gestión de categorías (mejora UX, base para otras features)
+2. ~~**Alta** - Gestión de categorías~~ ✅ IMPLEMENTADO
 3. **Alta** - Sincronización de productos (afecta UX actual)
 4. **Media** - Rediseño tickets (mejora flujo)
 5. **Media** - Mejoras Balance (valor añadido)

@@ -1,0 +1,152 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Categorías">
+  <div class="categories-page">
+    <header class="page-header">
+      <div>
+        <h1>Categorías</h1>
+        <p>Gestiona las categorías para tus listas</p>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button id="tab-shopping" class="tab active">
+        Listas de Compra
+      </button>
+      <button id="tab-agnostic" class="tab">
+        Listas Generales
+      </button>
+    </div>
+
+    <!-- Contenedor del componente -->
+    <div id="categories-container">
+      <hc-categories-manager></hc-categories-manager>
+    </div>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import '/components/hc-categories-manager.js';
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { getUserGroup } from '/js/group.js';
+
+  let currentTab = 'shopping';
+  let currentUser = null;
+  let currentGroup = null;
+
+  function getElements() {
+    return {
+      tabShopping: document.getElementById('tab-shopping'),
+      tabAgnostic: document.getElementById('tab-agnostic'),
+      manager: document.querySelector('hc-categories-manager')
+    };
+  }
+
+  function setupTabs() {
+    const { tabShopping, tabAgnostic, manager } = getElements();
+
+    tabShopping?.addEventListener('click', () => {
+      currentTab = 'shopping';
+      tabShopping.classList.add('active');
+      tabAgnostic?.classList.remove('active');
+      if (manager) {
+        manager.listType = 'shopping';
+      }
+    });
+
+    tabAgnostic?.addEventListener('click', () => {
+      currentTab = 'agnostic';
+      tabAgnostic.classList.add('active');
+      tabShopping?.classList.remove('active');
+      if (manager) {
+        manager.listType = 'agnostic';
+      }
+    });
+  }
+
+  async function initPage(user) {
+    currentUser = user;
+    currentGroup = await getUserGroup(user.uid);
+
+    const { manager } = getElements();
+    if (manager && currentGroup) {
+      manager.groupId = currentGroup.id;
+      manager.userId = user.uid;
+      manager.listType = currentTab;
+    }
+
+    setupTabs();
+  }
+
+  function tryInit() {
+    if (isAuthResolved()) {
+      const user = getCurrentUser();
+      if (user) initPage(user);
+    } else {
+      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+    }
+  }
+
+  tryInit();
+  document.addEventListener('astro:page-load', tryInit);
+</script>
+
+<style is:global>
+  .categories-page {
+    max-width: 800px;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+    gap: var(--space-md);
+  }
+
+  .page-header h1 {
+    margin-bottom: var(--space-xs);
+  }
+
+  .page-header p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin-bottom: -1px;
+  }
+
+  .tab:hover {
+    color: var(--color-text);
+  }
+
+  .tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+  }
+</style>

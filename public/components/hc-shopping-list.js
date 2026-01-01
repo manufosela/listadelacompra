@@ -16,7 +16,14 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { getCurrentUser } from '/js/auth.js';
 import { getCurrentGroupId } from '/js/group.js';
-import { searchProducts, UNITS, PRODUCT_CATEGORIES, GENERAL_CATEGORIES, PRIORITIES } from '/js/db.js';
+import { searchProducts, UNITS, PRIORITIES } from '/js/db.js';
+import {
+  DEFAULT_SHOPPING_CATEGORIES,
+  CATEGORY_COLORS,
+  getCategoriesForList,
+  createGroupCategory,
+  getNextAvailableColor
+} from '/js/categories.js';
 import './hc-list-item.js';
 
 export class HcShoppingList extends LitElement {
@@ -51,7 +58,16 @@ export class HcShoppingList extends LitElement {
     // Estado para edición de sublistas
     editItemIsChecklist: { type: Boolean, state: true },
     editChecklistItems: { type: Array, state: true },
-    editChecklistItemText: { type: String, state: true }
+    editChecklistItemText: { type: String, state: true },
+    // Estado para categorías
+    _categories: { type: Array, state: true },
+    newItemCategory: { type: String, state: true },
+    editItemCategory: { type: String, state: true },
+    _showNewCategoryForm: { type: Boolean, state: true },
+    _newCategoryName: { type: String, state: true },
+    _newCategoryIcon: { type: String, state: true },
+    _newCategoryBgColor: { type: String, state: true },
+    _newCategoryTextColor: { type: String, state: true }
   };
 
   static styles = css`
@@ -381,8 +397,10 @@ export class HcShoppingList extends LitElement {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 0.5rem 0;
+      padding: 0.5rem 0.75rem;
       font-weight: 500;
+      border-radius: 0.5rem;
+      margin-bottom: 0.5rem;
       color: #64748b;
       font-size: 0.875rem;
       text-transform: uppercase;
@@ -390,10 +408,11 @@ export class HcShoppingList extends LitElement {
     }
 
     .category-count {
-      background: #f1f5f9;
+      background: rgba(255, 255, 255, 0.3);
       padding: 0.125rem 0.5rem;
       border-radius: 9999px;
       font-size: 0.75rem;
+      color: inherit;
     }
 
     .items-list {
@@ -493,6 +512,123 @@ export class HcShoppingList extends LitElement {
       border-color: #2563eb;
     }
 
+    /* Selector de categoría */
+    .category-select {
+      min-width: 150px;
+    }
+
+    .category-select select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      background: white;
+      color: #1e293b;
+      cursor: pointer;
+    }
+
+    .category-select select:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    /* Formulario de nueva categoría inline */
+    .new-category-form {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      margin-top: 0.5rem;
+      width: 100%;
+    }
+
+    .new-category-form-title {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+
+    .new-category-form-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .new-category-form-row input {
+      flex: 1;
+      padding: 0.375rem 0.5rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+      background: white;
+      color: #1e293b;
+    }
+
+    .new-category-form-row input:focus {
+      outline: none;
+      border-color: #2563eb;
+    }
+
+    .color-picker {
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+    }
+
+    .color-option {
+      width: 24px;
+      height: 24px;
+      border: 2px solid transparent;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .color-option:hover {
+      transform: scale(1.1);
+    }
+
+    .color-option.selected {
+      border-color: #1e293b;
+      box-shadow: 0 0 0 2px white inset;
+    }
+
+    .new-category-form-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 0.5rem;
+    }
+
+    .new-category-form-actions button {
+      padding: 0.375rem 0.75rem;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .btn-create-category {
+      background: #2563eb;
+      border: none;
+      color: white;
+    }
+
+    .btn-create-category:hover {
+      background: #1d4ed8;
+    }
+
+    .btn-cancel-category {
+      background: #e2e8f0;
+      border: none;
+      color: #334155;
+    }
+
+    .btn-cancel-category:hover {
+      background: #cbd5e1;
+    }
+
     @media (prefers-color-scheme: dark) {
       .notes-input textarea {
         background: #1e293b;
@@ -508,6 +644,40 @@ export class HcShoppingList extends LitElement {
         background: #1e293b;
         color: #f1f5f9;
         border-color: #334155;
+      }
+
+      .category-select select {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #334155;
+      }
+
+      .new-category-form {
+        background: #334155;
+        border-color: #475569;
+      }
+
+      .new-category-form-title {
+        color: #94a3b8;
+      }
+
+      .new-category-form-row input {
+        background: #1e293b;
+        color: #f1f5f9;
+        border-color: #475569;
+      }
+
+      .color-option.selected {
+        border-color: #f1f5f9;
+      }
+
+      .btn-cancel-category {
+        background: #475569;
+        color: #f1f5f9;
+      }
+
+      .btn-cancel-category:hover {
+        background: #64748b;
       }
     }
 
@@ -848,6 +1018,15 @@ export class HcShoppingList extends LitElement {
     this.editItemIsChecklist = false;
     this.editChecklistItems = [];
     this.editChecklistItemText = '';
+    // Categorías
+    this._categories = [];
+    this.newItemCategory = '';
+    this.editItemCategory = '';
+    this._showNewCategoryForm = false;
+    this._newCategoryName = '';
+    this._newCategoryIcon = '📦';
+    this._newCategoryBgColor = CATEGORY_COLORS[0].bgColor;
+    this._newCategoryTextColor = CATEGORY_COLORS[0].textColor;
   }
 
   connectedCallback() {
@@ -863,6 +1042,10 @@ export class HcShoppingList extends LitElement {
   updated(changedProperties) {
     if ((changedProperties.has('userId') || changedProperties.has('listId')) && this.userId && this.listId) {
       this._setupSubscriptions();
+    }
+    // Recargar categorías cuando cambia el tipo de lista
+    if (changedProperties.has('listType') && this.userId && this.listId) {
+      this._loadCategories();
     }
   }
 
@@ -884,6 +1067,9 @@ export class HcShoppingList extends LitElement {
     this._unsubscribers.forEach(unsub => unsub());
     this._unsubscribers = [];
     this._subscribedPath = newPath;
+
+    // Cargar categorías del grupo
+    await this._loadCategories();
 
     // Suscribirse a la lista para obtener groupIds
     const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
@@ -947,6 +1133,26 @@ export class HcShoppingList extends LitElement {
     }
   }
 
+  async _loadCategories() {
+    try {
+      const groupId = getCurrentGroupId();
+      if (!groupId) {
+        // Si no hay grupo, usar categorías por defecto
+        this._categories = this.listType === 'shopping'
+          ? DEFAULT_SHOPPING_CATEGORIES.map(c => ({ ...c, isDefault: true }))
+          : [];
+        return;
+      }
+
+      this._categories = await getCategoriesForList(groupId, this.listType);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      this._categories = this.listType === 'shopping'
+        ? DEFAULT_SHOPPING_CATEGORIES.map(c => ({ ...c, isDefault: true }))
+        : [];
+    }
+  }
+
   get _checkedCount() {
     return this.items.filter(i => i.checked).length;
   }
@@ -1002,9 +1208,11 @@ export class HcShoppingList extends LitElement {
     try {
       const itemsRef = collection(db, 'users', this.userId, 'lists', this.listId, 'items');
 
-      // Encontrar la categoría si hay un producto sugerido seleccionado
-      let category = isAgnostic ? 'general_otros' : 'otros';
-      if (this._selectedProduct?.category) {
+      // Determinar la categoría
+      let category = null;
+      if (this.newItemCategory) {
+        category = this.newItemCategory;
+      } else if (this._selectedProduct?.category) {
         category = this._selectedProduct.category;
       }
 
@@ -1056,6 +1264,7 @@ export class HcShoppingList extends LitElement {
       this.newItemUnit = 'unidad';
       this.newItemNotes = '';
       this.newItemPriority = '';
+      this.newItemCategory = '';
       this.newItemIsChecklist = false;
       this.newChecklistItems = [];
       this.newChecklistItemText = '';
@@ -1263,6 +1472,7 @@ export class HcShoppingList extends LitElement {
     this.editItemUnit = item.unit || 'unidad';
     this.editItemNotes = item.notes || '';
     this.editItemPriority = item.priority || '';
+    this.editItemCategory = item.category || '';
     // Cargar datos de sublista
     this.editItemIsChecklist = item.isChecklist || false;
     this.editChecklistItems = item.checklist ? [...item.checklist] : [];
@@ -1276,9 +1486,11 @@ export class HcShoppingList extends LitElement {
     this.editItemUnit = 'unidad';
     this.editItemNotes = '';
     this.editItemPriority = '';
+    this.editItemCategory = '';
     this.editItemIsChecklist = false;
     this.editChecklistItems = [];
     this.editChecklistItemText = '';
+    this._showNewCategoryForm = false;
   }
 
   async _handleSaveEdit(e) {
@@ -1293,6 +1505,7 @@ export class HcShoppingList extends LitElement {
 
       const updates = {
         name: this.editItemName.trim(),
+        category: this.editItemCategory || null,
         updatedAt: serverTimestamp()
       };
 
@@ -1330,28 +1543,26 @@ export class HcShoppingList extends LitElement {
     this.filterByAssignee = e.target.value;
   }
 
-  _getCategoryIcon(category) {
-    // Buscar en categorías de producto
-    const productCat = PRODUCT_CATEGORIES.find(c => c.id === category);
-    if (productCat) return productCat.icon;
+  _getCategoryIcon(categoryId) {
+    const cat = this._categories.find(c => c.id === categoryId);
+    if (cat) return cat.icon || '📦';
 
-    // Buscar en categorías generales
-    const generalCat = GENERAL_CATEGORIES.find(c => c.id === category);
-    if (generalCat) return generalCat.icon;
-
-    return '📦';
+    // Fallback a categorías por defecto
+    const defaultCat = DEFAULT_SHOPPING_CATEGORIES.find(c => c.id === categoryId);
+    return defaultCat?.icon || '📦';
   }
 
-  _getCategoryName(category) {
-    // Buscar en categorías de producto
-    const productCat = PRODUCT_CATEGORIES.find(c => c.id === category);
-    if (productCat) return productCat.name;
+  _getCategoryName(categoryId) {
+    const cat = this._categories.find(c => c.id === categoryId);
+    if (cat) return cat.name;
 
-    // Buscar en categorías generales
-    const generalCat = GENERAL_CATEGORIES.find(c => c.id === category);
-    if (generalCat) return generalCat.name;
+    // Fallback a categorías por defecto
+    const defaultCat = DEFAULT_SHOPPING_CATEGORIES.find(c => c.id === categoryId);
+    return defaultCat?.name || categoryId;
+  }
 
-    return category;
+  _getCategoryById(categoryId) {
+    return this._categories.find(c => c.id === categoryId);
   }
 
   _handleNotesChange(e) {
@@ -1360,6 +1571,85 @@ export class HcShoppingList extends LitElement {
 
   _handlePriorityChange(e) {
     this.newItemPriority = e.target.value;
+  }
+
+  _handleCategoryChange(e) {
+    const value = e.target.value;
+    if (value === '__new__') {
+      this._openNewCategoryForm();
+    } else {
+      this.newItemCategory = value;
+    }
+  }
+
+  _handleEditCategoryChange(e) {
+    const value = e.target.value;
+    if (value === '__new__') {
+      this._openNewCategoryForm();
+    } else {
+      this.editItemCategory = value;
+    }
+  }
+
+  _openNewCategoryForm() {
+    this._showNewCategoryForm = true;
+    this._newCategoryName = '';
+    this._newCategoryIcon = '📦';
+    const nextColor = getNextAvailableColor(this._categories);
+    this._newCategoryBgColor = nextColor.bgColor;
+    this._newCategoryTextColor = nextColor.textColor;
+  }
+
+  _closeNewCategoryForm() {
+    this._showNewCategoryForm = false;
+    this._newCategoryName = '';
+  }
+
+  _handleNewCategoryNameChange(e) {
+    this._newCategoryName = e.target.value;
+  }
+
+  _handleNewCategoryIconChange(e) {
+    this._newCategoryIcon = e.target.value;
+  }
+
+  _selectCategoryColor(color) {
+    this._newCategoryBgColor = color.bgColor;
+    this._newCategoryTextColor = color.textColor;
+  }
+
+  async _handleCreateCategory() {
+    if (!this._newCategoryName.trim()) return;
+
+    try {
+      const groupId = getCurrentGroupId();
+      if (!groupId) {
+        console.error('No group ID found');
+        return;
+      }
+
+      const newCategoryId = await createGroupCategory(groupId, {
+        name: this._newCategoryName.trim(),
+        icon: this.listType === 'shopping' ? this._newCategoryIcon : null,
+        bgColor: this._newCategoryBgColor,
+        textColor: this._newCategoryTextColor,
+        listType: this.listType
+      }, this.userId);
+
+      // Recargar categorías
+      await this._loadCategories();
+
+      // Seleccionar la nueva categoría
+      if (this.editingItem) {
+        this.editItemCategory = newCategoryId;
+      } else {
+        this.newItemCategory = newCategoryId;
+      }
+
+      this._closeNewCategoryForm();
+    } catch (error) {
+      console.error('Error creating category:', error);
+    }
   }
 
   _handleIsChecklistChange(e) {
@@ -1613,7 +1903,7 @@ export class HcShoppingList extends LitElement {
             ${!isAgnostic && this.showSuggestions && this.suggestions.length > 0 ? html`
               <div class="suggestions-dropdown">
                 ${this.suggestions.map((product, index) => {
-                  const cat = PRODUCT_CATEGORIES.find(c => c.id === product.category);
+                  const cat = this._getCategoryById(product.category);
                   return html`
                     <div
                       class="suggestion-item ${index === this.selectedSuggestionIndex ? 'selected' : ''}"
@@ -1627,6 +1917,19 @@ export class HcShoppingList extends LitElement {
                 })}
               </div>
             ` : ''}
+          </div>
+          <!-- Selector de categoría -->
+          <div class="category-select">
+            <label>Categoría</label>
+            <select .value=${this.newItemCategory} @change=${this._handleCategoryChange}>
+              <option value="">Sin categoría</option>
+              ${this._categories.map(cat => html`
+                <option value="${cat.id}">
+                  ${cat.icon ? `${cat.icon} ` : ''}${cat.name}
+                </option>
+              `)}
+              <option value="__new__">+ Nueva categoría</option>
+            </select>
           </div>
           ${isAgnostic ? html`
             <!-- Campos para listas agnósticas -->
@@ -1699,6 +2002,50 @@ export class HcShoppingList extends LitElement {
             </div>
           </div>
         ` : ''}
+        ${this._showNewCategoryForm ? html`
+          <div class="new-category-form">
+            <div class="new-category-form-title">Nueva categoría</div>
+            <div class="new-category-form-row">
+              <input
+                type="text"
+                placeholder="Nombre de la categoría"
+                .value=${this._newCategoryName}
+                @input=${this._handleNewCategoryNameChange}
+              />
+              ${this.listType === 'shopping' ? html`
+                <input
+                  type="text"
+                  placeholder="📦"
+                  .value=${this._newCategoryIcon}
+                  @input=${this._handleNewCategoryIconChange}
+                  style="width: 50px; text-align: center;"
+                  maxlength="4"
+                />
+              ` : ''}
+            </div>
+            <div class="new-category-form-row">
+              <div class="color-picker">
+                ${CATEGORY_COLORS.map(color => html`
+                  <button
+                    type="button"
+                    class="color-option ${this._newCategoryBgColor === color.bgColor ? 'selected' : ''}"
+                    style="background: ${color.bgColor}"
+                    @click=${() => this._selectCategoryColor(color)}
+                    title=${color.name}
+                  ></button>
+                `)}
+              </div>
+            </div>
+            <div class="new-category-form-actions">
+              <button type="button" class="btn-cancel-category" @click=${this._closeNewCategoryForm}>
+                Cancelar
+              </button>
+              <button type="button" class="btn-create-category" @click=${this._handleCreateCategory}>
+                Crear
+              </button>
+            </div>
+          </div>
+        ` : ''}
         </div>
       ` : ''}
 
@@ -1708,12 +2055,15 @@ export class HcShoppingList extends LitElement {
           <p>${this.mode === 'edit' ? (isAgnostic ? '¡Añade items a la lista!' : '¡Añade productos a la lista!') : 'La lista está vacía.'}</p>
         </div>
       ` : html`
-        ${Object.entries(this._groupedItems).map(([category, items]) => html`
+        ${Object.entries(this._groupedItems).map(([category, items]) => {
+          const cat = this._getCategoryById(category);
+          const headerStyle = cat?.bgColor ? `background: ${cat.bgColor}; color: ${cat.textColor || '#fff'}` : '';
+          return html`
           <div class="category-group">
             ${this.groupByCategory && category !== 'todos' ? html`
-              <div class="category-header">
-                <span>${this._getCategoryIcon(category)}</span>
-                <span>${this._getCategoryName(category)}</span>
+              <div class="category-header" style="${headerStyle}">
+                <span>${cat?.icon || '📦'}</span>
+                <span>${cat?.name || category}</span>
                 <span class="category-count">${items.length}</span>
               </div>
             ` : ''}
@@ -1735,7 +2085,7 @@ export class HcShoppingList extends LitElement {
               `)}
             </div>
           </div>
-        `)}
+        `})}
       `}
 
       <!-- Modal de edición -->
@@ -1752,6 +2102,22 @@ export class HcShoppingList extends LitElement {
                   @input=${(e) => this.editItemName = e.target.value}
                   required
                 />
+              </div>
+              <!-- Selector de categoría en edición -->
+              <div class="form-group">
+                <label>Categoría</label>
+                <select
+                  .value=${this.editItemCategory}
+                  @change=${this._handleEditCategoryChange}
+                >
+                  <option value="">Sin categoría</option>
+                  ${this._categories.map(cat => html`
+                    <option value="${cat.id}">
+                      ${cat.icon ? `${cat.icon} ` : ''}${cat.name}
+                    </option>
+                  `)}
+                  <option value="__new__">+ Nueva categoría</option>
+                </select>
               </div>
               ${isAgnostic ? html`
                 <div class="form-group">
@@ -1830,6 +2196,50 @@ export class HcShoppingList extends LitElement {
                   </select>
                 </div>
               `}
+              ${this._showNewCategoryForm ? html`
+                <div class="new-category-form" style="margin-top: 1rem;">
+                  <div class="new-category-form-title">Nueva categoría</div>
+                  <div class="new-category-form-row">
+                    <input
+                      type="text"
+                      placeholder="Nombre de la categoría"
+                      .value=${this._newCategoryName}
+                      @input=${this._handleNewCategoryNameChange}
+                    />
+                    ${this.listType === 'shopping' ? html`
+                      <input
+                        type="text"
+                        placeholder="📦"
+                        .value=${this._newCategoryIcon}
+                        @input=${this._handleNewCategoryIconChange}
+                        style="width: 50px; text-align: center;"
+                        maxlength="4"
+                      />
+                    ` : ''}
+                  </div>
+                  <div class="new-category-form-row">
+                    <div class="color-picker">
+                      ${CATEGORY_COLORS.map(color => html`
+                        <button
+                          type="button"
+                          class="color-option ${this._newCategoryBgColor === color.bgColor ? 'selected' : ''}"
+                          style="background: ${color.bgColor}"
+                          @click=${() => this._selectCategoryColor(color)}
+                          title=${color.name}
+                        ></button>
+                      `)}
+                    </div>
+                  </div>
+                  <div class="new-category-form-actions">
+                    <button type="button" class="btn-cancel-category" @click=${this._closeNewCategoryForm}>
+                      Cancelar
+                    </button>
+                    <button type="button" class="btn-create-category" @click=${this._handleCreateCategory}>
+                      Crear
+                    </button>
+                  </div>
+                </div>
+              ` : ''}
               <div class="edit-modal-actions">
                 <button type="button" class="btn-cancel" @click=${this._handleCancelEdit}>
                   Cancelar
