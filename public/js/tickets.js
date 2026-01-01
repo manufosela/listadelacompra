@@ -3,9 +3,8 @@
  * Gestiona el escaneo y procesamiento de tickets de compra
  */
 
-import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
-import { db } from './firebase-config.js';
+import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js';
+import { db, functions, storage } from './firebase-config.js';
 import {
   collection,
   doc,
@@ -13,9 +12,6 @@ import {
   updateDoc,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
-
-const functions = getFunctions(undefined, 'europe-west1');
-const storage = getStorage();
 
 /**
  * Convierte un archivo de imagen a base64
