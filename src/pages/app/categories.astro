@@ -31,7 +31,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
 <script type="module">
   import '/components/hc-categories-manager.js';
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
-  import { getUserGroup } from '/js/group.js';
+  import { getCurrentGroupId, getGroup } from '/js/group.js';
 
   let currentTab = 'shopping';
   let currentUser = null;
@@ -69,11 +69,14 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
   async function initPage(user) {
     currentUser = user;
-    currentGroup = await getUserGroup(user.uid);
+    const groupId = getCurrentGroupId();
+    if (groupId) {
+      currentGroup = await getGroup(groupId);
+    }
 
     const { manager } = getElements();
-    if (manager && currentGroup) {
-      manager.groupId = currentGroup.id;
+    if (manager && groupId) {
+      manager.groupId = groupId;
       manager.userId = user.uid;
       manager.listType = currentTab;
     }
