@@ -4,7 +4,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
 <AppLayout title="Lista de la Compra">
   <div class="list-detail-page">
-    <a href="/app" class="back-link">← Volver a listas</a>
+    <a href="/app/lists" class="back-link">← Volver a listas</a>
     <div id="list-header" class="list-header">
       <div class="list-header-loading">Cargando...</div>
     </div>
@@ -67,7 +67,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
         headerEl.innerHTML = `
           <div class="list-not-found">
             <p>Lista no encontrada</p>
-            <a href="/app" class="btn btn-primary">Volver al inicio</a>
+            <a href="/app/lists" class="btn btn-primary">Volver a listas</a>
           </div>
         `;
         return;

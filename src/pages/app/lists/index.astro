@@ -2,76 +2,198 @@
 import AppLayout from '../../../layouts/AppLayout.astro';
 ---
 
-<AppLayout title="Mis Listas">
+<AppLayout title="Listas">
   <div class="lists-page">
     <header class="page-header">
       <div>
-        <h1>Mis Listas</h1>
-        <p>Gestiona tus listas de la compra</p>
+        <h1>Listas</h1>
+        <p id="user-greeting"></p>
       </div>
-      <a href="/app/lists/new" class="btn btn-primary">+ Nueva lista</a>
+      <div class="header-actions">
+        <a href="/app/lists/new" class="btn btn-primary">+ Nueva lista</a>
+      </div>
     </header>
 
-    <div class="lists-tabs">
-      <button class="tab active" data-status="pending">Pendientes</button>
-      <button class="tab" data-status="shopping">En curso</button>
-      <button class="tab" data-status="completed">Completadas</button>
+    <!-- Tabs y controles -->
+    <div class="tabs-row">
+      <div class="tabs">
+        <button id="tab-mine" class="tab active">Mis listas</button>
+        <button id="tab-archived" class="tab">
+          Archivadas
+          <span id="archived-count" class="tab-badge" hidden>0</span>
+        </button>
+        <button id="tab-shared" class="tab">
+          Compartidas
+          <span id="shared-count" class="tab-badge" hidden>0</span>
+        </button>
+      </div>
+      <div class="view-toggle">
+        <button id="view-grid" class="view-toggle-btn" title="Vista iconos">☷</button>
+        <button id="view-list" class="view-toggle-btn active" title="Vista lista">☰</button>
+      </div>
     </div>
 
-    <div id="lists-container" class="lists-grid">
-      <p class="loading">Cargando listas...</p>
+    <div id="lists-container" class="lists-container">
+      <!-- Se carga dinámicamente -->
     </div>
   </div>
 </AppLayout>
 
 <script type="module">
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
-  import { subscribeToLists } from '/js/realtime-sync.js';
-  import { getCurrentGroupId } from '/js/group.js';
+  import { getUserLists, getSharedListsForUser } from '/js/lists.js';
   import { db } from '/js/firebase-config.js';
-  import { doc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { collection, query, onSnapshot, orderBy, doc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
   import { toast } from '/js/toast.js';
 
-  let allLists = [];
-  let activeStatus = 'pending';
+  let currentTab = 'mine';
+  let viewMode = localStorage.getItem('listsViewMode') || 'list';
+  let myLists = [];
+  let sharedLists = [];
   let unsubscribe = null;
-  let currentUserId = null;
+  let currentUser = null;
 
-  function initPage() {
-    const container = document.getElementById('lists-container');
-    if (!container) return;
+  function getElements() {
+    return {
+      container: document.getElementById('lists-container'),
+      tabMine: document.getElementById('tab-mine'),
+      tabArchived: document.getElementById('tab-archived'),
+      tabShared: document.getElementById('tab-shared'),
+      archivedCount: document.getElementById('archived-count'),
+      sharedCount: document.getElementById('shared-count'),
+      greeting: document.getElementById('user-greeting'),
+      viewGrid: document.getElementById('view-grid'),
+      viewList: document.getElementById('view-list')
+    };
+  }
 
-    const user = getCurrentUser();
-    currentUserId = user?.uid;
+  function setupTabs() {
+    const { tabMine, tabArchived, tabShared, viewGrid, viewList } = getElements();
 
-    const groupId = getCurrentGroupId();
-    if (!groupId) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <p>Primero necesitas crear o unirte a un grupo.</p>
-          <a href="/app/groups" class="btn btn-primary">Configurar grupo</a>
-        </div>
-      `;
-      return;
+    function setActiveTab(tab) {
+      tabMine?.classList.remove('active');
+      tabArchived?.classList.remove('active');
+      tabShared?.classList.remove('active');
+      tab?.classList.add('active');
     }
+
+    tabMine?.addEventListener('click', () => {
+      currentTab = 'mine';
+      setActiveTab(tabMine);
+      renderLists();
+    });
+
+    tabArchived?.addEventListener('click', () => {
+      currentTab = 'archived';
+      setActiveTab(tabArchived);
+      renderLists();
+    });
+
+    tabShared?.addEventListener('click', () => {
+      currentTab = 'shared';
+      setActiveTab(tabShared);
+      renderLists();
+    });
+
+    // View toggle
+    viewGrid?.addEventListener('click', () => {
+      viewMode = 'grid';
+      localStorage.setItem('listsViewMode', 'grid');
+      viewGrid.classList.add('active');
+      viewList?.classList.remove('active');
+      renderLists();
+    });
+
+    viewList?.addEventListener('click', () => {
+      viewMode = 'list';
+      localStorage.setItem('listsViewMode', 'list');
+      viewList.classList.add('active');
+      viewGrid?.classList.remove('active');
+      renderLists();
+    });
+
+    // Aplicar estado inicial del toggle
+    if (viewMode === 'list') {
+      viewList?.classList.add('active');
+      viewGrid?.classList.remove('active');
+    } else {
+      viewGrid?.classList.add('active');
+      viewList?.classList.remove('active');
+    }
+  }
+
+  async function loadSharedLists() {
+    const { sharedCount } = getElements();
+
+    try {
+      sharedLists = await getSharedListsForUser();
+
+      if (sharedCount) {
+        if (sharedLists.length > 0) {
+          sharedCount.textContent = sharedLists.length;
+          sharedCount.hidden = false;
+        } else {
+          sharedCount.hidden = true;
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading shared lists:', e);
+      sharedLists = [];
+    }
+  }
+
+  async function initPage(user) {
+    const { greeting } = getElements();
+    currentUser = user;
 
     // Cancelar suscripción anterior si existe
     if (unsubscribe) {
       unsubscribe();
+      unsubscribe = null;
     }
 
-    unsubscribe = subscribeToLists(groupId, (lists) => {
-      allLists = lists;
+    setupTabs();
+
+    const displayName = user.displayName?.split(' ')[0] || 'Usuario';
+    if (greeting) greeting.textContent = `Hola, ${displayName}`;
+
+    // Cargar listas compartidas
+    await loadSharedLists();
+
+    // Primero mostrar datos cacheados de mis listas
+    try {
+      const cachedLists = await getUserLists(user);
+      if (cachedLists && cachedLists.length > 0) {
+        myLists = cachedLists;
+        renderLists();
+      }
+    } catch (e) {
+      console.warn('Error loading cached lists:', e);
+    }
+
+    // Luego suscribirse para actualizaciones en tiempo real
+    const listsRef = collection(db, 'users', user.uid, 'lists');
+    const q = query(listsRef, orderBy('updatedAt', 'desc'));
+
+    unsubscribe = onSnapshot(q, (snapshot) => {
+      myLists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       renderLists();
+    }, (error) => {
+      console.error('Error loading lists:', error);
     });
   }
 
-  // Comprobar estado de auth
-  if (isAuthResolved()) {
-    if (getCurrentUser()) initPage();
-  } else {
-    window.addEventListener('auth-ready', () => initPage(), { once: true });
+  function tryInit() {
+    if (isAuthResolved()) {
+      const user = getCurrentUser();
+      if (user) initPage(user);
+    } else {
+      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+    }
   }
+
+  tryInit();
+  document.addEventListener('astro:page-load', tryInit);
 
   document.addEventListener('astro:before-swap', () => {
     if (unsubscribe) {
@@ -80,83 +202,51 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
   });
 
-  // Tabs
-  const tabs = document.querySelectorAll('.tab');
-  if (tabs.length > 0) {
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        activeStatus = tab.dataset.status;
-        renderLists();
-      });
-    });
+  // Helper para renderizar icono (imagen o emoji)
+  function renderIcon(list, cssClass = '') {
+    if (list.iconUrl) {
+      return `<img src="${list.iconUrl}" alt="" class="list-icon-img ${cssClass}" />`;
+    }
+    return list.icon || '🛒';
   }
 
-  function renderLists() {
-    const container = document.getElementById('lists-container');
-    if (!container) return;
+  // Helper para generar los botones de acción
+  function renderActionButtons(list, isOwner, isSharedTab) {
+    const isAgnostic = list.listType === 'agnostic';
+    const listId = isSharedTab ? list.listId : list.id;
+    const ownerId = isSharedTab ? list.ownerId : currentUser.uid;
 
-    const filtered = allLists.filter(l => l.status === activeStatus);
+    let buttons = '';
 
-    if (filtered.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <p>No hay listas ${activeStatus === 'pending' ? 'pendientes' : activeStatus === 'shopping' ? 'en curso' : 'completadas'}.</p>
-        </div>
+    // Escanear ticket (solo para listas no agnósticas y no cerradas)
+    if (!isAgnostic && !list.closed) {
+      buttons += `
+        <button class="list-action-btn scan-btn" data-list-id="${listId}" data-owner-id="${ownerId}" title="Escanear ticket" aria-label="Escanear ticket">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </button>
       `;
-      return;
     }
 
-    container.innerHTML = filtered.map(list => {
-      const isOwner = list.ownerId === currentUserId || list.createdBy === currentUserId;
-      const isAgnostic = list.listType === 'agnostic';
-      const listIcon = list.iconUrl
-        ? `<img src="${list.iconUrl}" alt="" class="list-icon-img" />`
-        : `<span class="list-icon-emoji">${list.icon || '🛒'}</span>`;
-
-      return `
-        <div class="list-card-wrapper">
-          <a href="/app/list?id=${list.id}" class="list-card">
-            <div class="list-card-header">
-              <div class="list-title-row">
-                ${listIcon}
-                <h3>${list.name}</h3>
-              </div>
-              <span class="list-status ${list.status}">${list.status}</span>
-            </div>
-            ${list.store ? `<p class="list-store">📍 ${list.store}</p>` : ''}
-            ${list.scheduledDate ? `<p class="list-date">📅 ${list.scheduledDate.toLocaleDateString()}</p>` : ''}
-            ${list.isRecurring ? `<p class="list-recurring">🔄 Recurrente</p>` : ''}
-          </a>
-          <div class="list-actions-group">
-            ${!isAgnostic && !list.closed ? `
-              <button class="list-action-btn scan-btn" data-list-id="${list.id}" data-owner-id="${list.ownerId || list.createdBy}" title="Escanear ticket" aria-label="Escanear ticket">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-                </svg>
-              </button>
-            ` : ''}
-            ${isOwner ? `
-              <a href="/app/lists/edit?id=${list.id}" class="list-action-btn" title="Editar lista" aria-label="Editar lista ${list.name}">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                </svg>
-              </a>
-              <button class="list-action-btn archive-btn ${list.closed ? 'active' : ''}" data-list-id="${list.id}" data-owner-id="${list.ownerId || list.createdBy}" data-closed="${list.closed || false}" title="${list.closed ? 'Reabrir lista' : 'Archivar lista'}" aria-label="${list.closed ? 'Reabrir lista' : 'Archivar lista'}">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-                </svg>
-              </button>
-            ` : ''}
-          </div>
-        </div>
+    // Editar y archivar (solo para propietarios)
+    if (isOwner) {
+      buttons += `
+        <a href="/app/lists/edit?id=${listId}" class="list-action-btn" title="Editar lista" aria-label="Editar lista">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </a>
+        <button class="list-action-btn archive-btn ${list.closed ? 'active' : ''}" data-list-id="${listId}" data-owner-id="${ownerId}" data-closed="${list.closed || false}" title="${list.closed ? 'Reabrir lista' : 'Archivar lista'}" aria-label="${list.closed ? 'Reabrir lista' : 'Archivar lista'}">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+          </svg>
+        </button>
       `;
-    }).join('');
+    }
 
-    // Añadir event listeners para los botones de acción
-    setupActionListeners();
+    return buttons ? `<div class="list-actions-group">${buttons}</div>` : '';
   }
 
   function setupActionListeners() {
@@ -167,7 +257,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         e.stopPropagation();
         const listId = btn.dataset.listId;
         const ownerId = btn.dataset.ownerId;
-        // Navegar a la lista y abrir el scanner
         window.location.href = `/app/list?id=${listId}&owner=${ownerId}&openScanner=true`;
       });
     });
@@ -193,18 +282,146 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       });
     });
   }
+
+  function renderLists() {
+    const { container, archivedCount } = getElements();
+    if (!container) return;
+
+    // Filtrar listas abiertas y cerradas
+    const openLists = myLists.filter(l => !l.closed);
+    const archivedLists = myLists.filter(l => l.closed);
+
+    // Actualizar badge de archivadas
+    if (archivedCount) {
+      if (archivedLists.length > 0) {
+        archivedCount.textContent = archivedLists.length;
+        archivedCount.hidden = false;
+      } else {
+        archivedCount.hidden = true;
+      }
+    }
+
+    let lists;
+    if (currentTab === 'mine') {
+      lists = openLists;
+    } else if (currentTab === 'archived') {
+      lists = archivedLists;
+    } else {
+      lists = sharedLists;
+    }
+
+    const isSharedTab = currentTab === 'shared';
+    const isArchivedTab = currentTab === 'archived';
+
+    if (lists.length === 0) {
+      let emptyMessage = 'No tienes listas todavía';
+      if (isSharedTab) {
+        emptyMessage = 'No tienes listas compartidas contigo';
+      } else if (isArchivedTab) {
+        emptyMessage = 'No tienes listas archivadas';
+      }
+
+      container.innerHTML = `
+        <div class="empty-state">
+          <p>${emptyMessage}</p>
+          ${!isSharedTab && !isArchivedTab ? '<a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>' : ''}
+        </div>
+      `;
+      return;
+    }
+
+    if (viewMode === 'list') {
+      // Vista lista/tabla
+      container.innerHTML = `
+        <div class="lists-table-wrapper">
+          <table class="lists-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Nombre</th>
+                <th>Elementos</th>
+                ${isSharedTab ? '<th>Propietario</th>' : ''}
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lists.map(list => {
+                const listId = isSharedTab ? list.listId : list.id;
+                const ownerId = isSharedTab ? list.ownerId : currentUser.uid;
+                const isOwner = !isSharedTab;
+                const listUrl = isSharedTab
+                  ? `/app/list?id=${list.listId}&owner=${list.ownerId}`
+                  : `/app/list?id=${list.id}`;
+
+                return `
+                  <tr>
+                    <td class="icon-cell" onclick="window.location.href='${listUrl}'">${renderIcon(list)}</td>
+                    <td class="name-cell" onclick="window.location.href='${listUrl}'">
+                      ${list.name}
+                      ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
+                    </td>
+                    <td class="count-cell" onclick="window.location.href='${listUrl}'">${list.itemCount || 0}</td>
+                    ${isSharedTab ? `<td class="owner-cell" onclick="window.location.href='${listUrl}'">${list.ownerName || ''}</td>` : ''}
+                    <td class="actions-cell">${renderActionButtons(list, isOwner, isSharedTab)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      // Vista grid (iconos)
+      container.innerHTML = `
+        <div class="lists-grid">
+          ${lists.map(list => {
+            const listId = isSharedTab ? list.listId : list.id;
+            const ownerId = isSharedTab ? list.ownerId : currentUser.uid;
+            const isOwner = !isSharedTab;
+            const listUrl = isSharedTab
+              ? `/app/list?id=${list.listId}&owner=${list.ownerId}`
+              : `/app/list?id=${list.id}`;
+
+            return `
+              <div class="list-card-wrapper">
+                <a href="${listUrl}" class="list-card">
+                  <div class="list-card-icon">${renderIcon(list)}</div>
+                  <div class="list-card-name">${list.name}</div>
+                  ${isSharedTab ? `
+                    <div class="list-card-owner">
+                      <span class="owner-badge">De ${list.ownerName}</span>
+                    </div>
+                  ` : ''}
+                  <div class="list-card-meta">
+                    ${!isSharedTab ? `<span>${list.itemCount || 0} elementos</span>` : ''}
+                    ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
+                  </div>
+                </a>
+                ${renderActionButtons(list, isOwner, isSharedTab)}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    // Configurar listeners para los botones de acción
+    setupActionListeners();
+  }
 </script>
 
 <style is:global>
   .lists-page {
-    max-width: 1000px;
+    max-width: 800px;
   }
 
   .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--space-xl);
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+    gap: var(--space-md);
   }
 
   .page-header h1 {
@@ -213,39 +430,102 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .page-header p {
     color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
   }
 
-  .lists-tabs {
+  /* Tabs row */
+  .tabs-row {
     display: flex;
-    gap: var(--space-xs);
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: var(--space-lg);
     border-bottom: 1px solid var(--color-border);
-    padding-bottom: var(--space-xs);
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  /* View toggle */
+  .view-toggle {
+    display: flex;
+    background: var(--color-bg-secondary);
+    border-radius: 0.375rem;
+    padding: 0.125rem;
+    margin-bottom: -1px;
+  }
+
+  .view-toggle-btn {
+    padding: 0.375rem 0.5rem;
+    border: none;
+    background: transparent;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    transition: all 0.15s ease;
+    line-height: 1;
+  }
+
+  .view-toggle-btn:hover {
+    color: var(--color-text);
+  }
+
+  .view-toggle-btn.active {
+    background: var(--color-bg);
+    color: var(--color-primary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 
   .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
     padding: var(--space-sm) var(--space-md);
-    background: transparent;
+    background: none;
     border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--color-text-secondary);
+    cursor: pointer;
     transition: all var(--transition-fast);
+    margin-bottom: -1px;
   }
 
   .tab:hover {
-    background: var(--color-bg-secondary);
+    color: var(--color-text);
   }
 
   .tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+  }
+
+  .tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    font-weight: 600;
     background: var(--color-primary);
     color: white;
+    border-radius: 9px;
+  }
+
+  /* Grid de listas */
+  .lists-container {
+    min-height: 200px;
   }
 
   .lists-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: var(--space-md);
   }
 
@@ -254,30 +534,70 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   .list-card {
-    display: block;
-    padding: var(--space-lg);
-    padding-right: calc(var(--space-lg) + 110px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-lg) var(--space-md);
+    padding-bottom: calc(var(--space-lg) + 40px);
     background: var(--color-bg);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     text-decoration: none;
     color: inherit;
     transition: all var(--transition-fast);
+    text-align: center;
   }
 
   .list-card:hover {
-    border-color: var(--color-primary);
-    box-shadow: var(--shadow-md);
+    border-color: var(--color-text);
     transform: translateY(-2px);
   }
 
-  .list-actions-group {
+  .list-card-icon {
+    font-size: 2.5rem;
+    margin-bottom: var(--space-sm);
+  }
+
+  .list-card-name {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    margin-bottom: var(--space-xs);
+    line-height: 1.3;
+  }
+
+  .list-card-owner {
+    margin-bottom: var(--space-xs);
+  }
+
+  .owner-badge {
+    font-size: var(--font-size-xs);
+    color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.1);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+  }
+
+  .list-card-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+  }
+
+  .members-badge {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  /* Botones de acción en grid */
+  .list-card-wrapper .list-actions-group {
     position: absolute;
-    top: var(--space-sm);
-    right: var(--space-sm);
+    bottom: var(--space-sm);
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     gap: 4px;
-    z-index: 1;
   }
 
   .list-action-btn {
@@ -307,76 +627,145 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     color: white;
   }
 
-  .list-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: var(--space-sm);
+  .empty-state {
+    text-align: center;
+    padding: var(--space-2xl) var(--space-lg);
+    color: var(--color-text-secondary);
   }
 
-  .list-title-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
+  .empty-state p {
+    margin-bottom: var(--space-lg);
   }
 
-  .list-icon-emoji {
-    font-size: 1.25rem;
-    line-height: 1;
+  @media (max-width: 480px) {
+    .lists-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .list-card {
+      padding: var(--space-md);
+      padding-bottom: calc(var(--space-md) + 40px);
+    }
+
+    .list-card-icon {
+      font-size: 2rem;
+    }
+  }
+
+  /* Table view styles */
+  .lists-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .lists-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .lists-table th,
+  .lists-table td {
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .lists-table th {
+    font-weight: 500;
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+  }
+
+  .lists-table tbody tr {
+    transition: background 0.15s ease;
+  }
+
+  .lists-table tbody tr:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .lists-table .icon-cell,
+  .lists-table .name-cell,
+  .lists-table .count-cell,
+  .lists-table .owner-cell {
+    cursor: pointer;
+  }
+
+  .lists-table .icon-cell {
+    width: 50px;
+    font-size: 1.5rem;
+    text-align: center;
   }
 
   .list-icon-img {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--radius-sm);
     object-fit: cover;
   }
 
-  .list-card-header h3 {
-    font-size: var(--font-size-lg);
+  .list-card-icon .list-icon-img {
+    width: 48px;
+    height: 48px;
   }
 
-  .list-status {
-    padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
+  .lists-table .name-cell {
     font-weight: 500;
   }
 
-  .list-status.pending {
-    background: #fef3c7;
-    color: #92400e;
-  }
-
-  .list-status.shopping {
-    background: #dbeafe;
-    color: #1e40af;
-  }
-
-  .list-status.completed {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  .list-store,
-  .list-date,
-  .list-recurring {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    margin-top: var(--space-xs);
-  }
-
-  .empty-state {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: var(--space-xl);
+  .lists-table .name-cell .members-badge {
+    margin-left: var(--space-sm);
+    font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
   }
 
-  .loading {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: var(--space-xl);
+  .lists-table .count-cell {
     color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+
+  .lists-table .owner-cell {
+    color: var(--color-text-secondary);
+  }
+
+  .lists-table .actions-cell {
+    width: 120px;
+    text-align: right;
+  }
+
+  .lists-table .actions-cell .list-actions-group {
+    display: inline-flex;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 480px) {
+    .tabs-row {
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .view-toggle {
+      order: -1;
+      width: 100%;
+      justify-content: flex-end;
+      margin-bottom: var(--space-sm);
+    }
+
+    .lists-table .actions-cell {
+      width: auto;
+    }
+
+    .list-action-btn {
+      width: 28px;
+      height: 28px;
+    }
+
+    .list-action-btn svg {
+      width: 14px;
+      height: 14px;
+    }
   }
 </style>
