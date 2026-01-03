@@ -3,13 +3,13 @@ import AppLayout from '../../layouts/AppLayout.astro';
 ---
 
 <AppLayout title="Inicio">
-  <div class="home-page">
-    <div class="home-content">
-      <h1 id="greeting">Hola</h1>
-      <p class="welcome">Bienvenido a MyHomeCart</p>
-      <p class="description">
-        Tu aplicación para gestionar listas de la compra de forma colaborativa.
-        Crea listas, compártelas con tu familia o compañeros de piso,
+  <div class="home-page" style="display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 200px); padding: 1rem;">
+    <div class="home-content" style="text-align: center; max-width: 500px;">
+      <h1 id="greeting" style="font-size: 2rem; margin-bottom: 0.5rem;">Hola</h1>
+      <p class="welcome" style="font-size: 1.125rem; color: var(--color-primary); margin-bottom: 2rem;">Bienvenido a MyHomeCart</p>
+      <p class="description" style="color: var(--color-text-secondary); line-height: 1.6;">
+        Tu aplicacion para gestionar listas de la compra de forma colaborativa.
+        Crea listas, compartelas con tu familia o companeros de piso,
         escanea tickets para registrar gastos y lleva un control
         de los productos y precios de tu hogar.
       </p>
@@ -38,34 +38,3 @@ import AppLayout from '../../layouts/AppLayout.astro';
   tryInit();
   document.addEventListener('astro:page-load', tryInit);
 </script>
-
-<style is:global>
-  .home-page {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: calc(100vh - 200px);
-    padding: var(--space-lg);
-  }
-
-  .home-content {
-    text-align: center;
-    max-width: 500px;
-  }
-
-  .home-content h1 {
-    font-size: 2rem;
-    margin-bottom: var(--space-sm);
-  }
-
-  .home-content .welcome {
-    font-size: var(--font-size-lg);
-    color: var(--color-primary);
-    margin-bottom: var(--space-xl);
-  }
-
-  .home-content .description {
-    color: var(--color-text-secondary);
-    line-height: 1.6;
-  }
-</style>
