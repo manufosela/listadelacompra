@@ -189,7 +189,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     if (isAuthResolved()) {
       if (getCurrentUser()) loadProducts();
     } else {
-      globalThis.addEventListener('auth-ready', () => loadProducts(), { once: true });
+      window.addEventListener('auth-ready', () => loadProducts(), { once: true });
     }
   }
 

@@ -198,7 +198,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         });
         if (confirmed) {
           await signOut();
-          globalThis.location.href = '/login';
+          window.location.href = '/login';
         }
       });
     }
@@ -264,7 +264,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         setupEventListeners();
       }
     } else {
-      globalThis.addEventListener('auth-ready', (e) => {
+      window.addEventListener('auth-ready', (e) => {
         initPage(e.detail.user);
         setupEventListeners();
       }, { once: true });

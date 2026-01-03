@@ -258,4 +258,6 @@ export const modal = {
 };
 
 // Exponer globalmente
-globalThis.modal = modal;
+/** @type {typeof globalThis} */
+const globalScope = globalThis;
+globalScope.modal = modal;

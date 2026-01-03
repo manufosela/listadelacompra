@@ -244,4 +244,6 @@ export const toast = {
 };
 
 // Exponer globalmente para uso desde HTML inline
-globalThis.toast = toast;
+/** @type {typeof globalThis} */
+const globalScope = globalThis;
+globalScope.toast = toast;

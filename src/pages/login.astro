@@ -118,7 +118,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   // Verificar si ya está autenticado
   onAuthStateChanged((user) => {
     if (user) {
-      globalThis.location.href = '/app';
+      window.location.href = '/app';
     }
   });
 

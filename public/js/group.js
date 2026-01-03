@@ -143,7 +143,7 @@ export function getCurrentGroupId() {
  */
 export function setCurrentGroup(groupId) {
   localStorage.setItem('hc_current_group', groupId);
-  globalThis.dispatchEvent(new CustomEvent('group-changed', {
+  window.dispatchEvent(new CustomEvent('group-changed', {
     detail: { groupId }
   }));
 }

@@ -163,7 +163,7 @@ export class HcUserMenu extends LitElement {
   async _handleSignOut() {
     try {
       await signOut();
-      globalThis.location.href = '/login';
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error signing out:', error);
     }

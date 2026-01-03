@@ -378,7 +378,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     const user = getCurrentUser();
     if (user) initPage(user);
   } else {
-    globalThis.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+    window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
   }
 
   // Lista recurrente
@@ -453,7 +453,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         }
       }
 
-      globalThis.location.href = `/app/list?id=${newList.id}`;
+      window.location.href = `/app/list?id=${newList.id}`;
     } catch (error) {
       console.error('Error creating list:', error);
       toast.error('Error al crear la lista: ' + error.message);

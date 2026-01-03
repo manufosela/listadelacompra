@@ -237,7 +237,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
       const user = getCurrentUser();
       if (user) initPage(user);
     } else {
-      globalThis.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
     }
   }
 

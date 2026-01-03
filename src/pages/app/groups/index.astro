@@ -225,7 +225,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
           e.stopPropagation();
           const card = e.target.closest('.group-card');
           const groupId = card.dataset.id;
-          globalThis.location.href = `/app/groups/manage?id=${groupId}`;
+          window.location.href = `/app/groups/manage?id=${groupId}`;
         });
       });
     } catch (error) {
@@ -242,7 +242,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         loadGroups();
       }
     } else {
-      globalThis.addEventListener('auth-ready', (e) => {
+      window.addEventListener('auth-ready', (e) => {
         currentUser = e.detail.user;
         if (currentUser) {
           loadPendingInvitations();

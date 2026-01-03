@@ -3,6 +3,9 @@
  * Soporta: preferencia del sistema, preferencia manual, persistencia en localStorage
  */
 
+/** @type {typeof globalThis} */
+const globalScope = globalThis;
+
 const STORAGE_KEY = 'theme-preference';
 
 /**
@@ -22,7 +25,7 @@ export function getSavedTheme() {
  * @returns {'light' | 'dark'}
  */
 export function getSystemTheme() {
-  return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 /**
@@ -110,7 +113,7 @@ export function initTheme() {
   applyTheme(getEffectiveTheme());
 
   // Escuchar cambios en la preferencia del sistema
-  const mediaQuery = globalThis.matchMedia('(prefers-color-scheme: dark)');
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   mediaQuery.addEventListener('change', (e) => {
     // Solo actualizar si no hay preferencia manual
     if (!hasManualPreference()) {
@@ -120,7 +123,7 @@ export function initTheme() {
 }
 
 // Auto-inicializar si se carga como script normal (no módulo)
-if (typeof globalThis !== 'undefined' && !globalThis.__themeInitialized) {
-  globalThis.__themeInitialized = true;
+if (typeof globalScope !== 'undefined' && !globalScope.__themeInitialized) {
+  globalScope.__themeInitialized = true;
   initTheme();
 }

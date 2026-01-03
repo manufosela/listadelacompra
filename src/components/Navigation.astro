@@ -47,7 +47,7 @@ const currentPath = Astro.url.pathname;
 <script>
   // Actualizar estado activo de la navegación con View Transitions
   function updateActiveNav() {
-    const currentPath = globalThis.location.pathname;
+    const currentPath = window.location.pathname;
     document.querySelectorAll('.nav-link').forEach(link => {
       const href = link.getAttribute('data-href') || link.getAttribute('href');
 
