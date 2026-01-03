@@ -30,12 +30,12 @@ import AppLayout from '../../layouts/AppLayout.astro';
     currentUser = user;
 
     // Re-leer URL params en cada navegación
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(globalThis.location.search);
     const listId = urlParams.get('id');
     const ownerId = urlParams.get('owner') || user.uid; // Si no hay owner, es del usuario
 
     if (!listId) {
-      window.location.href = '/app';
+      globalThis.location.href = '/app';
       return;
     }
 
@@ -268,11 +268,14 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   function tryInit() {
+    // Solo ejecutar si estamos en la página de lista
+    if (!globalThis.location.pathname.startsWith('/app/list')) return;
+
     if (isAuthResolved()) {
       const user = getCurrentUser();
       if (user) initPage(user);
     } else {
-      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+      globalThis.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
     }
   }
 

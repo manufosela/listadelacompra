@@ -187,7 +187,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
       const user = getCurrentUser();
       if (user) initPage(user);
     } else {
-      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+      globalThis.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
     }
   }
 
@@ -200,6 +200,14 @@ import AppLayout from '../../layouts/AppLayout.astro';
       unsubscribe = null;
     }
   });
+
+  // Helper para renderizar icono (imagen o emoji)
+  function renderIcon(list, cssClass = '') {
+    if (list.iconUrl) {
+      return `<img src="${list.iconUrl}" alt="" class="list-icon-img ${cssClass}" />`;
+    }
+    return list.icon || '🛒';
+  }
 
   function renderLists() {
     const { container, archivedCount } = getElements();
@@ -268,8 +276,8 @@ import AppLayout from '../../layouts/AppLayout.astro';
                   : `/app/list?id=${list.id}`;
 
                 return `
-                  <tr onclick="window.location.href='${listUrl}'">
-                    <td class="icon-cell">${list.icon || '🛒'}</td>
+                  <tr onclick="globalThis.location.href='${listUrl}'">
+                    <td class="icon-cell">${renderIcon(list)}</td>
                     <td class="name-cell">
                       ${list.name}
                       ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
@@ -294,7 +302,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
             return `
               <a href="${listUrl}" class="list-card">
-                <div class="list-card-icon">${list.icon || '🛒'}</div>
+                <div class="list-card-icon">${renderIcon(list)}</div>
                 <div class="list-card-name">${list.name}</div>
                 ${isSharedTab ? `
                   <div class="list-card-owner">
@@ -552,6 +560,18 @@ import AppLayout from '../../layouts/AppLayout.astro';
     width: 50px;
     font-size: 1.5rem;
     text-align: center;
+  }
+
+  .list-icon-img {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+  }
+
+  .list-card-icon .list-icon-img {
+    width: 48px;
+    height: 48px;
   }
 
   .lists-table .name-cell {

@@ -63,7 +63,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   if (isAuthResolved()) {
     if (getCurrentUser()) initPage();
   } else {
-    window.addEventListener('auth-ready', () => initPage(), { once: true });
+    globalThis.addEventListener('auth-ready', () => initPage(), { once: true });
   }
 
   document.addEventListener('astro:before-swap', () => {

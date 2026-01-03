@@ -73,7 +73,10 @@ export class HcShoppingList extends LitElement {
     _newCategoryTextColor: { type: String, state: true },
     // Quick add
     _quickAddValue: { type: String, state: true },
-    _duplicateWarnings: { type: Array, state: true }
+    _duplicateWarnings: { type: Array, state: true },
+    // Ordenación en tabla
+    _sortColumn: { type: String, state: true },
+    _sortDirection: { type: String, state: true }
   };
 
   static styles = css`
@@ -578,6 +581,33 @@ export class HcShoppingList extends LitElement {
       background: #fef2f2;
     }
 
+    /* Cabeceras ordenables */
+    .items-table th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .items-table th.sortable:hover {
+      background: #e2e8f0;
+    }
+
+    .items-table th.sorted {
+      color: #2563eb;
+    }
+
+    /* Filas de categoría en tabla */
+    .items-table .category-row td {
+      font-weight: 600;
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+    }
+
+    .items-table .category-row .category-count {
+      font-weight: 400;
+      opacity: 0.7;
+      margin-left: 0.5rem;
+    }
+
     @media (prefers-color-scheme: dark) {
       .items-table th,
       .items-table td {
@@ -604,6 +634,18 @@ export class HcShoppingList extends LitElement {
 
       .table-actions button.danger:hover {
         background: #450a0a;
+      }
+
+      .items-table th.sortable:hover {
+        background: #334155;
+      }
+
+      .items-table th.sorted {
+        color: #3b82f6;
+      }
+
+      .items-table .category-row td {
+        background: #1e293b;
       }
     }
 
@@ -1388,6 +1430,8 @@ export class HcShoppingList extends LitElement {
     this._newCategoryTextColor = CATEGORY_COLORS[0].textColor;
     this._quickAddValue = '';
     this._duplicateWarnings = [];
+    this._sortColumn = null;
+    this._sortDirection = 'asc';
   }
 
   connectedCallback() {
@@ -2338,6 +2382,19 @@ export class HcShoppingList extends LitElement {
   }
 
   _handleTableClick(e) {
+    // Manejar clicks en cabeceras ordenables
+    const sortHeader = e.target.closest('th[data-sort]');
+    if (sortHeader) {
+      const column = sortHeader.dataset.sort;
+      if (this._sortColumn === column) {
+        this._sortDirection = this._sortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        this._sortColumn = column;
+        this._sortDirection = 'asc';
+      }
+      return;
+    }
+
     // Manejar botones de acción (editar/eliminar)
     const actionBtn = e.target.closest('button[data-action]');
     if (actionBtn) {
@@ -2373,51 +2430,110 @@ export class HcShoppingList extends LitElement {
     const isShoppingMode = this.mode === 'shopping';
     const isEditMode = this.mode === 'edit';
 
+    // Calcular número de columnas para colspan
+    let colCount = 1; // Nombre siempre
+    if (isShoppingMode) colCount++;
+    if (!isAgnostic) colCount++;
+    if (!this.groupByCategory) colCount++; // Columna categoría solo sin agrupar
+    if (isEditMode) colCount++;
+
+    // Obtener items ordenados
+    const sortedItems = this._getSortedItems();
+
     return html`
       <table class="items-table" @click=${this._handleTableClick}>
         <thead>
           <tr>
             ${isShoppingMode ? html`<th class="checkbox-cell"></th>` : ''}
-            <th>Nombre</th>
+            <th class="sortable ${this._sortColumn === 'name' ? 'sorted' : ''}" data-sort="name">
+              Nombre ${this._sortColumn === 'name' ? (this._sortDirection === 'asc' ? '↑' : '↓') : ''}
+            </th>
             ${!isAgnostic ? html`<th class="hide-mobile">Cantidad</th>` : ''}
-            ${this.groupByCategory ? html`<th class="hide-mobile">Categoría</th>` : ''}
+            ${!this.groupByCategory ? html`
+              <th class="hide-mobile sortable ${this._sortColumn === 'category' ? 'sorted' : ''}" data-sort="category">
+                Categoría ${this._sortColumn === 'category' ? (this._sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </th>
+            ` : ''}
             ${isEditMode ? html`<th class="table-actions"></th>` : ''}
           </tr>
         </thead>
         <tbody>
-          ${this._filteredItems.map(item => {
-            const cat = this._getCategoryById(item.category);
-            return html`
-              <tr
-                class="${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''}"
-                data-item-id="${item.id}"
-              >
-                ${isShoppingMode ? html`
-                  <td class="checkbox-cell">
-                    <div class="table-checkbox ${item.checked ? 'checked' : ''}">
-                      ${item.checked ? '✓' : ''}
-                    </div>
-                  </td>
+          ${this.groupByCategory ? html`
+            ${Object.entries(this._groupedItems).map(([category, items]) => {
+              const cat = this._getCategoryById(category);
+              const headerStyle = cat?.bgColor ? `background: ${cat.bgColor}; color: ${cat.textColor || '#fff'}` : '';
+              return html`
+                ${category !== 'todos' ? html`
+                  <tr class="category-row">
+                    <td colspan="${colCount}" style="${headerStyle}">
+                      <span>${cat?.icon || '📦'}</span>
+                      <span>${cat?.name || category}</span>
+                      <span class="category-count">(${items.length})</span>
+                    </td>
+                  </tr>
                 ` : ''}
-                <td>${item.name}</td>
-                ${!isAgnostic ? html`<td class="table-quantity hide-mobile">${item.quantity} ${item.unit}</td>` : ''}
-                ${this.groupByCategory ? html`
-                  <td class="hide-mobile">
-                    ${cat ? html`<span>${cat.icon || ''} ${cat.name}</span>` : '—'}
-                  </td>
-                ` : ''}
-                ${isEditMode ? html`
-                  <td class="table-actions">
-                    <button data-action="edit" data-item-id="${item.id}" title="Editar">✏️</button>
-                    <button data-action="delete" data-item-id="${item.id}" class="danger" title="Eliminar">🗑️</button>
-                  </td>
-                ` : ''}
-              </tr>
-            `;
-          })}
+                ${items.map(item => this._renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, false))}
+              `;
+            })}
+          ` : html`
+            ${sortedItems.map(item => this._renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, true))}
+          `}
         </tbody>
       </table>
     `;
+  }
+
+  _renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, showCategory) {
+    const cat = this._getCategoryById(item.category);
+    return html`
+      <tr
+        class="${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''}"
+        data-item-id="${item.id}"
+      >
+        ${isShoppingMode ? html`
+          <td class="checkbox-cell">
+            <div class="table-checkbox ${item.checked ? 'checked' : ''}">
+              ${item.checked ? '✓' : ''}
+            </div>
+          </td>
+        ` : ''}
+        <td>${item.name}</td>
+        ${!isAgnostic ? html`<td class="table-quantity hide-mobile">${item.quantity} ${item.unit}</td>` : ''}
+        ${showCategory ? html`
+          <td class="hide-mobile">
+            ${cat ? html`<span>${cat.icon || ''} ${cat.name}</span>` : '—'}
+          </td>
+        ` : ''}
+        ${isEditMode ? html`
+          <td class="table-actions">
+            <button data-action="edit" data-item-id="${item.id}" title="Editar">✏️</button>
+            <button data-action="delete" data-item-id="${item.id}" class="danger" title="Eliminar">🗑️</button>
+          </td>
+        ` : ''}
+      </tr>
+    `;
+  }
+
+  _getSortedItems() {
+    const items = [...this._filteredItems];
+    if (!this._sortColumn) return items;
+
+    return items.sort((a, b) => {
+      let valA, valB;
+      if (this._sortColumn === 'name') {
+        valA = (a.name || '').toLowerCase();
+        valB = (b.name || '').toLowerCase();
+      } else if (this._sortColumn === 'category') {
+        const catA = this._getCategoryById(a.category);
+        const catB = this._getCategoryById(b.category);
+        valA = (catA?.name || a.category || 'zzz').toLowerCase();
+        valB = (catB?.name || b.category || 'zzz').toLowerCase();
+      }
+
+      if (valA < valB) return this._sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return this._sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
   }
 
   render() {

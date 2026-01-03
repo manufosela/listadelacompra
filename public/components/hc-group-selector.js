@@ -258,7 +258,7 @@ export class HcGroupSelector extends LitElement {
       await this._loadGroups();
     } else {
       // Escuchar evento de auth ready
-      window.addEventListener('auth-ready', async () => {
+      globalThis.addEventListener('auth-ready', async () => {
         await this._loadGroups();
       }, { once: true });
     }

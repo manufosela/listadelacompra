@@ -96,7 +96,7 @@ const { redirectTo = '/login' } = Astro.props;
     if (!authGuard || !authContent) return;
 
     // Si ya hay usuario cacheado, no hacer nada (defaults ya muestran contenido)
-    if (window.__authUser) {
+    if (globalThis.__authUser) {
       return;
     }
 
@@ -106,8 +106,8 @@ const { redirectTo = '/login' } = Astro.props;
   })();
 
   // Lógica de verificación de auth (solo se registra una vez)
-  if (!window.__authGuardListenerRegistered) {
-    window.__authGuardListenerRegistered = true;
+  if (!globalThis.__authGuardListenerRegistered) {
+    globalThis.__authGuardListenerRegistered = true;
 
     function completeAuth(user) {
       var authGuard = document.getElementById('auth-guard');
@@ -115,19 +115,19 @@ const { redirectTo = '/login' } = Astro.props;
       if (!authGuard || !authContent) return;
 
       if (user) {
-        window.__authUser = user;
+        globalThis.__authUser = user;
         authGuard.classList.remove('checking');
         authContent.classList.remove('hidden');
       } else {
-        window.__authUser = null;
+        globalThis.__authUser = null;
         var redirectTo = authGuard.dataset.redirect || '/login';
-        window.location.href = redirectTo;
+        globalThis.location.href = redirectTo;
       }
     }
 
     async function checkAuth() {
       // Si ya verificamos y hay usuario, no hacer nada
-      if (window.__authUser) return;
+      if (globalThis.__authUser) return;
 
       var authGuard = document.getElementById('auth-guard');
       if (!authGuard) return;
@@ -141,7 +141,7 @@ const { redirectTo = '/login' } = Astro.props;
         if (auth.isAuthResolved()) {
           completeAuth(auth.getCurrentUser());
         } else {
-          window.addEventListener('auth-ready', function(e) {
+          globalThis.addEventListener('auth-ready', function(e) {
             completeAuth(e.detail.user);
           }, { once: true });
         }
@@ -157,7 +157,7 @@ const { redirectTo = '/login' } = Astro.props;
   } else {
     // En navegaciones subsiguientes, verificar si necesitamos chequear
     (async function() {
-      if (window.__authUser) return; // Ya autenticado
+      if (globalThis.__authUser) return; // Ya autenticado
 
       var authGuard = document.getElementById('auth-guard');
       if (!authGuard || !authGuard.classList.contains('checking')) return;
@@ -167,12 +167,12 @@ const { redirectTo = '/login' } = Astro.props;
         if (auth.isAuthResolved()) {
           var user = auth.getCurrentUser();
           if (user) {
-            window.__authUser = user;
+            globalThis.__authUser = user;
             authGuard.classList.remove('checking');
             var authContent = document.getElementById('auth-content');
             if (authContent) authContent.classList.remove('hidden');
           } else {
-            window.location.href = authGuard.dataset.redirect || '/login';
+            globalThis.location.href = authGuard.dataset.redirect || '/login';
           }
         }
       } catch (e) {

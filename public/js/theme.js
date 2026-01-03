@@ -22,7 +22,7 @@ export function getSavedTheme() {
  * @returns {'light' | 'dark'}
  */
 export function getSystemTheme() {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 /**
@@ -110,7 +110,7 @@ export function initTheme() {
   applyTheme(getEffectiveTheme());
 
   // Escuchar cambios en la preferencia del sistema
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const mediaQuery = globalThis.matchMedia('(prefers-color-scheme: dark)');
   mediaQuery.addEventListener('change', (e) => {
     // Solo actualizar si no hay preferencia manual
     if (!hasManualPreference()) {
@@ -120,7 +120,7 @@ export function initTheme() {
 }
 
 // Auto-inicializar si se carga como script normal (no módulo)
-if (typeof window !== 'undefined' && !window.__themeInitialized) {
-  window.__themeInitialized = true;
+if (typeof globalThis !== 'undefined' && !globalThis.__themeInitialized) {
+  globalThis.__themeInitialized = true;
   initTheme();
 }

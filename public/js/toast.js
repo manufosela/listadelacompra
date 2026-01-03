@@ -244,4 +244,4 @@ export const toast = {
 };
 
 // Exponer globalmente para uso desde HTML inline
-window.toast = toast;
+globalThis.toast = toast;

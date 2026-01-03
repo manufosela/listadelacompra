@@ -1,0 +1,89 @@
+/**
+ * Servicio de Storage para subir archivos a Firebase Storage
+ */
+
+import { storage } from './firebase-config.js';
+import { ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
+
+/**
+ * Sube una imagen como icono de lista
+ * @param {File} file - Archivo de imagen
+ * @param {string} listId - ID de la lista
+ * @returns {Promise<string>} URL de descarga de la imagen
+ */
+export async function uploadListIcon(file, listId) {
+  if (!file) throw new Error('No se proporcionó archivo');
+
+  // Validar tipo de archivo
+  const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    throw new Error('Tipo de archivo no válido. Usa JPG, PNG, GIF o WebP.');
+  }
+
+  // Validar tamaño (máximo 2MB)
+  const maxSize = 2 * 1024 * 1024;
+  if (file.size > maxSize) {
+    throw new Error('La imagen es demasiado grande. Máximo 2MB.');
+  }
+
+  // Generar nombre único basado en listId
+  const extension = file.name.split('.').pop();
+  const fileName = `list-icons/${listId}.${extension}`;
+
+  const storageRef = ref(storage, fileName);
+
+  // Subir archivo
+  const snapshot = await uploadBytes(storageRef, file, {
+    contentType: file.type
+  });
+
+  // Obtener URL de descarga
+  const downloadURL = await getDownloadURL(snapshot.ref);
+
+  return downloadURL;
+}
+
+/**
+ * Redimensiona una imagen antes de subirla
+ * @param {File} file - Archivo de imagen
+ * @param {number} maxWidth - Ancho máximo
+ * @param {number} maxHeight - Alto máximo
+ * @returns {Promise<Blob>} Imagen redimensionada
+ */
+export async function resizeImage(file, maxWidth = 200, maxHeight = 200) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    img.onload = () => {
+      let { width, height } = img;
+
+      // Calcular nuevas dimensiones manteniendo proporción
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        blob => resolve(blob),
+        'image/webp',
+        0.85
+      );
+    };
+
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}

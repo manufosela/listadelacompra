@@ -258,4 +258,4 @@ export const modal = {
 };
 
 // Exponer globalmente
-window.modal = modal;
+globalThis.modal = modal;

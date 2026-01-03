@@ -30,7 +30,7 @@ const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopp
       (function() {
         function applyTheme() {
           const saved = localStorage.getItem('theme-preference');
-          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const prefersDark = globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
           if (saved === 'dark' || (!saved && prefersDark)) {
             document.documentElement.classList.add('dark');
           } else {

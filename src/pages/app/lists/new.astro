@@ -13,10 +13,18 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       <div class="form-row icon-name-row">
         <div class="form-group icon-group">
           <label>Icono</label>
-          <button type="button" id="icon-selector-btn" class="icon-selector-btn">
-            <span id="selected-icon">🛒</span>
-          </button>
+          <div class="icon-selector-wrapper">
+            <button type="button" id="icon-selector-btn" class="icon-selector-btn">
+              <span id="selected-icon">🛒</span>
+              <img id="icon-preview" class="icon-preview" hidden alt="Icono personalizado" />
+            </button>
+            <label class="upload-icon-btn" title="Subir imagen personalizada">
+              <input type="file" id="icon-file" accept="image/*" hidden />
+              📷
+            </label>
+          </div>
           <input type="hidden" id="icon" value="🛒" />
+          <input type="hidden" id="icon-url" value="" />
         </div>
         <div class="form-group name-group">
           <label for="name">Nombre de la lista *</label>
@@ -142,6 +150,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { toast } from '/js/toast.js';
   import { getCurrentGroupId, getGroup } from '/js/group.js';
   import { createList } from '/js/lists.js';
+  import { uploadListIcon, resizeImage } from '/js/storage.js';
 
   // Iconos disponibles según tipo de lista
   const SHOPPING_ICONS = [
@@ -169,7 +178,58 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   const iconSelectorBtn = document.getElementById('icon-selector-btn');
   const selectedIconSpan = document.getElementById('selected-icon');
   const iconInput = document.getElementById('icon');
+  const iconUrlInput = document.getElementById('icon-url');
+  const iconFileInput = document.getElementById('icon-file');
+  const iconPreview = document.getElementById('icon-preview');
   const nameInput = document.getElementById('name');
+
+  let selectedImageFile = null;
+
+  // Manejar subida de imagen
+  iconFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      // Validar tipo
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        toast.error('Tipo de archivo no válido. Usa JPG, PNG, GIF o WebP.');
+        return;
+      }
+
+      // Validar tamaño (máximo 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('La imagen es demasiado grande. Máximo 2MB.');
+        return;
+      }
+
+      // Redimensionar y mostrar previsualización
+      const resizedBlob = await resizeImage(file);
+      selectedImageFile = new File([resizedBlob], 'icon.webp', { type: 'image/webp' });
+
+      // Mostrar previsualización
+      iconPreview.src = URL.createObjectURL(resizedBlob);
+      iconPreview.hidden = false;
+      selectedIconSpan.hidden = true;
+      iconInput.value = ''; // Limpiar emoji seleccionado
+
+      toast.success('Imagen seleccionada');
+    } catch (error) {
+      console.error('Error processing image:', error);
+      toast.error('Error al procesar la imagen');
+    }
+  });
+
+  // Al seleccionar un emoji, quitar la imagen
+  function selectEmoji(emoji) {
+    selectedIconSpan.textContent = emoji;
+    selectedIconSpan.hidden = false;
+    iconInput.value = emoji;
+    iconPreview.hidden = true;
+    selectedImageFile = null;
+    iconUrlInput.value = '';
+  }
 
   // Función para actualizar el grid de iconos según el tipo de lista
   function updateIconGrid(listType) {
@@ -183,8 +243,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       btn.className = 'icon-option';
       btn.textContent = icon;
       btn.addEventListener('click', () => {
-        selectedIconSpan.textContent = icon;
-        iconInput.value = icon;
+        selectEmoji(icon);
         iconPicker.hidden = true;
         document.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
@@ -193,9 +252,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       iconGrid.appendChild(btn);
     });
 
-    // Actualizar icono seleccionado por defecto
-    selectedIconSpan.textContent = defaultIcon;
-    iconInput.value = defaultIcon;
+    // Actualizar icono seleccionado por defecto (solo si no hay imagen)
+    if (!selectedImageFile) {
+      selectEmoji(defaultIcon);
+    }
 
     // Actualizar placeholder del nombre
     nameInput.placeholder = listType === 'shopping'
@@ -318,7 +378,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     const user = getCurrentUser();
     if (user) initPage(user);
   } else {
-    window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+    globalThis.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
   }
 
   // Lista recurrente
@@ -363,10 +423,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       : null;
 
     try {
-      // Crear lista usando el servicio
+      let iconUrl = null;
+
+      // Crear lista primero (necesitamos el ID para subir la imagen)
       const newList = await createList({
         name,
-        icon,
+        icon: selectedImageFile ? null : icon, // Solo emoji si no hay imagen
+        iconUrl: null, // Se actualizará después si hay imagen
         listType,
         store: listType === 'shopping' ? (store || null) : null,
         expenseType,
@@ -376,7 +439,21 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         recurringPattern: isRecurring ? { frequency } : null
       }, selectedMembers);
 
-      window.location.href = `/app/list?id=${newList.id}`;
+      // Si hay imagen seleccionada, subirla y actualizar la lista
+      if (selectedImageFile) {
+        submitBtn.textContent = 'Subiendo imagen...';
+        try {
+          iconUrl = await uploadListIcon(selectedImageFile, newList.id);
+          // Actualizar la lista con la URL de la imagen
+          const { updateList } = await import('/js/lists.js');
+          await updateList(newList.id, { iconUrl, icon: null });
+        } catch (uploadError) {
+          console.error('Error uploading icon:', uploadError);
+          toast.warning('Lista creada, pero hubo un error al subir la imagen');
+        }
+      }
+
+      globalThis.location.href = `/app/list?id=${newList.id}`;
     } catch (error) {
       console.error('Error creating list:', error);
       toast.error('Error al crear la lista: ' + error.message);
@@ -433,6 +510,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     flex: 1;
   }
 
+  .icon-selector-wrapper {
+    display: flex;
+    gap: var(--space-xs);
+  }
+
   .icon-selector-btn {
     width: 56px;
     height: 42px;
@@ -442,9 +524,38 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     background: var(--color-bg);
     cursor: pointer;
     transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
   }
 
   .icon-selector-btn:hover {
+    border-color: var(--color-primary);
+    background: var(--color-bg-secondary);
+  }
+
+  .icon-preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .upload-icon-btn {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .upload-icon-btn:hover {
     border-color: var(--color-primary);
     background: var(--color-bg-secondary);
   }

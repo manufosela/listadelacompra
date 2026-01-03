@@ -214,7 +214,7 @@ export class HcMemberManager extends LitElement {
 
     // Escuchar cambios de grupo
     eventBus.on('group:changed', this._handleGroupChanged);
-    window.addEventListener('group-changed', () => this._loadData());
+    globalThis.addEventListener('group-changed', () => this._loadData());
 
     // Cargar miembros
     this._loadData();

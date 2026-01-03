@@ -46,7 +46,7 @@ let authReadyFired = false;
  */
 function isMobileDevice() {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    (navigator.maxTouchPoints > 0 && window.innerWidth < 768);
+    (navigator.maxTouchPoints > 0 && globalThis.innerWidth < 768);
 }
 
 /**
@@ -250,7 +250,7 @@ export function waitForAuth() {
     }
 
     // Si no, esperar al evento auth-ready
-    window.addEventListener('auth-ready', (e) => {
+    globalThis.addEventListener('auth-ready', (e) => {
       resolve(e.detail.user);
     }, { once: true });
   });
@@ -286,7 +286,7 @@ onAuthStateChanged((user) => {
   // Disparar evento auth-ready UNA SOLA VEZ
   if (!authReadyFired) {
     authReadyFired = true;
-    window.dispatchEvent(new CustomEvent('auth-ready', {
+    globalThis.dispatchEvent(new CustomEvent('auth-ready', {
       detail: { user }
     }));
   }
