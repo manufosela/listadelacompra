@@ -1,0 +1,933 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+---
+
+<AppLayout title="Editar Lista">
+  <div class="edit-list-page">
+    <a href="/app/lists" class="back-link">← Volver a listas</a>
+
+    <h1>Editar Lista</h1>
+
+    <div id="loading-state" class="loading-state">
+      <p>Cargando lista...</p>
+    </div>
+
+    <form id="edit-list-form" class="form" hidden>
+      <!-- Icono y Nombre -->
+      <div class="form-row icon-name-row">
+        <div class="form-group icon-group">
+          <label>Icono</label>
+          <div class="icon-selector-wrapper">
+            <button type="button" id="icon-selector-btn" class="icon-selector-btn">
+              <span id="selected-icon">🛒</span>
+              <img id="icon-preview" class="icon-preview" hidden alt="Icono personalizado" />
+            </button>
+            <label class="upload-icon-btn" title="Subir imagen personalizada">
+              <input type="file" id="icon-file" accept="image/*" hidden />
+              📷
+            </label>
+          </div>
+          <input type="hidden" id="icon" value="🛒" />
+          <input type="hidden" id="icon-url" value="" />
+        </div>
+        <div class="form-group name-group">
+          <label for="name">Nombre de la lista *</label>
+          <input type="text" id="name" required placeholder="Ej: Compra semanal" />
+        </div>
+      </div>
+
+      <!-- Selector de iconos (modal) -->
+      <div id="icon-picker" class="icon-picker" hidden>
+        <div class="icon-grid">
+          <!-- Se llena dinámicamente -->
+        </div>
+      </div>
+
+      <!-- Tipo de lista (solo lectura) -->
+      <div class="form-group">
+        <label>Tipo de lista</label>
+        <div class="list-type-display">
+          <span id="list-type-icon" class="list-type-badge-icon">🛒</span>
+          <span id="list-type-label">Lista de Compra</span>
+        </div>
+        <small class="form-help">El tipo de lista no se puede cambiar después de crearla</small>
+      </div>
+
+      <!-- Tipo de gasto (solo para listas de compra) -->
+      <div class="form-group" id="expense-type-group" hidden>
+        <label>Tipo de gasto</label>
+        <div class="expense-type-options">
+          <label class="expense-option">
+            <input type="radio" name="expenseType" value="common" />
+            <div class="expense-card">
+              <span class="expense-icon">🏠</span>
+              <div class="expense-info">
+                <strong>Gasto Común</strong>
+                <small>Se paga de un fondo común del grupo</small>
+              </div>
+            </div>
+          </label>
+          <label class="expense-option">
+            <input type="radio" name="expenseType" value="shared" />
+            <div class="expense-card">
+              <span class="expense-icon">➗</span>
+              <div class="expense-info">
+                <strong>Gasto a dividir</strong>
+                <small>Se divide entre los miembros seleccionados</small>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Miembros -->
+      <div class="form-group">
+        <label>Compartir con miembros</label>
+        <div id="members-container" class="members-container">
+          <p class="loading-text">Cargando miembros...</p>
+        </div>
+        <small class="form-help">Selecciona qué miembros del grupo pueden ver y editar esta lista</small>
+      </div>
+
+      <!-- Tienda (opcional, solo para listas de compra) -->
+      <div class="form-group" id="store-group" hidden>
+        <label for="store">Tienda (opcional)</label>
+        <input type="text" id="store" placeholder="Ej: Mercadona, Carrefour..." />
+      </div>
+
+      <!-- Opciones avanzadas -->
+      <details class="advanced-options">
+        <summary>Opciones avanzadas</summary>
+        <div class="advanced-content">
+          <div class="form-group">
+            <label for="date">Fecha programada</label>
+            <input type="date" id="date" />
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="recurring" />
+              Lista recurrente
+            </label>
+          </div>
+
+          <div id="recurring-options" class="recurring-options" hidden>
+            <div class="form-group">
+              <label for="frequency">Frecuencia</label>
+              <select id="frequency">
+                <option value="weekly">Semanal</option>
+                <option value="biweekly">Quincenal</option>
+                <option value="monthly">Mensual</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div class="form-actions">
+        <a href="/app/lists" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Guardar cambios</button>
+      </div>
+    </form>
+
+    <div id="error-state" class="error-state" hidden>
+      <p>No se pudo cargar la lista</p>
+      <a href="/app/lists" class="btn btn-secondary">Volver a listas</a>
+    </div>
+  </div>
+</AppLayout>
+
+<script type="module">
+  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { toast } from '/js/toast.js';
+  import { getCurrentGroupId, getGroup } from '/js/group.js';
+  import { getList, updateList, updateListMembers } from '/js/lists.js';
+  import { uploadListIcon, resizeImage, deleteListIcon } from '/js/storage.js';
+
+  // Iconos disponibles según tipo de lista
+  const SHOPPING_ICONS = [
+    '🛒', '🛍️', '🏪', '🏬', '🛵', '📦',
+    '🥗', '🍎', '🥩', '🧀', '🥖', '🍪',
+    '🧹', '🧴', '💊', '🐕', '🎁', '🎄'
+  ];
+
+  const GENERAL_ICONS = [
+    '📝', '✅', '📋', '🎯', '💡', '⭐',
+    '✈️', '⛺', '🏕️', '🎒', '🧳', '🗺️',
+    '💻', '📱', '🎮', '⚽', '🏃', '🚴',
+    '🏠', '🔧', '📚', '✏️', '💼', '📄'
+  ];
+
+  let currentList = null;
+  let groupMembers = [];
+  let selectedMembers = [];
+  let currentUser = null;
+  let selectedImageFile = null;
+  let originalIconUrl = null;
+
+  // Elementos DOM
+  const loadingState = document.getElementById('loading-state');
+  const errorState = document.getElementById('error-state');
+  const form = document.getElementById('edit-list-form');
+  const iconGrid = document.querySelector('.icon-grid');
+  const iconPicker = document.getElementById('icon-picker');
+  const iconSelectorBtn = document.getElementById('icon-selector-btn');
+  const selectedIconSpan = document.getElementById('selected-icon');
+  const iconInput = document.getElementById('icon');
+  const iconUrlInput = document.getElementById('icon-url');
+  const iconFileInput = document.getElementById('icon-file');
+  const iconPreview = document.getElementById('icon-preview');
+  const nameInput = document.getElementById('name');
+  const expenseTypeGroup = document.getElementById('expense-type-group');
+  const storeGroup = document.getElementById('store-group');
+  const listTypeIcon = document.getElementById('list-type-icon');
+  const listTypeLabel = document.getElementById('list-type-label');
+
+  // Obtener ID de la lista de la URL
+  function getListIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('id');
+  }
+
+  // Cargar lista y datos
+  async function loadListData(user) {
+    currentUser = user;
+    const listId = getListIdFromUrl();
+
+    if (!listId) {
+      showError();
+      return;
+    }
+
+    try {
+      currentList = await getList(listId, true);
+
+      if (!currentList) {
+        showError();
+        return;
+      }
+
+      // Verificar que el usuario es el propietario
+      if (currentList.ownerId !== user.uid && currentList.createdBy !== user.uid) {
+        toast.error('No tienes permiso para editar esta lista');
+        window.location.href = '/app/lists';
+        return;
+      }
+
+      // Mostrar formulario
+      loadingState.hidden = true;
+      form.hidden = false;
+
+      // Llenar datos
+      populateForm();
+      await loadGroupMembers();
+
+    } catch (error) {
+      console.error('Error loading list:', error);
+      showError();
+    }
+  }
+
+  function showError() {
+    loadingState.hidden = true;
+    errorState.hidden = false;
+  }
+
+  function populateForm() {
+    // Nombre
+    nameInput.value = currentList.name || '';
+
+    // Icono
+    originalIconUrl = currentList.iconUrl || null;
+    if (currentList.iconUrl) {
+      iconPreview.src = currentList.iconUrl;
+      iconPreview.hidden = false;
+      selectedIconSpan.hidden = true;
+      iconUrlInput.value = currentList.iconUrl;
+    } else {
+      const icon = currentList.icon || '🛒';
+      selectedIconSpan.textContent = icon;
+      iconInput.value = icon;
+    }
+
+    // Tipo de lista (solo lectura)
+    const isShopping = currentList.listType === 'shopping' || !currentList.listType;
+    listTypeIcon.textContent = isShopping ? '🛒' : '📝';
+    listTypeLabel.textContent = isShopping ? 'Lista de Compra' : 'Lista General';
+
+    // Campos específicos de listas de compra
+    if (isShopping) {
+      expenseTypeGroup.hidden = false;
+      storeGroup.hidden = false;
+
+      // Tipo de gasto
+      const expenseType = currentList.expenseType || 'common';
+      const expenseRadio = document.querySelector(`input[name="expenseType"][value="${expenseType}"]`);
+      if (expenseRadio) expenseRadio.checked = true;
+
+      // Tienda
+      document.getElementById('store').value = currentList.store || '';
+    }
+
+    // Fecha programada
+    if (currentList.scheduledDate) {
+      const date = currentList.scheduledDate.toDate ? currentList.scheduledDate.toDate() : new Date(currentList.scheduledDate);
+      document.getElementById('date').value = date.toISOString().split('T')[0];
+    }
+
+    // Recurrente
+    const recurringCheckbox = document.getElementById('recurring');
+    const recurringOptions = document.getElementById('recurring-options');
+    if (currentList.isRecurring) {
+      recurringCheckbox.checked = true;
+      recurringOptions.hidden = false;
+      if (currentList.recurringPattern?.frequency) {
+        document.getElementById('frequency').value = currentList.recurringPattern.frequency;
+      }
+    }
+
+    // Actualizar grid de iconos
+    updateIconGrid(currentList.listType || 'shopping');
+  }
+
+  function updateIconGrid(listType) {
+    const icons = listType === 'shopping' ? SHOPPING_ICONS : GENERAL_ICONS;
+
+    iconGrid.innerHTML = '';
+    icons.forEach(icon => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'icon-option';
+      btn.textContent = icon;
+      btn.addEventListener('click', () => {
+        selectEmoji(icon);
+        iconPicker.hidden = true;
+        document.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+      // Marcar el icono actual
+      if (icon === iconInput.value) btn.classList.add('selected');
+      iconGrid.appendChild(btn);
+    });
+  }
+
+  function selectEmoji(emoji) {
+    selectedIconSpan.textContent = emoji;
+    selectedIconSpan.hidden = false;
+    iconInput.value = emoji;
+    iconPreview.hidden = true;
+    selectedImageFile = null;
+    iconUrlInput.value = '';
+  }
+
+  // Cargar miembros del grupo
+  async function loadGroupMembers() {
+    const membersContainer = document.getElementById('members-container');
+    if (!membersContainer) return;
+
+    const groupId = getCurrentGroupId();
+
+    if (!groupId) {
+      membersContainer.innerHTML = `
+        <div class="no-group">
+          <p>No tienes un grupo activo.</p>
+        </div>
+      `;
+      return;
+    }
+
+    try {
+      const group = await getGroup(groupId);
+
+      if (!group || !group.members) {
+        membersContainer.innerHTML = '<p class="error-text">Error al cargar el grupo</p>';
+        return;
+      }
+
+      // Convertir miembros a array, excluyendo al usuario actual
+      groupMembers = Object.entries(group.members)
+        .filter(([uid]) => uid !== currentUser.uid)
+        .map(([uid, data]) => ({
+          uid,
+          name: data.displayName || data.email?.split('@')[0] || 'Usuario',
+          photoURL: data.photoURL
+        }));
+
+      if (groupMembers.length === 0) {
+        membersContainer.innerHTML = `
+          <div class="no-members">
+            <p>No hay otros miembros en el grupo.</p>
+            <small>Invita a alguien desde la gestión del grupo.</small>
+          </div>
+        `;
+        return;
+      }
+
+      // Miembros actuales de la lista (excluyendo al propietario)
+      const currentMembers = (currentList.members || []).filter(m => m !== currentUser.uid);
+
+      membersContainer.innerHTML = `
+        <div class="members-list">
+          ${groupMembers.map(member => `
+            <label class="member-checkbox">
+              <input type="checkbox" name="members" value="${member.uid}"
+                ${currentMembers.includes(member.uid) ? 'checked' : ''} />
+              <div class="member-info">
+                <div class="member-avatar-small">
+                  ${member.photoURL
+                    ? `<img src="${member.photoURL}" alt="">`
+                    : `<span>${member.name[0].toUpperCase()}</span>`
+                  }
+                </div>
+                <span class="member-name">${member.name}</span>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+      `;
+
+      // Inicializar selectedMembers
+      selectedMembers = currentMembers;
+
+      // Manejar selección de miembros
+      membersContainer.querySelectorAll('input[name="members"]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+          selectedMembers = Array.from(membersContainer.querySelectorAll('input[name="members"]:checked'))
+            .map(cb => cb.value);
+        });
+      });
+    } catch (error) {
+      console.error('Error loading members:', error);
+      membersContainer.innerHTML = '<p class="error-text">Error al cargar miembros</p>';
+    }
+  }
+
+  // Event listeners
+  iconFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        toast.error('Tipo de archivo no válido. Usa JPG, PNG, GIF o WebP.');
+        return;
+      }
+
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('La imagen es demasiado grande. Máximo 2MB.');
+        return;
+      }
+
+      const resizedBlob = await resizeImage(file);
+      selectedImageFile = new File([resizedBlob], 'icon.webp', { type: 'image/webp' });
+
+      iconPreview.src = URL.createObjectURL(resizedBlob);
+      iconPreview.hidden = false;
+      selectedIconSpan.hidden = true;
+      iconInput.value = '';
+
+      toast.success('Imagen seleccionada');
+    } catch (error) {
+      console.error('Error processing image:', error);
+      toast.error('Error al procesar la imagen');
+    }
+  });
+
+  iconSelectorBtn.addEventListener('click', () => {
+    iconPicker.hidden = !iconPicker.hidden;
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!iconPicker.contains(e.target) && e.target !== iconSelectorBtn && !iconSelectorBtn.contains(e.target)) {
+      iconPicker.hidden = true;
+    }
+  });
+
+  // Lista recurrente
+  const recurringCheckbox = document.getElementById('recurring');
+  const recurringOptions = document.getElementById('recurring-options');
+
+  recurringCheckbox.addEventListener('change', () => {
+    recurringOptions.hidden = !recurringCheckbox.checked;
+  });
+
+  // Enviar formulario
+  const submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!currentUser || !currentList) {
+      toast.error('Error de sesión');
+      return;
+    }
+
+    const name = nameInput.value.trim();
+    if (!name) {
+      toast.warning('El nombre es obligatorio');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Guardando...';
+
+    try {
+      const updates = {
+        name,
+        scheduledDate: document.getElementById('date').value || null,
+        isRecurring: recurringCheckbox.checked,
+        recurringPattern: recurringCheckbox.checked ? { frequency: document.getElementById('frequency').value } : null
+      };
+
+      // Campos específicos de listas de compra
+      if (currentList.listType === 'shopping' || !currentList.listType) {
+        updates.expenseType = document.querySelector('input[name="expenseType"]:checked')?.value || 'common';
+        updates.store = document.getElementById('store').value.trim() || null;
+      }
+
+      // Manejar icono
+      if (selectedImageFile) {
+        submitBtn.textContent = 'Subiendo imagen...';
+        // Eliminar icono anterior si existe
+        if (originalIconUrl) {
+          try {
+            await deleteListIcon(currentList.id);
+          } catch (e) {
+            console.warn('Could not delete old icon:', e);
+          }
+        }
+        const iconUrl = await uploadListIcon(selectedImageFile, currentList.id);
+        updates.iconUrl = iconUrl;
+        updates.icon = null;
+      } else if (iconInput.value) {
+        // Se seleccionó un emoji
+        updates.icon = iconInput.value;
+        // Si había una imagen antes, eliminarla
+        if (originalIconUrl) {
+          updates.iconUrl = null;
+          try {
+            await deleteListIcon(currentList.id);
+          } catch (e) {
+            console.warn('Could not delete old icon:', e);
+          }
+        }
+      }
+
+      // Actualizar lista
+      await updateList(currentList.id, updates);
+
+      // Actualizar miembros si cambiaron
+      const originalMembers = (currentList.members || []).filter(m => m !== currentUser.uid).sort();
+      const newMembers = selectedMembers.sort();
+      const membersChanged = JSON.stringify(originalMembers) !== JSON.stringify(newMembers);
+
+      if (membersChanged) {
+        await updateListMembers(currentList.id, selectedMembers);
+      }
+
+      toast.success('Lista actualizada');
+      window.location.href = '/app/lists';
+
+    } catch (error) {
+      console.error('Error updating list:', error);
+      toast.error('Error al actualizar: ' + error.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Guardar cambios';
+    }
+  });
+
+  // Inicialización
+  function tryInit() {
+    if (isAuthResolved()) {
+      const user = getCurrentUser();
+      if (user) loadListData(user);
+    } else {
+      window.addEventListener('auth-ready', (e) => loadListData(e.detail.user), { once: true });
+    }
+  }
+
+  tryInit();
+  document.addEventListener('astro:page-load', tryInit);
+</script>
+
+<style is:global>
+  .edit-list-page {
+    max-width: 560px;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: var(--space-lg);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+  }
+
+  .back-link:hover {
+    color: var(--color-primary);
+  }
+
+  h1 {
+    margin-bottom: var(--space-xl);
+  }
+
+  .loading-state,
+  .error-state {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+  }
+
+  .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .list-type-display {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+  }
+
+  .list-type-badge-icon {
+    font-size: 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: var(--space-lg);
+  }
+
+  .form-group > label {
+    display: block;
+    margin-bottom: var(--space-xs);
+    font-weight: 500;
+  }
+
+  .form-row {
+    display: flex;
+    gap: var(--space-md);
+  }
+
+  .icon-name-row {
+    align-items: flex-end;
+  }
+
+  .icon-group {
+    flex-shrink: 0;
+  }
+
+  .name-group {
+    flex: 1;
+  }
+
+  .icon-selector-wrapper {
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  .icon-selector-btn {
+    width: 56px;
+    height: 42px;
+    font-size: 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .icon-selector-btn:hover {
+    border-color: var(--color-primary);
+    background: var(--color-bg-secondary);
+  }
+
+  .icon-preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .upload-icon-btn {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .upload-icon-btn:hover {
+    border-color: var(--color-primary);
+    background: var(--color-bg-secondary);
+  }
+
+  .icon-picker {
+    position: relative;
+    margin-top: calc(-1 * var(--space-md));
+    margin-bottom: var(--space-lg);
+    padding: var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--space-xs);
+  }
+
+  .icon-option {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .icon-option:hover {
+    background: var(--color-bg-tertiary);
+    transform: scale(1.1);
+  }
+
+  .icon-option.selected {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.1);
+  }
+
+  /* Tipo de gasto */
+  .expense-type-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .expense-option {
+    cursor: pointer;
+  }
+
+  .expense-option input {
+    display: none;
+  }
+
+  .expense-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+  }
+
+  .expense-option input:checked + .expense-card {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.05);
+  }
+
+  .expense-card:hover {
+    border-color: var(--color-primary);
+  }
+
+  .expense-icon {
+    font-size: 1.5rem;
+  }
+
+  .expense-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .expense-info strong {
+    font-size: var(--font-size-base);
+  }
+
+  .expense-info small {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  /* Miembros */
+  .members-container {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .members-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .member-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .member-checkbox:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .member-checkbox:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .member-checkbox:has(input:checked) {
+    background: rgba(37, 99, 235, 0.05);
+  }
+
+  .member-checkbox:has(input:checked) .member-name {
+    font-weight: 500;
+  }
+
+  .member-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .member-avatar-small {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-text-tertiary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    overflow: hidden;
+  }
+
+  .member-avatar-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .no-group,
+  .no-members {
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+
+  .form-help {
+    display: block;
+    margin-top: var(--space-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  /* Inputs */
+  .form-group input[type="text"],
+  .form-group input[type="date"],
+  .form-group select {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+  }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  /* Opciones avanzadas */
+  .advanced-options {
+    margin-bottom: var(--space-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .advanced-options summary {
+    padding: var(--space-md);
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .advanced-options summary:hover {
+    color: var(--color-text);
+  }
+
+  .advanced-content {
+    padding: 0 var(--space-md) var(--space-md);
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+  }
+
+  .recurring-options {
+    padding: var(--space-md);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+    margin-top: var(--space-sm);
+  }
+
+  .recurring-options .form-group {
+    margin-bottom: 0;
+  }
+
+  /* Actions */
+  .form-actions {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: flex-end;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .loading-text,
+  .error-text {
+    padding: var(--space-md);
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+
+  .error-text {
+    color: var(--color-danger);
+  }
+
+  @media (max-width: 480px) {
+    .icon-grid {
+      grid-template-columns: repeat(5, 1fr);
+    }
+
+    .expense-card {
+      padding: var(--space-sm);
+    }
+  }
+</style>

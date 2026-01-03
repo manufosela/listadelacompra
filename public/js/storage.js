@@ -3,7 +3,7 @@
  */
 
 import { storage } from './firebase-config.js';
-import { ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
 
 /**
  * Sube una imagen como icono de lista
@@ -86,4 +86,30 @@ export async function resizeImage(file, maxWidth = 200, maxHeight = 200) {
     img.onerror = reject;
     img.src = URL.createObjectURL(file);
   });
+}
+
+/**
+ * Elimina el icono de una lista
+ * @param {string} listId - ID de la lista
+ * @returns {Promise<void>}
+ */
+export async function deleteListIcon(listId) {
+  if (!listId) throw new Error('No se proporcionó ID de lista');
+
+  // Intentar eliminar con diferentes extensiones
+  const extensions = ['webp', 'png', 'jpg', 'jpeg', 'gif'];
+
+  for (const ext of extensions) {
+    try {
+      const fileName = `list-icons/${listId}.${ext}`;
+      const storageRef = ref(storage, fileName);
+      await deleteObject(storageRef);
+      return; // Éxito, salir
+    } catch (error) {
+      // Continuar con la siguiente extensión si no existe
+      if (error.code !== 'storage/object-not-found') {
+        throw error;
+      }
+    }
+  }
 }
