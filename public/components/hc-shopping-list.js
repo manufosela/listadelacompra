@@ -76,7 +76,9 @@ export class HcShoppingList extends LitElement {
     _duplicateWarnings: { type: Array, state: true },
     // Ordenación en tabla
     _sortColumn: { type: String, state: true },
-    _sortDirection: { type: String, state: true }
+    _sortDirection: { type: String, state: true },
+    // Scanner modal
+    _scannerOpen: { type: Boolean, state: true }
   };
 
   static styles = css`
@@ -795,47 +797,71 @@ export class HcShoppingList extends LitElement {
       margin-bottom: 0.5rem;
     }
 
-    .bulk-actions {
+    /* Scanner Modal */
+    .scanner-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
       display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
+      align-items: center;
+      justify-content: center;
+      z-index: 100001;
+      padding: 1rem;
     }
 
-    .ticket-scanner-container {
-      margin-bottom: 1rem;
+    .scanner-modal {
+      background: white;
+      border-radius: 0.75rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
-    .bulk-btn {
-      padding: 0.375rem 0.75rem;
-      background: transparent;
-      border: 1px solid #e2e8f0;
-      border-radius: 0.375rem;
-      font-size: 0.75rem;
+    .scanner-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .scanner-modal-header h3 {
+      margin: 0;
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    .scanner-close-btn {
+      background: none;
+      border: none;
+      font-size: 1.25rem;
       cursor: pointer;
-      transition: all 0.15s ease;
       color: #64748b;
+      padding: 0.25rem;
+      line-height: 1;
     }
 
-    .bulk-btn:hover {
-      background: #f8fafc;
-      border-color: #cbd5e1;
+    .scanner-close-btn:hover {
       color: #334155;
     }
 
-    .bulk-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
     @media (prefers-color-scheme: dark) {
-      .bulk-btn {
-        border-color: #475569;
+      .scanner-modal {
+        background: #1e293b;
+        color: #f1f5f9;
+      }
+
+      .scanner-modal-header {
+        border-bottom-color: #475569;
+      }
+
+      .scanner-close-btn {
         color: #94a3b8;
       }
 
-      .bulk-btn:hover {
-        background: #334155;
-        border-color: #64748b;
+      .scanner-close-btn:hover {
         color: #f1f5f9;
       }
     }
@@ -1438,6 +1464,12 @@ export class HcShoppingList extends LitElement {
     super.connectedCallback();
     eventBus.registerComponent(this._componentId);
 
+    // Escuchar evento para abrir scanner desde el header
+    this._handleOpenScanner = () => {
+      this._scannerOpen = true;
+    };
+    this.addEventListener('open-scanner', this._handleOpenScanner);
+
     // Esperar a que tengamos userId y listId
     if (this.userId && this.listId) {
       this._setupSubscriptions();
@@ -1459,6 +1491,9 @@ export class HcShoppingList extends LitElement {
     this._unsubscribers.forEach(unsub => unsub());
     this._subscribedPath = null;
     eventBus.unregisterComponent(this._componentId);
+    if (this._handleOpenScanner) {
+      this.removeEventListener('open-scanner', this._handleOpenScanner);
+    }
   }
 
   async _setupSubscriptions() {
@@ -2339,6 +2374,21 @@ export class HcShoppingList extends LitElement {
         console.error('Error saving ticket to history:', error);
       }
     }
+    // Cerrar el modal después de aplicar el ticket
+    this._scannerOpen = false;
+  }
+
+  _closeScannerModal() {
+    this._scannerOpen = false;
+  }
+
+  _toggleAllItems() {
+    // Si todos están marcados, desmarcar todos; si no, marcar todos
+    if (this._checkedCount === this.items.length) {
+      this._unmarkAllItems();
+    } else {
+      this._markAllItems();
+    }
   }
 
   async _handleQuickAdd(e) {
@@ -2590,15 +2640,21 @@ export class HcShoppingList extends LitElement {
         </div>
       ` : ''}
 
-      <!-- Ticket Scanner (only for shopping lists, not readonly) -->
-      ${!isAgnostic && !this.readonly && this.mode === 'shopping' ? html`
-        <div class="ticket-scanner-container">
-          <hc-ticket-scanner
-            list-id="${this.listId}"
-            user-id="${this.userId}"
-            .listItems=${this.items}
-            @ticket-applied=${this._handleTicketApplied}
-          ></hc-ticket-scanner>
+      <!-- Ticket Scanner Modal (only for shopping lists, not readonly) -->
+      ${!isAgnostic && !this.readonly && this._scannerOpen ? html`
+        <div class="scanner-modal-overlay" @click=${this._closeScannerModal}>
+          <div class="scanner-modal" @click=${e => e.stopPropagation()}>
+            <div class="scanner-modal-header">
+              <h3>Escanear ticket</h3>
+              <button class="scanner-close-btn" @click=${this._closeScannerModal}>✕</button>
+            </div>
+            <hc-ticket-scanner
+              list-id="${this.listId}"
+              user-id="${this.userId}"
+              .listItems=${this.items}
+              @ticket-applied=${this._handleTicketApplied}
+            ></hc-ticket-scanner>
+          </div>
         </div>
       ` : ''}
 
@@ -2610,26 +2666,6 @@ export class HcShoppingList extends LitElement {
         <div class="progress-bar">
           <div class="progress-fill" style="width: ${this._progress}%"></div>
         </div>
-        ${this.items.length > 0 ? html`
-          <div class="bulk-actions">
-            <button
-              class="bulk-btn"
-              @click=${this._unmarkAllItems}
-              ?disabled=${this._checkedCount === 0}
-              title="Desmarcar todos los elementos"
-            >
-              ↺ Desmarcar todos
-            </button>
-            <button
-              class="bulk-btn"
-              @click=${this._markAllItems}
-              ?disabled=${this._checkedCount === this.items.length}
-              title="Marcar todos los elementos"
-            >
-              ✓ Marcar todos
-            </button>
-          </div>
-        ` : ''}
       ` : ''}
 
       <div class="list-controls">
@@ -2656,8 +2692,17 @@ export class HcShoppingList extends LitElement {
             class="control-btn ${this.showCompleted ? 'active' : ''}"
             @click=${() => this.showCompleted = !this.showCompleted}
           >
-            ✓ Mostrar completados
+            ✓ Completados
           </button>
+          ${this.items.length > 0 ? html`
+            <button
+              class="control-btn ${this._checkedCount === this.items.length ? 'active' : ''}"
+              @click=${this._toggleAllItems}
+              title="${this._checkedCount === this.items.length ? 'Desmarcar todos' : 'Marcar todos'}"
+            >
+              ${this._checkedCount === this.items.length ? '↺' : '✓'} Todos
+            </button>
+          ` : ''}
           ${this.members.length > 0 ? html`
             <select
               class="filter-select"
