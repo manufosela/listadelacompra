@@ -41,11 +41,29 @@ let currentUser = null;
 let authReadyFired = false;
 
 /**
+ * Detecta si el navegador es móvil
+ * @returns {boolean}
+ */
+function isMobileDevice() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 0 && window.innerWidth < 768);
+}
+
+/**
  * Inicia sesión con Google
- * Intenta popup primero, si el navegador lo bloquea usa redirect
+ * En móviles usa redirect directamente (los popups no funcionan bien)
+ * En desktop intenta popup primero, si falla usa redirect
  * @returns {Promise<User>} Usuario autenticado
  */
 export async function signInWithGoogle() {
+  // En móviles usar siempre redirect (los popups fallan silenciosamente)
+  if (isMobileDevice()) {
+    console.log('Dispositivo móvil detectado, usando redirect...');
+    await signInWithRedirect(auth, googleProvider);
+    return null;
+  }
+
+  // En desktop intentar popup
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
@@ -55,11 +73,10 @@ export async function signInWithGoogle() {
 
     return user;
   } catch (error) {
-    // Si el popup está bloqueado, usar redirect como fallback
-    if (error.code === 'auth/popup-blocked') {
-      console.log('Popup bloqueado, usando redirect...');
+    // Si el popup falla por cualquier razón, usar redirect
+    if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+      console.log('Popup falló, usando redirect...');
       await signInWithRedirect(auth, googleProvider);
-      // El resultado se procesará cuando la página recargue
       return null;
     }
     console.error('Error signing in with Google:', error);

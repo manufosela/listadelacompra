@@ -732,8 +732,11 @@ export class HcListItem extends LitElement {
   }
 
   _handleItemClick(e) {
-    // No hacer toggle si se clickea en botones de acción o menú de asignación
-    if (e.target.closest('.item-actions') || e.target.closest('.assign-menu')) {
+    // No hacer toggle si se clickea en checkbox, botones de acción o menú de asignación
+    if (e.target.closest('.checkbox') ||
+        e.target.closest('.checkbox-square') ||
+        e.target.closest('.item-actions') ||
+        e.target.closest('.assign-menu')) {
       return;
     }
     this._handleToggle();

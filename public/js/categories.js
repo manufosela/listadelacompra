@@ -90,21 +90,26 @@ export function isDefaultCategory(categoryId) {
 /**
  * Obtiene las categorías custom de un grupo
  * @param {string} groupId
- * @param {string} listType - 'shopping' | 'agnostic'
+ * @param {string} listType - 'shopping' | 'agnostic' | null (todas)
  * @returns {Promise<Array>}
  */
 export async function getGroupCategories(groupId, listType = null) {
   const categoriesRef = collection(db, 'groups', groupId, 'categories');
 
-  let q;
+  // Cargar todas las categorías y filtrar en cliente
+  // Esto es más permisivo con categorías que no tienen listType definido
+  const q = query(categoriesRef, orderBy('order', 'asc'));
+  const snapshot = await getDocs(q);
+
+  let categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isDefault: false }));
+
+  // Filtrar por listType si se especifica
+  // Incluir categorías que coincidan O que no tengan listType (compatibilidad)
   if (listType) {
-    q = query(categoriesRef, where('listType', '==', listType), orderBy('order', 'asc'));
-  } else {
-    q = query(categoriesRef, orderBy('order', 'asc'));
+    categories = categories.filter(cat => cat.listType === listType || !cat.listType);
   }
 
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), isDefault: false }));
+  return categories;
 }
 
 /**

@@ -2337,11 +2337,32 @@ export class HcShoppingList extends LitElement {
     }
   }
 
-  _handleTableRowClick(item, e) {
-    // No hacer toggle si se clickea en botones de acción
-    if (e.target.closest('.table-actions')) {
+  _handleTableClick(e) {
+    // Manejar botones de acción (editar/eliminar)
+    const actionBtn = e.target.closest('button[data-action]');
+    if (actionBtn) {
+      const action = actionBtn.dataset.action;
+      const itemId = actionBtn.dataset.itemId;
+      const item = this.items.find(i => i.id === itemId);
+      if (!item) return;
+
+      if (action === 'edit') {
+        this._handleEditItem({ detail: { item } });
+      } else if (action === 'delete') {
+        this._handleRemoveItem({ detail: { itemId } });
+      }
       return;
     }
+
+    // Buscar la fila clickeada
+    const row = e.target.closest('tr[data-item-id]');
+    if (!row) return;
+
+    const itemId = row.dataset.itemId;
+    const item = this.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // En modo shopping, hacer toggle
     if (this.mode === 'shopping') {
       this._handleToggleItem({ detail: { itemId: item.id, checked: !item.checked } });
     }
@@ -2353,7 +2374,7 @@ export class HcShoppingList extends LitElement {
     const isEditMode = this.mode === 'edit';
 
     return html`
-      <table class="items-table">
+      <table class="items-table" @click=${this._handleTableClick}>
         <thead>
           <tr>
             ${isShoppingMode ? html`<th class="checkbox-cell"></th>` : ''}
@@ -2368,15 +2389,12 @@ export class HcShoppingList extends LitElement {
             const cat = this._getCategoryById(item.category);
             return html`
               <tr
-                class="${item.checked && isShoppingMode ? 'checked' : ''}"
-                @click=${(e) => this._handleTableRowClick(item, e)}
+                class="${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''}"
+                data-item-id="${item.id}"
               >
                 ${isShoppingMode ? html`
                   <td class="checkbox-cell">
-                    <div
-                      class="table-checkbox ${item.checked ? 'checked' : ''}"
-                      @click=${(e) => e.stopPropagation()}
-                    >
+                    <div class="table-checkbox ${item.checked ? 'checked' : ''}">
                       ${item.checked ? '✓' : ''}
                     </div>
                   </td>
@@ -2390,8 +2408,8 @@ export class HcShoppingList extends LitElement {
                 ` : ''}
                 ${isEditMode ? html`
                   <td class="table-actions">
-                    <button @click=${() => this._handleEditItem({ detail: { item } })} title="Editar">✏️</button>
-                    <button class="danger" @click=${() => this._handleRemoveItem({ detail: { itemId: item.id } })} title="Eliminar">🗑️</button>
+                    <button data-action="edit" data-item-id="${item.id}" title="Editar">✏️</button>
+                    <button data-action="delete" data-item-id="${item.id}" class="danger" title="Eliminar">🗑️</button>
                   </td>
                 ` : ''}
               </tr>
