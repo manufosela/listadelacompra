@@ -4,147 +4,26 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
 <AppLayout title="Inicio">
   <div class="home-page">
-    <header class="home-header">
+    <div class="home-content">
       <h1 id="greeting">Hola</h1>
-      <p class="subtitle">Bienvenido a MyHomeCart</p>
-    </header>
-
-    <section class="quick-actions">
-      <a href="/app/lists/new" class="action-card primary">
-        <span class="action-icon">+</span>
-        <span class="action-label">Nueva lista</span>
-      </a>
-      <a href="/app/lists" class="action-card">
-        <span class="action-icon">📋</span>
-        <span class="action-label">Mis listas</span>
-      </a>
-      <a href="/app/products" class="action-card">
-        <span class="action-icon">🏷️</span>
-        <span class="action-label">Productos</span>
-      </a>
-      <a href="/app/tickets" class="action-card">
-        <span class="action-icon">🧾</span>
-        <span class="action-label">Tickets</span>
-      </a>
-    </section>
-
-    <section class="recent-section">
-      <h2>Listas recientes</h2>
-      <div id="recent-lists" class="recent-lists">
-        <p class="loading">Cargando...</p>
-      </div>
-      <a href="/app/lists" class="view-all-link">Ver todas las listas</a>
-    </section>
-
-    <section class="stats-section">
-      <h2>Resumen</h2>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <span class="stat-value" id="stat-lists">-</span>
-          <span class="stat-label">Listas activas</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-items">-</span>
-          <span class="stat-label">Items pendientes</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-products">-</span>
-          <span class="stat-label">Productos</span>
-        </div>
-      </div>
-    </section>
+      <p class="welcome">Bienvenido a MyHomeCart</p>
+      <p class="description">
+        Tu aplicación para gestionar listas de la compra de forma colaborativa.
+        Crea listas, compártelas con tu familia o compañeros de piso,
+        escanea tickets para registrar gastos y lleva un control
+        de los productos y precios de tu hogar.
+      </p>
+    </div>
   </div>
 </AppLayout>
 
 <script type="module">
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
-  import { db } from '/js/firebase-config.js';
-  import { collection, query, orderBy, limit, getDocs, where } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
-  async function initPage(user) {
-    // Saludo personalizado
+  function initPage(user) {
     const greeting = document.getElementById('greeting');
     const displayName = user.displayName?.split(' ')[0] || 'Usuario';
     if (greeting) greeting.textContent = `Hola, ${displayName}`;
-
-    // Cargar listas recientes
-    await loadRecentLists(user);
-
-    // Cargar estadísticas
-    await loadStats(user);
-  }
-
-  async function loadRecentLists(user) {
-    const container = document.getElementById('recent-lists');
-    if (!container) return;
-
-    try {
-      const listsRef = collection(db, 'users', user.uid, 'lists');
-      const q = query(listsRef, where('closed', '==', false), orderBy('updatedAt', 'desc'), limit(3));
-      const snapshot = await getDocs(q);
-
-      if (snapshot.empty) {
-        container.innerHTML = `
-          <div class="empty-recent">
-            <p>No tienes listas todavía</p>
-            <a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>
-          </div>
-        `;
-        return;
-      }
-
-      const lists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      container.innerHTML = lists.map(list => {
-        const icon = list.iconUrl
-          ? `<img src="${list.iconUrl}" alt="" class="recent-list-icon-img" />`
-          : `<span class="recent-list-icon">${list.icon || '🛒'}</span>`;
-
-        return `
-          <a href="/app/list?id=${list.id}" class="recent-list-item">
-            ${icon}
-            <div class="recent-list-info">
-              <span class="recent-list-name">${list.name}</span>
-              <span class="recent-list-count">${list.itemCount || 0} elementos</span>
-            </div>
-          </a>
-        `;
-      }).join('');
-    } catch (e) {
-      console.error('Error loading recent lists:', e);
-      container.innerHTML = '<p class="error">Error al cargar listas</p>';
-    }
-  }
-
-  async function loadStats(user) {
-    const statLists = document.getElementById('stat-lists');
-    const statItems = document.getElementById('stat-items');
-    const statProducts = document.getElementById('stat-products');
-
-    try {
-      // Contar listas activas
-      const listsRef = collection(db, 'users', user.uid, 'lists');
-      const listsQuery = query(listsRef, where('closed', '==', false));
-      const listsSnapshot = await getDocs(listsQuery);
-
-      if (statLists) statLists.textContent = listsSnapshot.size;
-
-      // Contar items pendientes (suma de itemCount de todas las listas abiertas)
-      let totalItems = 0;
-      listsSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        totalItems += data.itemCount || 0;
-      });
-      if (statItems) statItems.textContent = totalItems;
-
-      // Contar productos del usuario
-      const productsRef = collection(db, 'users', user.uid, 'products');
-      const productsSnapshot = await getDocs(productsRef);
-      if (statProducts) statProducts.textContent = productsSnapshot.size;
-
-    } catch (e) {
-      console.error('Error loading stats:', e);
-    }
   }
 
   function tryInit() {
@@ -162,207 +41,31 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
 <style is:global>
   .home-page {
-    max-width: 800px;
-  }
-
-  .home-header {
-    margin-bottom: var(--space-xl);
-  }
-
-  .home-header h1 {
-    font-size: 1.75rem;
-    margin-bottom: var(--space-xs);
-  }
-
-  .home-header .subtitle {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-  }
-
-  /* Quick actions */
-  .quick-actions {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-md);
-    margin-bottom: var(--space-xl);
-  }
-
-  .action-card {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: var(--space-lg) var(--space-md);
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    text-decoration: none;
-    color: inherit;
-    transition: all var(--transition-fast);
+    min-height: calc(100vh - 200px);
+    padding: var(--space-lg);
+  }
+
+  .home-content {
     text-align: center;
+    max-width: 500px;
   }
 
-  .action-card:hover {
-    border-color: var(--color-primary);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+  .home-content h1 {
+    font-size: 2rem;
+    margin-bottom: var(--space-sm);
   }
 
-  .action-card.primary {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
-  }
-
-  .action-card.primary:hover {
-    background: var(--color-primary-hover);
-  }
-
-  .action-icon {
-    font-size: 1.75rem;
-    margin-bottom: var(--space-xs);
-  }
-
-  .action-label {
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-  }
-
-  /* Recent section */
-  .recent-section {
+  .home-content .welcome {
+    font-size: var(--font-size-lg);
+    color: var(--color-primary);
     margin-bottom: var(--space-xl);
   }
 
-  .recent-section h2 {
-    font-size: var(--font-size-lg);
-    margin-bottom: var(--space-md);
-  }
-
-  .recent-lists {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    margin-bottom: var(--space-md);
-  }
-
-  .recent-list-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-md);
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    text-decoration: none;
-    color: inherit;
-    transition: all var(--transition-fast);
-  }
-
-  .recent-list-item:hover {
-    border-color: var(--color-primary);
-    background: var(--color-bg-secondary);
-  }
-
-  .recent-list-icon {
-    font-size: 1.5rem;
-  }
-
-  .recent-list-icon-img {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-sm);
-    object-fit: cover;
-  }
-
-  .recent-list-info {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .recent-list-name {
-    font-weight: 500;
-  }
-
-  .recent-list-count {
-    font-size: var(--font-size-sm);
+  .home-content .description {
     color: var(--color-text-secondary);
-  }
-
-  .view-all-link {
-    display: inline-block;
-    font-size: var(--font-size-sm);
-    color: var(--color-primary);
-    text-decoration: none;
-  }
-
-  .view-all-link:hover {
-    text-decoration: underline;
-  }
-
-  .empty-recent {
-    text-align: center;
-    padding: var(--space-lg);
-    color: var(--color-text-secondary);
-  }
-
-  .empty-recent p {
-    margin-bottom: var(--space-md);
-  }
-
-  /* Stats section */
-  .stats-section h2 {
-    font-size: var(--font-size-lg);
-    margin-bottom: var(--space-md);
-  }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-md);
-  }
-
-  .stat-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: var(--space-lg);
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    text-align: center;
-  }
-
-  .stat-value {
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--color-primary);
-    margin-bottom: var(--space-xs);
-  }
-
-  .stat-label {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-  }
-
-  .loading {
-    color: var(--color-text-secondary);
-    padding: var(--space-lg);
-    text-align: center;
-  }
-
-  .error {
-    color: var(--color-error);
-    padding: var(--space-lg);
-    text-align: center;
-  }
-
-  @media (max-width: 600px) {
-    .quick-actions {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    .stats-grid {
-      grid-template-columns: 1fr;
-    }
+    line-height: 1.6;
   }
 </style>
