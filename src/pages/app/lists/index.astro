@@ -28,6 +28,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
   import { subscribeToLists } from '/js/realtime-sync.js';
   import { getCurrentGroupId } from '/js/group.js';
+  import { db } from '/js/firebase-config.js';
+  import { doc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { toast } from '/js/toast.js';
 
   let allLists = [];
   let activeStatus = 'pending';
@@ -107,6 +110,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     container.innerHTML = filtered.map(list => {
       const isOwner = list.ownerId === currentUserId || list.createdBy === currentUserId;
+      const isAgnostic = list.listType === 'agnostic';
       const listIcon = list.iconUrl
         ? `<img src="${list.iconUrl}" alt="" class="list-icon-img" />`
         : `<span class="list-icon-emoji">${list.icon || '🛒'}</span>`;
@@ -125,16 +129,69 @@ import AppLayout from '../../../layouts/AppLayout.astro';
             ${list.scheduledDate ? `<p class="list-date">📅 ${list.scheduledDate.toLocaleDateString()}</p>` : ''}
             ${list.isRecurring ? `<p class="list-recurring">🔄 Recurrente</p>` : ''}
           </a>
-          ${isOwner ? `
-            <a href="/app/lists/edit?id=${list.id}" class="list-edit-btn" title="Editar lista" aria-label="Editar lista ${list.name}">
-              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-              </svg>
-            </a>
-          ` : ''}
+          <div class="list-actions-group">
+            ${!isAgnostic && !list.closed ? `
+              <button class="list-action-btn scan-btn" data-list-id="${list.id}" data-owner-id="${list.ownerId || list.createdBy}" title="Escanear ticket" aria-label="Escanear ticket">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+              </button>
+            ` : ''}
+            ${isOwner ? `
+              <a href="/app/lists/edit?id=${list.id}" class="list-action-btn" title="Editar lista" aria-label="Editar lista ${list.name}">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </a>
+              <button class="list-action-btn archive-btn ${list.closed ? 'active' : ''}" data-list-id="${list.id}" data-owner-id="${list.ownerId || list.createdBy}" data-closed="${list.closed || false}" title="${list.closed ? 'Reabrir lista' : 'Archivar lista'}" aria-label="${list.closed ? 'Reabrir lista' : 'Archivar lista'}">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                </svg>
+              </button>
+            ` : ''}
+          </div>
         </div>
       `;
     }).join('');
+
+    // Añadir event listeners para los botones de acción
+    setupActionListeners();
+  }
+
+  function setupActionListeners() {
+    // Botones de escanear ticket
+    document.querySelectorAll('.scan-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const listId = btn.dataset.listId;
+        const ownerId = btn.dataset.ownerId;
+        // Navegar a la lista y abrir el scanner
+        window.location.href = `/app/list?id=${listId}&owner=${ownerId}&openScanner=true`;
+      });
+    });
+
+    // Botones de archivar
+    document.querySelectorAll('.archive-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const listId = btn.dataset.listId;
+        const ownerId = btn.dataset.ownerId;
+        const isClosed = btn.dataset.closed === 'true';
+        const newClosed = !isClosed;
+
+        try {
+          const listRef = doc(db, 'users', ownerId, 'lists', listId);
+          await updateDoc(listRef, { closed: newClosed, updatedAt: serverTimestamp() });
+          toast.success(newClosed ? 'Lista archivada' : 'Lista reabierta');
+        } catch (error) {
+          console.error('Error al archivar:', error);
+          toast.error('Error al cambiar estado de la lista');
+        }
+      });
+    });
   }
 </script>
 
@@ -199,7 +256,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   .list-card {
     display: block;
     padding: var(--space-lg);
-    padding-right: calc(var(--space-lg) + 32px);
+    padding-right: calc(var(--space-lg) + 110px);
     background: var(--color-bg);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
@@ -214,10 +271,16 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     transform: translateY(-2px);
   }
 
-  .list-edit-btn {
+  .list-actions-group {
     position: absolute;
     top: var(--space-sm);
     right: var(--space-sm);
+    display: flex;
+    gap: 4px;
+    z-index: 1;
+  }
+
+  .list-action-btn {
     width: 32px;
     height: 32px;
     display: flex;
@@ -228,13 +291,19 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     border-radius: var(--radius-sm);
     color: var(--color-text-secondary);
     text-decoration: none;
+    cursor: pointer;
     transition: all var(--transition-fast);
-    z-index: 1;
   }
 
-  .list-edit-btn:hover {
+  .list-action-btn:hover {
     background: var(--color-primary);
     border-color: var(--color-primary);
+    color: white;
+  }
+
+  .list-action-btn.active {
+    background: var(--color-text-secondary);
+    border-color: var(--color-text-secondary);
     color: white;
   }
 

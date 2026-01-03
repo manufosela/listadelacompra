@@ -112,6 +112,18 @@ service cloud.firestore {
             && (uid == request.auth.uid
                 || request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/lists/$(listId)).data.members);
         }
+
+        // Tickets procesados de la lista del usuario
+        match /tickets/{ticketId} {
+          // Propietario o miembro de la lista puede acceder
+          allow read: if isAuthenticated()
+            && (uid == request.auth.uid
+                || request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/lists/$(listId)).data.members);
+
+          allow create, update, delete: if isAuthenticated()
+            && (uid == request.auth.uid
+                || request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/lists/$(listId)).data.members);
+        }
       }
 
       // ==================== CUSTOM CATEGORIES ====================

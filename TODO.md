@@ -4,7 +4,90 @@ Tareas pendientes y features planificadas para desarrollo futuro.
 
 ---
 
-## Sesión actual (01/01/2026) - Sistema de Categorías ✅ EN PROGRESO
+## Sesión actual (02/01/2026) - Sistema de Tickets
+
+### Implementado hoy ✅
+
+- [x] Cloud Function `processTicket` con OpenAI Vision (gpt-4o)
+- [x] Soporte para PDF (conversión a imagen con pdf.js)
+- [x] Prompt optimizado para tickets españoles (fecha DD/MM/YYYY, palabras clave TOTAL/IMPORTE)
+- [x] Guardar tickets en historial: `users/{uid}/lists/{listId}/tickets/{ticketId}`
+- [x] Página `/app/tickets` - listado de tickets con eliminación
+- [x] Modal personalizado para confirmar eliminación (no alert/confirm nativos)
+- [x] Cálculo automático de total sumando items si OCR no lo detecta
+- [x] Reglas Firestore para subcolección tickets
+- [x] Fix: navegación View Transitions (list.astro redirigía a /app desde otras páginas)
+
+### Pendiente próxima sesión
+
+#### 1. Editar fecha del ticket
+La IA no siempre detecta la fecha correctamente. Necesito poder editarla manualmente.
+
+**Implementación:**
+- Añadir botón editar en ticket card
+- Modal para editar fecha, tienda, total
+- Función updateTicket en Firestore
+
+**Archivos:**
+- `src/pages/app/tickets/index.astro`
+- `public/js/tickets.js` (añadir updateTicket)
+
+#### 2. Guardar imagen del ticket en Storage
+Actualmente la imagen NO se guarda. Solo se procesa y se descarta.
+
+**Estado actual:**
+- `imageUrl` siempre es `null` en el documento
+- La imagen se envía como base64 a la Cloud Function y se pierde
+
+**Implementación:**
+- Subir imagen a Storage: `users/{uid}/tickets/{ticketId}.jpg`
+- Guardar URL en documento del ticket
+- Añadir botón "Ver ticket" en la página de tickets
+
+**Archivos:**
+- `public/components/hc-ticket-scanner.js` - subir a Storage
+- `public/js/tickets.js` - pasar imageUrl a saveTicketToHistory
+- `src/pages/app/tickets/index.astro` - mostrar imagen
+
+#### 3. Mejorar detección de fecha OCR
+El prompt ya está optimizado pero sigue fallando en algunos tickets.
+
+**Archivo:** `functions/index.js` (líneas 28-61)
+
+**Posibles mejoras:**
+- Añadir más formatos: "02 ENE 2026", "2-1-26"
+- Buscar cerca de palabras: FECHA, DIA, F.VENTA
+
+### Contexto técnico
+
+**Estructura Firestore:**
+```
+users/{uid}/lists/{listId}/tickets/{ticketId}
+  - store: string
+  - date: string (YYYY-MM-DD)
+  - total: number
+  - itemCount: number
+  - imageUrl: string | null  <-- Actualmente siempre null
+  - groupId: string
+  - processedAt: timestamp
+```
+
+**Cloud Function:**
+- Region: europe-west1
+- Config: `invoker: 'public'`, `secrets: ['OPENAI_API_KEY']`
+- Modelo: gpt-4o
+- Coste: ~$0.003-0.01 por ticket
+
+**Archivos del sistema de tickets:**
+- `src/pages/app/tickets/index.astro` - Listado
+- `public/components/hc-ticket-scanner.js` - Componente Lit
+- `public/components/hc-shopping-list.js` - Integración y guardado
+- `public/js/tickets.js` - Servicios
+- `functions/index.js` - Cloud Function
+
+---
+
+## Sesión anterior (01/01/2026) - Sistema de Categorías ✅ COMPLETADO
 
 ### Gestión de Categorías por Tipo de Lista ✅
 

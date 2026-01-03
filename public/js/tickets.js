@@ -154,12 +154,21 @@ export async function applyTicketToList({ userId, listId, ticketItems, listItems
 export async function saveTicketToHistory({ userId, listId, groupId, ticketData, imageUrl }) {
   const ticketsRef = collection(db, 'users', userId, 'lists', listId, 'tickets');
 
+  // Calcular total sumando items si no viene del OCR
+  let total = ticketData.total;
+  if (!total || total === 0) {
+    total = (ticketData.items || []).reduce((sum, item) => {
+      const itemTotal = item.totalPrice || item.unitPrice || 0;
+      return sum + (typeof itemTotal === 'number' ? itemTotal : 0);
+    }, 0);
+  }
+
   const ticketDoc = await addDoc(ticketsRef, {
     store: ticketData.store,
     date: ticketData.date,
-    total: ticketData.total,
-    subtotal: ticketData.subtotal,
-    taxes: ticketData.taxes,
+    total,
+    subtotal: ticketData.subtotal || total,
+    taxes: ticketData.taxes || 0,
     itemCount: ticketData.items?.length || 0,
     imageUrl: imageUrl || null,
     groupId,

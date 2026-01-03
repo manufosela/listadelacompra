@@ -30,6 +30,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
     const urlParams = new URLSearchParams(window.location.search);
     const listId = urlParams.get('id');
     const ownerId = urlParams.get('owner') || user.uid; // Si no hay owner, es del usuario
+    const openScanner = urlParams.get('openScanner') === 'true';
 
     if (!listId) {
       window.location.href = '/app';
@@ -163,6 +164,13 @@ import AppLayout from '../../layouts/AppLayout.astro';
           listComponent.setAttribute('readonly', 'true');
         }
         container.appendChild(listComponent);
+
+        // Si viene con openScanner=true, abrir el scanner después de montar
+        if (openScanner && !list.closed && list.listType !== 'agnostic') {
+          setTimeout(() => {
+            listComponent.dispatchEvent(new CustomEvent('open-scanner'));
+          }, 100);
+        }
       } else if (container) {
         // Actualizar readonly si la lista ya existe
         const existingComponent = container.querySelector('hc-shopping-list');

@@ -25,11 +25,18 @@ async function analyzeTicketWithOpenAI(imageContent) {
     apiKey: process.env.OPENAI_API_KEY,
   });
 
-  const prompt = `Analiza este ticket de compra y extrae la siguiente información en formato JSON:
+  const prompt = `Analiza este ticket de compra ESPAÑOL y extrae la información en formato JSON.
+
+CONTEXTO: Es un ticket de supermercado o tienda española.
+- La fecha aparece en formato DD/MM/YYYY o DD-MM-YYYY
+- El total aparece junto a palabras como: TOTAL, IMPORTE, A PAGAR, TOTAL A PAGAR, VENTA, TOTAL EUR, TOTAL €
+- Los precios usan coma como separador decimal (ej: 3,50 = 3.50)
+
+Extrae esta información:
 
 {
-  "store": "nombre de la tienda",
-  "date": "fecha en formato YYYY-MM-DD",
+  "store": "nombre de la tienda (busca en la cabecera del ticket)",
+  "date": "fecha convertida a formato YYYY-MM-DD",
   "items": [
     {
       "name": "nombre del producto",
@@ -37,7 +44,7 @@ async function analyzeTicketWithOpenAI(imageContent) {
       "unit": "unidad (kg, L, ud, pack, etc)",
       "unitPrice": 0.00,
       "totalPrice": 0.00,
-      "category": "categoría sugerida (frutas, verduras, carnes, pescados, lacteos, panaderia, bebidas, limpieza, higiene, mascotas, congelados, despensa, otros)"
+      "category": "categoría (frutas, verduras, carnes, pescados, lacteos, panaderia, bebidas, limpieza, higiene, mascotas, congelados, despensa, otros)"
     }
   ],
   "subtotal": 0.00,
@@ -46,11 +53,11 @@ async function analyzeTicketWithOpenAI(imageContent) {
   "paymentMethod": "efectivo/tarjeta/otro"
 }
 
-Importante:
+IMPORTANTE:
+- Busca el TOTAL final (el importe más grande, normalmente al final del ticket)
+- Convierte la fecha de DD/MM/YYYY a YYYY-MM-DD
+- Convierte precios: reemplaza comas por puntos (3,50 → 3.50)
 - Si no puedes leer algún campo, usa null
-- Los precios deben ser números decimales
-- La fecha debe estar en formato ISO (YYYY-MM-DD)
-- Intenta categorizar cada producto según las categorías disponibles
 - Responde SOLO con el JSON, sin texto adicional`;
 
   const response = await openai.chat.completions.create({
