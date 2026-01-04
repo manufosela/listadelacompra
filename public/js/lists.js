@@ -311,6 +311,80 @@ export async function restoreList(listId) {
 }
 
 /**
+ * Clona una lista existente (crea una nueva con los mismos items)
+ * @param {string} sourceListId - ID de la lista a clonar
+ * @param {string} sourceOwnerId - ID del propietario de la lista origen (opcional, para listas compartidas)
+ * @param {string} newName - Nombre para la nueva lista (opcional)
+ * @returns {Promise<Object>} Nueva lista creada
+ */
+export async function cloneList(sourceListId, sourceOwnerId = null, newName = null) {
+  const user = getCurrentUser();
+  if (!user) throw new Error('No authenticated user');
+
+  const ownerId = sourceOwnerId || user.uid;
+  const sourceListRef = doc(db, 'users', ownerId, 'lists', sourceListId);
+  const sourceListSnap = await getDoc(sourceListRef);
+
+  if (!sourceListSnap.exists()) {
+    throw new Error('Lista origen no encontrada');
+  }
+
+  const sourceList = sourceListSnap.data();
+
+  // Obtener items de la lista origen
+  const itemsRef = collection(db, 'users', ownerId, 'lists', sourceListId, 'items');
+  const itemsSnap = await getDocs(itemsRef);
+  const sourceItems = itemsSnap.docs.map(d => d.data());
+
+  // Crear nueva lista
+  const listsRef = collection(db, 'users', user.uid, 'lists');
+  const newList = {
+    name: newName || `${sourceList.name} (copia)`,
+    icon: sourceList.icon || '🛒',
+    iconUrl: sourceList.iconUrl || null,
+    listType: sourceList.listType || 'shopping',
+    expenseType: sourceList.expenseType || 'common',
+    ownerId: user.uid,
+    ownerName: user.displayName || user.email?.split('@')[0] || 'Usuario',
+    members: [user.uid],
+    itemCount: sourceItems.length,
+    closed: false,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    createdBy: user.uid,
+    clonedFrom: sourceListId
+  };
+
+  const newListRef = await addDoc(listsRef, newList);
+
+  // Copiar items (sin checked, checkedAt, checkedBy)
+  const batch = writeBatch(db);
+  for (const item of sourceItems) {
+    const newItemRef = doc(collection(db, 'users', user.uid, 'lists', newListRef.id, 'items'));
+    batch.set(newItemRef, {
+      name: item.name,
+      quantity: item.quantity || 1,
+      unit: item.unit || 'unidad',
+      category: item.category || 'otros',
+      notes: item.notes || '',
+      priority: item.priority || 'normal',
+      productId: item.productId || null,
+      checked: false,
+      checkedAt: null,
+      checkedBy: null,
+      createdAt: serverTimestamp(),
+      createdBy: user.uid
+    });
+  }
+  await batch.commit();
+
+  // Invalidar cache
+  invalidateCache('lists', user.uid);
+
+  return { id: newListRef.id, ...newList };
+}
+
+/**
  * Elimina una lista
  * @param {string} listId - ID de la lista
  */

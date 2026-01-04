@@ -44,11 +44,25 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
 <script type="module">
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
-  import { getUserLists, getSharedListsForUser } from '/js/lists.js';
+  import { getUserLists, getSharedListsForUser, cloneList, deleteList } from '/js/lists.js';
   import { db } from '/js/firebase-config.js';
   import { collection, query, onSnapshot, orderBy, doc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
   import { toast } from '/js/toast.js';
   import '/components/hc-ticket-scanner.js';
+
+  // Helper para formatear fechas
+  function formatDate(timestamp) {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function formatDateTime(timestamp) {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
   let currentTab = 'mine';
   let viewMode = localStorage.getItem('listsViewMode') || 'list';
   let myLists = [];
@@ -232,6 +246,15 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     let buttons = '';
 
+    // Clonar lista (siempre disponible)
+    buttons += `
+      <button class="list-action-btn clone-btn" data-list-id="${listId}" data-owner-id="${ownerId}" data-list-name="${list.name}" title="Clonar lista" aria-label="Clonar lista">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+      </button>
+    `;
+
     // Escanear ticket (solo para listas no agnósticas y no cerradas)
     if (!isAgnostic && !list.closed) {
       buttons += `
@@ -244,20 +267,37 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       `;
     }
 
-    // Editar y archivar (solo para propietarios)
+    // Editar y archivar/borrar (solo para propietarios)
     if (isOwner) {
-      buttons += `
-        <a href="/app/lists/edit?id=${listId}" class="list-action-btn" title="Editar lista" aria-label="Editar lista">
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-          </svg>
-        </a>
-        <button class="list-action-btn archive-btn ${list.closed ? 'active' : ''}" data-list-id="${listId}" data-owner-id="${ownerId}" data-closed="${list.closed || false}" title="${list.closed ? 'Reabrir lista' : 'Archivar lista'}" aria-label="${list.closed ? 'Reabrir lista' : 'Archivar lista'}">
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-          </svg>
-        </button>
-      `;
+      // Editar solo si no está archivada
+      if (!list.closed) {
+        buttons += `
+          <a href="/app/lists/edit?id=${listId}" class="list-action-btn" title="Editar lista" aria-label="Editar lista">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+          </a>
+          <button class="list-action-btn archive-btn" data-list-id="${listId}" data-owner-id="${ownerId}" title="Archivar lista" aria-label="Archivar lista">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+            </svg>
+          </button>
+        `;
+      } else {
+        // Reabrir y borrar para listas archivadas
+        buttons += `
+          <button class="list-action-btn restore-btn" data-list-id="${listId}" data-owner-id="${ownerId}" title="Reabrir lista" aria-label="Reabrir lista">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+            </svg>
+          </button>
+          <button class="list-action-btn delete-btn danger" data-list-id="${listId}" data-owner-id="${ownerId}" data-list-name="${list.name}" title="Eliminar lista" aria-label="Eliminar lista">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        `;
+      }
     }
 
     return buttons ? `<div class="list-actions-group">${buttons}</div>` : '';
@@ -300,6 +340,78 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         } catch (error) {
           console.error('Error al archivar:', error);
           toast.error('Error al cambiar estado de la lista');
+        }
+      });
+    });
+
+    // Botones de clonar
+    document.querySelectorAll('.clone-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const listId = btn.dataset.listId;
+        const ownerId = btn.dataset.ownerId;
+        const listName = btn.dataset.listName;
+
+        try {
+          btn.disabled = true;
+          toast.info('Clonando lista...');
+          const newList = await cloneList(listId, ownerId);
+          toast.success(`Lista "${newList.name}" creada`);
+          // Navegar a la nueva lista
+          window.location.href = `/app/list?id=${newList.id}`;
+        } catch (error) {
+          console.error('Error al clonar:', error);
+          toast.error('Error al clonar la lista');
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // Botones de restaurar (reabrir lista archivada)
+    document.querySelectorAll('.restore-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const listId = btn.dataset.listId;
+        const ownerId = btn.dataset.ownerId;
+
+        try {
+          const listRef = doc(db, 'users', ownerId, 'lists', listId);
+          await updateDoc(listRef, {
+            closed: false,
+            archivedAt: null,
+            archivedBy: null,
+            updatedAt: serverTimestamp()
+          });
+          toast.success('Lista reabierta');
+        } catch (error) {
+          console.error('Error al reabrir:', error);
+          toast.error('Error al reabrir la lista');
+        }
+      });
+    });
+
+    // Botones de eliminar
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const listId = btn.dataset.listId;
+        const listName = btn.dataset.listName;
+
+        if (!confirm(`¿Eliminar la lista "${listName}"?\n\nEsta acción no se puede deshacer.`)) {
+          return;
+        }
+
+        try {
+          btn.disabled = true;
+          await deleteList(listId);
+          toast.success('Lista eliminada');
+        } catch (error) {
+          console.error('Error al eliminar:', error);
+          toast.error('Error al eliminar la lista');
+          btn.disabled = false;
         }
       });
     });
@@ -362,6 +474,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                 <th></th>
                 <th>Nombre</th>
                 <th>Elementos</th>
+                ${isArchivedTab ? '<th>Creada</th><th>Archivada</th>' : ''}
                 ${isSharedTab ? '<th>Propietario</th>' : ''}
                 <th></th>
               </tr>
@@ -385,6 +498,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                       </a>
                     </td>
                     <td class="count-cell"><a href="${listUrl}">${list.itemCount || 0}</a></td>
+                    ${isArchivedTab ? `
+                      <td class="date-cell"><a href="${listUrl}">${formatDate(list.createdAt)}</a></td>
+                      <td class="date-cell"><a href="${listUrl}">${formatDate(list.archivedAt)}</a></td>
+                    ` : ''}
                     ${isSharedTab ? `<td class="owner-cell"><a href="${listUrl}">${list.ownerName || ''}</a></td>` : ''}
                     <td class="actions-cell">${renderActionButtons(list, isOwner, isSharedTab)}</td>
                   </tr>
@@ -417,9 +534,15 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                     </div>
                   ` : ''}
                   <div class="list-card-meta">
-                    ${!isSharedTab ? `<span>${list.itemCount || 0} elementos</span>` : ''}
+                    ${!isSharedTab && !isArchivedTab ? `<span>${list.itemCount || 0} elementos</span>` : ''}
                     ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
                   </div>
+                  ${isArchivedTab ? `
+                    <div class="list-card-dates">
+                      <span class="date-label">Creada: ${formatDate(list.createdAt)}</span>
+                      <span class="date-label">Archivada: ${formatDate(list.archivedAt)}</span>
+                    </div>
+                  ` : ''}
                 </a>
                 ${renderActionButtons(list, isOwner, isSharedTab)}
               </div>
@@ -651,6 +774,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     color: white;
   }
 
+  .list-action-btn.danger:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+    color: white;
+  }
+
   .empty-state {
     text-align: center;
     padding: var(--space-2xl) var(--space-lg);
@@ -765,8 +894,33 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     color: var(--color-text-secondary);
   }
 
+  .lists-table .date-cell {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+  }
+
+  .lists-table .date-cell a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Fechas en cards */
+  .list-card-dates {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  .list-card-dates .date-label {
+    display: block;
+  }
+
   .lists-table .actions-cell {
-    width: 120px;
+    width: 150px;
     text-align: right;
   }
 
