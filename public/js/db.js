@@ -89,7 +89,8 @@ export const UNITS = [
   { id: 'bolsa', name: 'Bolsa(s)' },
   { id: 'lata', name: 'Lata(s)' },
   { id: 'botella', name: 'Botella(s)' },
-  { id: 'bandeja', name: 'Bandeja(s)' }
+  { id: 'bandeja', name: 'Bandeja(s)' },
+  { id: 'bolsa', name: 'Bolsa(s)' },
 ];
 
 // ============================================

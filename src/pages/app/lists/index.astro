@@ -351,15 +351,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         e.stopPropagation();
         const listId = btn.dataset.listId;
         const ownerId = btn.dataset.ownerId;
-        const listName = btn.dataset.listName;
 
         try {
           btn.disabled = true;
           toast.info('Clonando lista...');
           const newList = await cloneList(listId, ownerId);
           toast.success(`Lista "${newList.name}" creada`);
-          // Navegar a la nueva lista
-          window.location.href = `/app/list?id=${newList.id}`;
+          btn.disabled = false;
         } catch (error) {
           console.error('Error al clonar:', error);
           toast.error('Error al clonar la lista');
