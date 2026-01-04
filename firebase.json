@@ -37,11 +37,29 @@
         ]
       },
       {
-        "source": "**/*.@(js|css)",
+        "source": "components/**/*.js",
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public, max-age=3600, must-revalidate"
+            "value": "no-cache, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "js/**/*.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "css/**/*.css",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, must-revalidate"
           }
         ]
       }

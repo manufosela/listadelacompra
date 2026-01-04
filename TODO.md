@@ -205,6 +205,94 @@ Este comando:
 
 ---
 
+## Arquitectura de Listas
+
+### Principios fundamentales
+
+Las listas son **únicas e independientes** (NO recurrentes). Cada lista representa una compra o evento específico.
+
+### Metadatos de lista
+
+Cada lista debe incluir:
+- `createdAt`: Fecha de creación
+- `createdBy`: UID del creador
+- `updatedAt`: Última modificación
+- `updatedBy`: UID de quién hizo la última modificación
+- `archivedAt`: Fecha de archivado (null si está activa)
+- `archivedBy`: UID de quién archivó
+
+**Estado actual:** Solo tiene `createdAt` y `updatedAt`.
+
+**Pendiente:**
+- [ ] Añadir campos `createdBy`, `updatedBy`, `archivedAt`, `archivedBy` al modelo
+- [ ] Actualizar `updatedBy` en cada modificación de items
+- [ ] Registrar `archivedAt` y `archivedBy` al archivar
+
+### Historial de listas
+
+- [ ] Vista histórica de todas las listas (activas + archivadas)
+- [ ] Filtros: por fecha, por estado (activa/archivada), por tipo
+- [ ] Ordenación: fecha creación, última modificación, nombre
+- [ ] Búsqueda por nombre de lista
+
+### Tickets asociados a lista
+
+Cada lista puede tener **múltiples tickets** asociados (compras parciales).
+
+**Estado actual:** Ya implementado en `users/{uid}/lists/{listId}/tickets/{ticketId}`
+
+**Pendiente:**
+- [ ] Mostrar resumen de tickets en cabecera de lista (total tickets, suma totales)
+- [ ] Vincular items marcados con el ticket que los compró
+
+---
+
+## Creación de listas desde Productos
+
+### Dos flujos de creación
+
+#### Flujo 1: Añadir productos manualmente a lista
+- [ ] Al escribir nombre de producto, buscar en productos existentes
+- [ ] Mostrar sugerencias con autocompletado (fuzzy matching)
+- [ ] Si el producto NO existe, crearlo automáticamente en `groups/{groupId}/products`
+- [ ] Usar datos del producto existente (categoría, unidad) si existe
+
+#### Flujo 2: Seleccionar desde vista de Productos
+- [ ] En `/app/products`, añadir modo selección
+- [ ] Checkbox para marcar productos a añadir
+- [ ] Botón "Añadir a lista" → selector de lista destino (o crear nueva)
+- [ ] Crear items en la lista con los productos seleccionados
+
+### Vista de Productos (`/app/products`)
+
+- [ ] Tabla de productos ordenable:
+  - Por nombre (A-Z, Z-A)
+  - Por categoría
+- [ ] Indicador visual de orden actual
+- [ ] Mantener orden en localStorage
+
+---
+
+## Categorías en listas
+
+### Ordenación de categorías con Drag & Drop
+
+- [ ] Las categorías agrupadas pueden reordenarse arrastrando
+- [ ] Guardar orden personalizado por lista o globalmente
+- [ ] Usar biblioteca ligera (ej: SortableJS) o nativo con Drag API
+
+### Categorías colapsables (summary/details)
+
+- [ ] Cada categoría agrupada usa `<details><summary>` nativo
+- [ ] Estado expandido/colapsado persistido
+- [ ] Botón "Colapsar todas" / "Expandir todas"
+- [ ] Mostrar contador de items por categoría en el summary
+
+**Archivos a modificar:**
+- `public/components/hc-shopping-list.js` - render de categorías agrupadas
+
+---
+
 ## Pendiente Inmediato
 
 ### Persistencia de preferencias de usuario
@@ -461,26 +549,30 @@ localStorage.setItem(`prefs:${listId}`, JSON.stringify(prefs));
 
 ---
 
-### 4. Sincronización de Productos (Bug Fix + Feature)
+### 4. Sincronización de Productos
 
-**Problema actual:** Los productos añadidos en listas de compra no se guardan en la sección Productos del grupo.
+**Objetivo:** Los productos son la fuente de verdad. Las listas referencian productos existentes o crean nuevos automáticamente.
 
 **Requisitos:**
 
 #### Fase 1: Migración inicial
-- [ ] Crear script/función para extraer todos los productos únicos de listas existentes
-- [ ] Añadir productos extraídos a `groups/{groupId}/products`
-- [ ] Normalizar nombres (lowercase, trim, etc.)
-- [ ] Detectar y fusionar duplicados similares
+- [ ] Script para extraer productos únicos de listas existentes
+- [ ] Normalizar nombres y fusionar duplicados
+- [ ] Poblar `groups/{groupId}/products`
 
-#### Fase 2: Sincronización automática
-- [ ] Al añadir producto a lista de compra:
-  - Buscar si existe en productos del grupo
-  - Si no existe, crear nuevo producto
-  - Si existe, usar datos existentes (categoría, unidad, etc.)
-- [ ] Implementar autocompletado/sugerencias al escribir nombre de producto
-- [ ] Fuzzy matching para detectar variantes: "Filetes de pollo" ≈ "filetes pollo"
-- [ ] Mostrar sugerencias ordenadas por frecuencia de uso
+#### Fase 2: Autocompletado en listas
+- [ ] Al escribir nombre en lista, buscar en productos del grupo
+- [ ] Sugerencias con fuzzy matching ("Filetes de pollo" ≈ "filetes pollo")
+- [ ] Ordenar sugerencias por frecuencia de uso
+- [ ] Si no existe, crear producto automáticamente al añadir a lista
+
+#### Fase 3: Vista de Productos mejorada
+- [ ] Tabla ordenable por nombre (A-Z) y categoría
+- [ ] Modo selección: checkbox para marcar productos
+- [ ] Acción "Añadir a lista" con selector de lista destino
+- [ ] Búsqueda/filtro rápido
+
+**Ver también:** Sección "Creación de listas desde Productos" más arriba.
 
 **Algoritmo de normalización:**
 ```javascript
@@ -488,12 +580,8 @@ function normalizeProductName(name) {
   return name
     .toLowerCase()
     .trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar acentos
-    .replace(/\s+/g, ' '); // espacios múltiples a uno
-}
-
-function calculateSimilarity(a, b) {
-  // Levenshtein distance o similar
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
 }
 ```
 
@@ -597,10 +685,14 @@ function calculateSimilarity(a, b) {
 
 1. ~~**Alta** - Sublistas/checklists~~ ✅ COMPLETADO
 2. ~~**Alta** - Gestión de categorías~~ ✅ IMPLEMENTADO
-3. **Alta** - Sincronización de productos (afecta UX actual)
-4. **Media** - Rediseño tickets (mejora flujo)
-5. **Media** - Mejoras Balance (valor añadido)
-6. **Baja** - Imágenes/logos (nice to have)
+3. **Alta** - Arquitectura de listas (metadatos, historial)
+4. **Alta** - Sincronización de productos + autocompletado
+5. **Alta** - Creación de listas desde Productos
+6. **Media** - Categorías colapsables y ordenables (D&D)
+7. **Media** - Vista de productos ordenable
+8. **Media** - Mejoras tickets (resumen en lista)
+9. **Media** - Mejoras Balance (estadísticas)
+10. **Baja** - Imágenes/logos para listas
 
 ---
 
