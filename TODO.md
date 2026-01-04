@@ -36,9 +36,16 @@ Tareas pendientes y features planificadas para desarrollo futuro.
    - Estado persistido en localStorage por lista
    - Al borrar categoría: limpia `categoryId` de items afectados
 
+6. **Drag & Drop para ordenar categorías** ✅
+   - HTML5 Drag API nativo (sin bibliotecas)
+   - Handle de arrastre (⋮⋮) visible en hover
+   - Indicadores visuales de zona de drop
+   - Orden persistido en localStorage por lista
+   - Vista tabla también respeta el orden
+
 ### Pendiente (próxima sesión)
 
-6. **SEO - Assets gráficos** (MANUAL - herramientas online)
+7. **SEO - Assets gráficos** (MANUAL - herramientas online)
    - Convertir `og-image.svg` → `og-image.png` (1200x630)
    - Crear iconos: 192x192, 512x512, 180x180 (apple), 32x32, 16x16
 
@@ -327,11 +334,11 @@ Cada lista puede tener **múltiples tickets** asociados (compras parciales).
 
 ## Categorías en listas
 
-### Ordenación de categorías con Drag & Drop
+### Ordenación de categorías con Drag & Drop ✅ COMPLETADO
 
-- [ ] Las categorías agrupadas pueden reordenarse arrastrando
-- [ ] Guardar orden personalizado por lista o globalmente
-- [ ] Usar biblioteca ligera (ej: SortableJS) o nativo con Drag API
+- [x] Las categorías agrupadas pueden reordenarse arrastrando
+- [x] Guardar orden personalizado por lista (localStorage)
+- [x] Usar HTML5 Drag API nativo (sin bibliotecas externas)
 
 ### Categorías colapsables (summary/details) ✅ COMPLETADO
 
@@ -742,7 +749,7 @@ function normalizeProductName(name) {
 3. **Alta** - Arquitectura de listas (metadatos, historial)
 4. **Alta** - Sincronización de productos + autocompletado
 5. **Alta** - Creación de listas desde Productos
-6. ~~**Media** - Categorías colapsables~~ ✅ / ordenables (D&D) pendiente
+6. ~~**Media** - Categorías colapsables y ordenables (D&D)~~ ✅
 7. **Media** - Vista de productos ordenable
 8. **Media** - Mejoras tickets (resumen en lista)
 9. **Media** - Mejoras Balance (estadísticas)
