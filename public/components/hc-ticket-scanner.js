@@ -21,6 +21,7 @@ export class HcTicketScanner extends LitElement {
     listId: { type: String, attribute: 'list-id' },
     userId: { type: String, attribute: 'user-id' },
     listItems: { type: Array },
+    buttonHidden: { type: Boolean, attribute: 'button-hidden' },
 
     // Estado interno
     _isOpen: { type: Boolean, state: true },
@@ -33,6 +34,7 @@ export class HcTicketScanner extends LitElement {
   constructor() {
     super();
     this.listItems = [];
+    this.buttonHidden = false;
     this._isOpen = false;
     this._step = 'upload';
     this._ticketData = null;
@@ -709,7 +711,9 @@ export class HcTicketScanner extends LitElement {
 
   render() {
     return html`
-      <button class="scan-button" @click=${this.open}>📷 Escanear ticket</button>
+      ${!this.buttonHidden ? html`
+        <button class="scan-button" @click=${this.open}>📷 Escanear ticket</button>
+      ` : ''}
       ${this._isOpen ? html`
         <div class="modal-backdrop" @click=${(e) => e.target === e.currentTarget && this.close()}>
           <div class="modal">

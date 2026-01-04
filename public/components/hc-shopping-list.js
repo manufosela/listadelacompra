@@ -76,14 +76,19 @@ export class HcShoppingList extends LitElement {
     _duplicateWarnings: { type: Array, state: true },
     // Ordenación en tabla
     _sortColumn: { type: String, state: true },
-    _sortDirection: { type: String, state: true },
-    // Scanner modal
-    _scannerOpen: { type: Boolean, state: true }
+    _sortDirection: { type: String, state: true }
   };
 
   static styles = css`
     :host {
       display: block;
+    }
+
+    /* Espacio para navegación móvil fija */
+    @media (max-width: 767px) {
+      :host {
+        padding-bottom: 80px;
+      }
     }
 
     .list-controls {
@@ -398,6 +403,49 @@ export class HcShoppingList extends LitElement {
     .add-btn:disabled {
       background: #94a3b8;
       cursor: not-allowed;
+    }
+
+    /* Formulario móvil - elementos visibles */
+    @media (max-width: 640px) {
+      .add-item-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+      }
+
+      .input-group {
+        grid-column: 1 / -1;
+        min-width: 0;
+      }
+
+      .category-select {
+        grid-column: 1 / -1;
+        min-width: 0;
+      }
+
+      .quantity-input {
+        width: auto;
+      }
+
+      .unit-select {
+        width: auto;
+      }
+
+      .add-btn {
+        grid-column: 1 / -1;
+      }
+
+      .priority-select {
+        grid-column: 1 / -1;
+      }
+
+      .checklist-option {
+        grid-column: 1 / -1;
+      }
+
+      .notes-input {
+        grid-column: 1 / -1;
+      }
     }
 
     .category-group {
@@ -795,75 +843,6 @@ export class HcShoppingList extends LitElement {
       font-size: 0.875rem;
       color: #64748b;
       margin-bottom: 0.5rem;
-    }
-
-    /* Scanner Modal */
-    .scanner-modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100001;
-      padding: 1rem;
-    }
-
-    .scanner-modal {
-      background: white;
-      border-radius: 0.75rem;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      max-width: 600px;
-      width: 100%;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-
-    .scanner-modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid #e2e8f0;
-    }
-
-    .scanner-modal-header h3 {
-      margin: 0;
-      font-size: 1.125rem;
-      font-weight: 600;
-    }
-
-    .scanner-close-btn {
-      background: none;
-      border: none;
-      font-size: 1.25rem;
-      cursor: pointer;
-      color: #64748b;
-      padding: 0.25rem;
-      line-height: 1;
-    }
-
-    .scanner-close-btn:hover {
-      color: #334155;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      .scanner-modal {
-        background: #1e293b;
-        color: #f1f5f9;
-      }
-
-      .scanner-modal-header {
-        border-bottom-color: #475569;
-      }
-
-      .scanner-close-btn {
-        color: #94a3b8;
-      }
-
-      .scanner-close-btn:hover {
-        color: #f1f5f9;
-      }
     }
 
     .empty-state {
@@ -1464,9 +1443,11 @@ export class HcShoppingList extends LitElement {
     super.connectedCallback();
     eventBus.registerComponent(this._componentId);
 
-    // Escuchar evento para abrir scanner desde el header
-    this._handleOpenScanner = () => {
-      this._scannerOpen = true;
+    // Escuchar evento para abrir scanner
+    this._handleOpenScanner = async () => {
+      await this.updateComplete;
+      const scanner = this.shadowRoot.querySelector('hc-ticket-scanner');
+      if (scanner) scanner.open();
     };
     this.addEventListener('open-scanner', this._handleOpenScanner);
 
@@ -2374,12 +2355,6 @@ export class HcShoppingList extends LitElement {
         console.error('Error saving ticket to history:', error);
       }
     }
-    // Cerrar el modal después de aplicar el ticket
-    this._scannerOpen = false;
-  }
-
-  _closeScannerModal() {
-    this._scannerOpen = false;
   }
 
   _toggleAllItems() {
@@ -2640,22 +2615,15 @@ export class HcShoppingList extends LitElement {
         </div>
       ` : ''}
 
-      <!-- Ticket Scanner Modal (only for shopping lists, not readonly) -->
-      ${!isAgnostic && !this.readonly && this._scannerOpen ? html`
-        <div class="scanner-modal-overlay" @click=${this._closeScannerModal}>
-          <div class="scanner-modal" @click=${e => e.stopPropagation()}>
-            <div class="scanner-modal-header">
-              <h3>Escanear ticket</h3>
-              <button class="scanner-close-btn" @click=${this._closeScannerModal}>✕</button>
-            </div>
-            <hc-ticket-scanner
-              list-id="${this.listId}"
-              user-id="${this.userId}"
-              .listItems=${this.items}
-              @ticket-applied=${this._handleTicketApplied}
-            ></hc-ticket-scanner>
-          </div>
-        </div>
+      <!-- Ticket Scanner (only for shopping lists, not readonly) -->
+      ${!isAgnostic && !this.readonly ? html`
+        <hc-ticket-scanner
+          list-id="${this.listId}"
+          user-id="${this.userId}"
+          .listItems=${this.items}
+          button-hidden
+          @ticket-applied=${this._handleTicketApplied}
+        ></hc-ticket-scanner>
       ` : ''}
 
       <!-- Progress (only in shopping mode) -->

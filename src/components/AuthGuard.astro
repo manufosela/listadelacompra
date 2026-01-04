@@ -124,7 +124,12 @@ const { redirectTo = '/login' } = Astro.props;
       } else {
         globalScope.__authUser = null;
         var redirectTo = authGuard.dataset.redirect || '/login';
-        window.location.href = redirectTo;
+        // Usar navigateTo para View Transitions
+        import('/js/navigate.js').then(function(m) {
+          m.navigateTo(redirectTo);
+        }).catch(function() {
+          window.location.href = redirectTo;
+        });
       }
     }
 
@@ -175,7 +180,12 @@ const { redirectTo = '/login' } = Astro.props;
             var authContent = document.getElementById('auth-content');
             if (authContent) authContent.classList.remove('hidden');
           } else {
-            window.location.href = authGuard.dataset.redirect || '/login';
+            var redirectTo = authGuard.dataset.redirect || '/login';
+            import('/js/navigate.js').then(function(m) {
+              m.navigateTo(redirectTo);
+            }).catch(function() {
+              window.location.href = redirectTo;
+            });
           }
         }
       } catch (e) {

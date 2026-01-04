@@ -151,6 +151,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { getCurrentGroupId, getGroup } from '/js/group.js';
   import { createList } from '/js/lists.js';
   import { uploadListIcon, resizeImage } from '/js/storage.js';
+  import { navigateTo } from '/js/navigate.js';
 
   // Iconos disponibles según tipo de lista
   const SHOPPING_ICONS = [
@@ -453,7 +454,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         }
       }
 
-      window.location.href = `/app/list?id=${newList.id}`;
+      navigateTo(`/app/list?id=${newList.id}`);
     } catch (error) {
       console.error('Error creating list:', error);
       toast.error('Error al crear la lista: ' + error.message);

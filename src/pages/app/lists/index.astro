@@ -14,6 +14,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       </div>
     </header>
 
+    <!-- Scanner compartido para todas las listas -->
+    <hc-ticket-scanner id="shared-scanner" button-hidden></hc-ticket-scanner>
+
     <!-- Tabs y controles -->
     <div class="tabs-row">
       <div class="tabs">
@@ -45,13 +48,15 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { db } from '/js/firebase-config.js';
   import { collection, query, onSnapshot, orderBy, doc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
   import { toast } from '/js/toast.js';
-
+  import '/components/hc-ticket-scanner.js';
   let currentTab = 'mine';
   let viewMode = localStorage.getItem('listsViewMode') || 'list';
   let myLists = [];
   let sharedLists = [];
   let unsubscribe = null;
   let currentUser = null;
+  let initialized = false;
+  let tabsInitialized = false;
 
   function getElements() {
     return {
@@ -68,6 +73,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   function setupTabs() {
+    if (tabsInitialized) return;
+    tabsInitialized = true;
+
     const { tabMine, tabArchived, tabShared, viewGrid, viewList } = getElements();
 
     function setActiveTab(tab) {
@@ -143,6 +151,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   async function initPage(user) {
+    // Evitar inicializaciones múltiples
+    if (initialized && currentUser?.uid === user?.uid) return;
+    initialized = true;
+
     const { greeting } = getElements();
     currentUser = user;
 
@@ -200,6 +212,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       unsubscribe();
       unsubscribe = null;
     }
+    initialized = false;
+    tabsInitialized = false;
   });
 
   // Helper para renderizar icono (imagen o emoji)
@@ -250,14 +264,22 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   function setupActionListeners() {
-    // Botones de escanear ticket
+    // Botones de escanear ticket - abrir scanner directamente sin navegar
     document.querySelectorAll('.scan-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const listId = btn.dataset.listId;
         const ownerId = btn.dataset.ownerId;
-        window.location.href = `/app/list?id=${listId}&owner=${ownerId}&openScanner=true`;
+
+        const scanner = document.getElementById('shared-scanner');
+        if (scanner) {
+          // Configurar el scanner con los datos de la lista
+          scanner.setAttribute('list-id', listId);
+          scanner.setAttribute('user-id', ownerId);
+          scanner.listItems = []; // Sin items para matching, todo será "nuevo"
+          scanner.open();
+        }
       });
     });
 
@@ -355,13 +377,15 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
                 return `
                   <tr>
-                    <td class="icon-cell" onclick="window.location.href='${listUrl}'">${renderIcon(list)}</td>
-                    <td class="name-cell" onclick="window.location.href='${listUrl}'">
-                      ${list.name}
-                      ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
+                    <td class="icon-cell"><a href="${listUrl}">${renderIcon(list)}</a></td>
+                    <td class="name-cell">
+                      <a href="${listUrl}">
+                        ${list.name}
+                        ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
+                      </a>
                     </td>
-                    <td class="count-cell" onclick="window.location.href='${listUrl}'">${list.itemCount || 0}</td>
-                    ${isSharedTab ? `<td class="owner-cell" onclick="window.location.href='${listUrl}'">${list.ownerName || ''}</td>` : ''}
+                    <td class="count-cell"><a href="${listUrl}">${list.itemCount || 0}</a></td>
+                    ${isSharedTab ? `<td class="owner-cell"><a href="${listUrl}">${list.ownerName || ''}</a></td>` : ''}
                     <td class="actions-cell">${renderActionButtons(list, isOwner, isSharedTab)}</td>
                   </tr>
                 `;
@@ -684,6 +708,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .lists-table tbody tr:hover {
     background: var(--color-bg-secondary);
+  }
+
+  .lists-table .icon-cell a,
+  .lists-table .name-cell a,
+  .lists-table .count-cell a,
+  .lists-table .owner-cell a {
+    color: inherit;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 
   .lists-table .icon-cell,

@@ -143,6 +143,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { getCurrentGroupId, getGroup } from '/js/group.js';
   import { getList, updateList, updateListMembers } from '/js/lists.js';
   import { uploadListIcon, resizeImage, deleteListIcon } from '/js/storage.js';
+  import { navigateTo } from '/js/navigate.js';
 
   // Iconos disponibles según tipo de lista
   const SHOPPING_ICONS = [
@@ -210,7 +211,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       // Verificar que el usuario es el propietario
       if (currentList.ownerId !== user.uid && currentList.createdBy !== user.uid) {
         toast.error('No tienes permiso para editar esta lista');
-        window.location.href = '/app/lists';
+        navigateTo('/app/lists');
         return;
       }
 
@@ -527,7 +528,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       }
 
       toast.success('Lista actualizada');
-      window.location.href = '/app/lists';
+      navigate('/app/lists');
 
     } catch (error) {
       console.error('Error updating list:', error);
