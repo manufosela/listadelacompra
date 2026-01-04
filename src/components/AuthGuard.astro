@@ -175,8 +175,7 @@ const { redirectTo = '/login' } = Astro.props;
             var authContent = document.getElementById('auth-content');
             if (authContent) authContent.classList.remove('hidden');
           } else {
-            var redirectTo = authGuard.dataset.redirect || '/login';
-            window.location.href = redirectTo;
+            window.location.href = authGuard.dataset.redirect || '/login';
           }
         }
       } catch (e) {

@@ -110,7 +110,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   const emailForm = document.getElementById('email-form');
   const errorMessage = document.getElementById('error-message');
 
-  // Procesar resultado de redirect (si viene de Google redirect)
+  // Procesar resultado de redirect (si viene de un popup bloqueado)
   handleGoogleRedirectResult().catch((error) => {
     console.error('Error processing redirect:', error);
   });
@@ -118,7 +118,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   // Verificar si ya está autenticado
   onAuthStateChanged((user) => {
     if (user) {
-      window.location.href = '/app/lists';
+      window.location.href = '/app';
     }
   });
 
