@@ -57,6 +57,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   let allProducts = [];
   let allCategories = []; // Incluye default + custom
+  let sortColumn = localStorage.getItem('productsSortColumn') || 'name';
+  let sortDirection = localStorage.getItem('productsSortDirection') || 'asc';
   const productModal = document.getElementById('product-modal');
   const productCategory = document.getElementById('product-category');
 
@@ -80,6 +82,42 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     if (!categoryId) return '-';
     const cat = allCategories.find(c => c.id === categoryId);
     return cat ? `${cat.icon || '📦'} ${cat.name}` : categoryId;
+  }
+
+  function getCategoryName(categoryId) {
+    if (!categoryId) return '';
+    const cat = allCategories.find(c => c.id === categoryId);
+    return cat ? cat.name : categoryId;
+  }
+
+  function sortProducts(products) {
+    return [...products].sort((a, b) => {
+      let valA, valB;
+
+      if (sortColumn === 'name') {
+        valA = a.name?.toLowerCase() || '';
+        valB = b.name?.toLowerCase() || '';
+      } else if (sortColumn === 'category') {
+        valA = getCategoryName(a.category).toLowerCase();
+        valB = getCategoryName(b.category).toLowerCase();
+      }
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function handleSort(column) {
+    if (sortColumn === column) {
+      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = column;
+      sortDirection = 'asc';
+    }
+    localStorage.setItem('productsSortColumn', sortColumn);
+    localStorage.setItem('productsSortDirection', sortDirection);
+    renderProducts(allProducts);
   }
 
   async function loadProducts() {
@@ -124,17 +162,29 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       return;
     }
 
+    const sorted = sortProducts(products);
+    const getSortIcon = (col) => {
+      if (sortColumn !== col) return '<span class="sort-icon">⇅</span>';
+      return sortDirection === 'asc'
+        ? '<span class="sort-icon active">↑</span>'
+        : '<span class="sort-icon active">↓</span>';
+    };
+
     container.innerHTML = `
       <table class="products-table">
         <thead>
           <tr>
-            <th>Producto</th>
-            <th>Categoría</th>
+            <th class="sortable" data-sort="name">
+              Producto ${getSortIcon('name')}
+            </th>
+            <th class="sortable" data-sort="category">
+              Categoría ${getSortIcon('category')}
+            </th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          ${products.map(p => `
+          ${sorted.map(p => `
             <tr data-id="${p.id}">
               <td class="product-name">${p.name}</td>
               <td class="product-category">${getCategoryDisplay(p.category)}</td>
@@ -146,6 +196,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         </tbody>
       </table>
     `;
+
+    // Event listeners para ordenar
+    container.querySelectorAll('.sortable').forEach(th => {
+      th.addEventListener('click', () => handleSort(th.dataset.sort));
+    });
 
     // Event listeners para editar
     container.querySelectorAll('.edit-btn').forEach(btn => {
@@ -327,6 +382,27 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     font-weight: 500;
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
+  }
+
+  .products-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+  }
+
+  .products-table th.sortable:hover {
+    background: var(--color-border);
+  }
+
+  .sort-icon {
+    margin-left: 0.5rem;
+    opacity: 0.4;
+    font-size: 0.75rem;
+  }
+
+  .sort-icon.active {
+    opacity: 1;
+    color: var(--color-primary);
   }
 
   .products-table tr:not(:last-child) td {
