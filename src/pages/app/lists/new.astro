@@ -102,6 +102,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         <small class="form-help">Selecciona qué miembros del grupo pueden ver y editar esta lista</small>
       </div>
 
+      <!-- Productos del catálogo (solo para listas de compra) -->
+      <div class="form-group" id="products-group">
+        <label>Productos iniciales</label>
+        <button type="button" id="add-products-btn" class="add-products-btn">
+          <span class="add-products-icon">📦</span>
+          <span class="add-products-text">Añadir productos del catálogo</span>
+          <span id="selected-products-count" class="selected-count" hidden>0</span>
+        </button>
+        <small class="form-help">Selecciona productos de tu catálogo para añadirlos a la lista</small>
+      </div>
+
       <!-- Tienda (opcional, solo para listas de compra) -->
       <div class="form-group" id="store-group">
         <label for="store">Tienda (opcional)</label>
@@ -142,6 +153,30 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         <button type="submit" class="btn btn-primary" id="submit-btn">Crear lista</button>
       </div>
     </form>
+
+    <!-- Modal de productos del catálogo -->
+    <div id="products-modal" class="modal" hidden>
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Seleccionar productos</h2>
+          <button type="button" class="modal-close" id="close-products-modal">&times;</button>
+        </div>
+        <div class="modal-search">
+          <input type="text" id="product-search" placeholder="Buscar producto..." />
+        </div>
+        <div class="modal-body" id="products-list">
+          <p class="loading-text">Cargando productos...</p>
+        </div>
+        <div class="modal-footer">
+          <span id="modal-selected-count">0 productos seleccionados</span>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancel-products-btn">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="confirm-products-btn">Confirmar</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </AppLayout>
 
@@ -152,6 +187,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { createList } from '/js/lists.js';
   import { uploadListIcon, resizeImage } from '/js/storage.js';
   import { navigateTo } from '/js/navigate.js';
+  import { getProducts, UNITS } from '/js/db.js';
+  import { getCategoriesForList, DEFAULT_SHOPPING_CATEGORIES } from '/js/categories.js';
 
   // Iconos disponibles según tipo de lista
   const SHOPPING_ICONS = [
@@ -172,6 +209,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   let groupMembers = [];
   let selectedMembers = [];
   let currentUser = null;
+
+  // Estado para productos del catálogo
+  let catalogProducts = [];
+  let selectedProducts = {}; // { productId: { product, quantity, unit } }
+  let productCategories = [];
 
   // Inicializar selector de iconos
   const iconGrid = document.querySelector('.icon-grid');
@@ -281,6 +323,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   // Manejar cambio de tipo de lista
   const expenseTypeGroup = document.getElementById('expense-type-group');
   const storeGroup = document.getElementById('store-group');
+  const productsGroup = document.getElementById('products-group');
   const listTypeRadios = document.querySelectorAll('input[name="listType"]');
 
   listTypeRadios.forEach(radio => {
@@ -291,6 +334,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       // Mostrar/ocultar campos específicos de listas de compra
       expenseTypeGroup.hidden = !isShopping;
       storeGroup.hidden = !isShopping;
+      productsGroup.hidden = !isShopping;
 
       // Actualizar iconos disponibles
       updateIconGrid(currentListType);
@@ -390,6 +434,211 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     recurringOptions.hidden = !recurringCheckbox.checked;
   });
 
+  // ========== Modal de productos del catálogo ==========
+  const productsModal = document.getElementById('products-modal');
+  const addProductsBtn = document.getElementById('add-products-btn');
+  const closeProductsModal = document.getElementById('close-products-modal');
+  const cancelProductsBtn = document.getElementById('cancel-products-btn');
+  const confirmProductsBtn = document.getElementById('confirm-products-btn');
+  const productsList = document.getElementById('products-list');
+  const productSearch = document.getElementById('product-search');
+  const modalSelectedCount = document.getElementById('modal-selected-count');
+  const selectedProductsCount = document.getElementById('selected-products-count');
+
+  // Abrir modal
+  addProductsBtn.addEventListener('click', async () => {
+    productsModal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    await loadCatalogProducts();
+  });
+
+  // Cerrar modal
+  function closeModal() {
+    productsModal.hidden = true;
+    document.body.style.overflow = '';
+    productSearch.value = '';
+  }
+
+  closeProductsModal.addEventListener('click', closeModal);
+  cancelProductsBtn.addEventListener('click', () => {
+    // Restaurar selección previa
+    closeModal();
+  });
+
+  productsModal.querySelector('.modal-backdrop').addEventListener('click', closeModal);
+
+  // Cargar productos del catálogo
+  async function loadCatalogProducts() {
+    const groupId = getCurrentGroupId();
+    if (!groupId) {
+      productsList.innerHTML = '<p class="no-products">No hay grupo activo</p>';
+      return;
+    }
+
+    try {
+      catalogProducts = await getProducts(groupId);
+      productCategories = await getCategoriesForList(groupId, 'shopping');
+
+      if (catalogProducts.length === 0) {
+        productsList.innerHTML = `
+          <div class="no-products">
+            <p>No hay productos en el catálogo</p>
+            <small>Los productos se añaden automáticamente cuando compras</small>
+          </div>
+        `;
+        return;
+      }
+
+      renderProductsList();
+    } catch (error) {
+      console.error('Error loading products:', error);
+      productsList.innerHTML = '<p class="error-text">Error al cargar productos</p>';
+    }
+  }
+
+  // Renderizar lista de productos agrupados por categoría
+  function renderProductsList(filter = '') {
+    const filterLower = filter.toLowerCase();
+
+    // Agrupar productos por categoría
+    const grouped = {};
+    catalogProducts.forEach(product => {
+      if (filter && !product.name.toLowerCase().includes(filterLower)) return;
+
+      const cat = product.category || 'otros';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(product);
+    });
+
+    // Ordenar productos dentro de cada categoría
+    Object.values(grouped).forEach(products => {
+      products.sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    // Obtener orden de categorías
+    const categoryOrder = productCategories.map(c => c.id);
+
+    if (Object.keys(grouped).length === 0) {
+      productsList.innerHTML = '<p class="no-results">No se encontraron productos</p>';
+      return;
+    }
+
+    productsList.innerHTML = Object.entries(grouped)
+      .sort(([a], [b]) => {
+        const aIdx = categoryOrder.indexOf(a);
+        const bIdx = categoryOrder.indexOf(b);
+        return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+      })
+      .map(([categoryId, products]) => {
+        const category = productCategories.find(c => c.id === categoryId) ||
+          DEFAULT_SHOPPING_CATEGORIES.find(c => c.id === categoryId) ||
+          { name: categoryId, icon: '📦' };
+
+        return `
+          <div class="product-category-group">
+            <div class="product-category-header">
+              <span>${category.icon || '📦'} ${category.name}</span>
+              <span class="category-count">${products.length}</span>
+            </div>
+            <div class="product-items">
+              ${products.map(product => {
+                const selected = selectedProducts[product.id];
+                const isChecked = !!selected;
+                const quantity = selected?.quantity || 1;
+                const unit = selected?.unit || product.defaultUnit || 'unidad';
+
+                return `
+                  <div class="product-item ${isChecked ? 'selected' : ''}" data-id="${product.id}">
+                    <label class="product-checkbox">
+                      <input type="checkbox" ${isChecked ? 'checked' : ''} />
+                      <span class="product-name">${product.name}</span>
+                    </label>
+                    <div class="product-quantity" ${isChecked ? '' : 'hidden'}>
+                      <input type="number" min="0.1" step="0.1" value="${quantity}" class="qty-input" />
+                      <select class="unit-select">
+                        ${Object.entries(UNITS).map(([key, label]) =>
+                          `<option value="${key}" ${unit === key ? 'selected' : ''}>${label}</option>`
+                        ).join('')}
+                      </select>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+    // Añadir event listeners
+    productsList.querySelectorAll('.product-item').forEach(item => {
+      const productId = item.dataset.id;
+      const product = catalogProducts.find(p => p.id === productId);
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      const quantityDiv = item.querySelector('.product-quantity');
+      const qtyInput = item.querySelector('.qty-input');
+      const unitSelect = item.querySelector('.unit-select');
+
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          selectedProducts[productId] = {
+            product,
+            quantity: parseFloat(qtyInput.value) || 1,
+            unit: unitSelect.value
+          };
+          item.classList.add('selected');
+          quantityDiv.hidden = false;
+        } else {
+          delete selectedProducts[productId];
+          item.classList.remove('selected');
+          quantityDiv.hidden = true;
+        }
+        updateSelectedCount();
+      });
+
+      qtyInput.addEventListener('change', () => {
+        if (selectedProducts[productId]) {
+          selectedProducts[productId].quantity = parseFloat(qtyInput.value) || 1;
+        }
+      });
+
+      unitSelect.addEventListener('change', () => {
+        if (selectedProducts[productId]) {
+          selectedProducts[productId].unit = unitSelect.value;
+        }
+      });
+    });
+  }
+
+  // Búsqueda de productos
+  productSearch.addEventListener('input', (e) => {
+    renderProductsList(e.target.value);
+  });
+
+  // Actualizar contador de seleccionados
+  function updateSelectedCount() {
+    const count = Object.keys(selectedProducts).length;
+    modalSelectedCount.textContent = `${count} producto${count !== 1 ? 's' : ''} seleccionado${count !== 1 ? 's' : ''}`;
+
+    if (count > 0) {
+      selectedProductsCount.textContent = count;
+      selectedProductsCount.hidden = false;
+    } else {
+      selectedProductsCount.hidden = true;
+    }
+  }
+
+  // Confirmar selección
+  confirmProductsBtn.addEventListener('click', () => {
+    updateSelectedCount();
+    closeModal();
+    const count = Object.keys(selectedProducts).length;
+    if (count > 0) {
+      toast.success(`${count} producto${count !== 1 ? 's' : ''} añadido${count !== 1 ? 's' : ''}`);
+    }
+  });
+
+  // ========== Fin Modal ==========
+
   // Enviar formulario
   const form = document.getElementById('new-list-form');
   const submitBtn = document.getElementById('submit-btn');
@@ -451,6 +700,43 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         } catch (uploadError) {
           console.error('Error uploading icon:', uploadError);
           toast.warning('Lista creada, pero hubo un error al subir la imagen');
+        }
+      }
+
+      // Añadir productos seleccionados del catálogo
+      const selectedProductsList = Object.values(selectedProducts);
+      if (selectedProductsList.length > 0) {
+        submitBtn.textContent = 'Añadiendo productos...';
+        try {
+          const { db } = await import('/js/firebase-config.js');
+          const { collection, addDoc, updateDoc, doc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
+
+          const itemsRef = collection(db, 'users', currentUser.uid, 'lists', newList.id, 'items');
+
+          for (const { product, quantity, unit } of selectedProductsList) {
+            await addDoc(itemsRef, {
+              name: product.name,
+              quantity: quantity,
+              unit: unit,
+              category: product.category || 'otros',
+              productId: product.id,
+              checked: false,
+              checkedAt: null,
+              checkedBy: null,
+              createdAt: serverTimestamp(),
+              createdBy: currentUser.uid
+            });
+          }
+
+          // Actualizar contador de items
+          const listRef = doc(db, 'users', currentUser.uid, 'lists', newList.id);
+          await updateDoc(listRef, {
+            itemCount: selectedProductsList.length,
+            updatedAt: serverTimestamp()
+          });
+        } catch (itemsError) {
+          console.error('Error adding items:', itemsError);
+          toast.warning('Lista creada, pero hubo un error al añadir algunos productos');
         }
       }
 
@@ -895,6 +1181,262 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     .expense-card {
       padding: var(--space-sm);
+    }
+  }
+
+  /* Botón añadir productos */
+  .add-products-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: var(--space-md);
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+  }
+
+  .add-products-btn:hover {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.05);
+    color: var(--color-primary);
+  }
+
+  .add-products-icon {
+    font-size: 1.5rem;
+  }
+
+  .add-products-text {
+    flex: 1;
+    text-align: left;
+  }
+
+  .selected-count {
+    background: var(--color-primary);
+    color: white;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 9999px;
+  }
+
+  /* Modal de productos */
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+  }
+
+  .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-content {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    max-height: 80vh;
+    background: var(--color-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .modal-header h2 {
+    font-size: var(--font-size-lg);
+    margin: 0;
+  }
+
+  .modal-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    border-radius: var(--radius-sm);
+  }
+
+  .modal-close:hover {
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+  }
+
+  .modal-search {
+    padding: var(--space-sm) var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .modal-search input {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+  }
+
+  .modal-search input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+  }
+
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-md) var(--space-lg);
+  }
+
+  .modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .modal-footer span {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  /* Lista de productos en modal */
+  .product-category-group {
+    margin-bottom: var(--space-md);
+  }
+
+  .product-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    margin-bottom: var(--space-xs);
+  }
+
+  .category-count {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    background: var(--color-bg);
+    padding: 2px 6px;
+    border-radius: 9999px;
+  }
+
+  .product-items {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .product-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm);
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+  }
+
+  .product-item:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .product-item.selected {
+    background: rgba(37, 99, 235, 0.08);
+  }
+
+  .product-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .product-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .product-quantity {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
+
+  .qty-input {
+    width: 60px;
+    padding: 4px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    text-align: center;
+  }
+
+  .unit-select {
+    padding: 4px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    background: var(--color-bg);
+  }
+
+  .no-products,
+  .no-results {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+  }
+
+  .no-products small {
+    display: block;
+    margin-top: var(--space-xs);
+    font-size: var(--font-size-xs);
+  }
+
+  @media (max-width: 480px) {
+    .modal-content {
+      max-height: 90vh;
+    }
+
+    .product-item {
+      flex-wrap: wrap;
+    }
+
+    .product-quantity {
+      width: 100%;
+      margin-top: var(--space-xs);
+      padding-left: 24px;
     }
   }
 </style>
