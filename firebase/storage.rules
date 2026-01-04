@@ -34,8 +34,8 @@ service firebase.storage {
     // ==================== LIST ICONS ====================
 
     match /list-icons/{listId} {
-      // Cualquiera autenticado puede ver iconos de lista
-      allow read: if isAuthenticated();
+      // Lectura pública (las imágenes se cargan sin token)
+      allow read: if true;
 
       // Usuarios autenticados pueden subir/actualizar iconos
       allow write: if isAuthenticated() && isValidImage();
