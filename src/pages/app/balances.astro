@@ -7,10 +7,16 @@ import AppLayout from '../../layouts/AppLayout.astro';
     <header class="page-header">
       <div>
         <h1>Balances del Grupo</h1>
-        <p>Resumen de deudas entre miembros</p>
+        <p>Resumen de deudas y estadísticas</p>
       </div>
     </header>
 
+    <!-- Estadísticas de compras -->
+    <div id="stats-container" class="stats-container">
+      <p class="loading">Cargando estadísticas...</p>
+    </div>
+
+    <!-- Balances -->
     <div id="balances-container" class="balances-container">
       <p class="loading">Calculando balances...</p>
     </div>
@@ -23,13 +29,167 @@ import AppLayout from '../../layouts/AppLayout.astro';
   import { db } from '/js/firebase-config.js';
   import { collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
+  function renderStats(container, purchaseDocs, members) {
+    if (purchaseDocs.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    // Calcular estadísticas
+    let totalSpent = 0;
+    let totalItems = 0;
+    const byStore = {};
+    const byMonth = {};
+    const byMember = {};
+
+    purchaseDocs.forEach(doc => {
+      const purchase = doc.data();
+      const amount = purchase.total || 0;
+      const store = purchase.store || 'Sin tienda';
+      const createdBy = purchase.createdBy;
+      const itemCount = purchase.itemCount || 0;
+
+      totalSpent += amount;
+      totalItems += itemCount;
+
+      // Por tienda
+      byStore[store] = (byStore[store] || 0) + amount;
+
+      // Por mes
+      let monthKey = 'Sin fecha';
+      if (purchase.date) {
+        const [year, month] = purchase.date.split('-');
+        monthKey = `${month}/${year}`;
+      } else if (purchase.createdAt?.toDate) {
+        const d = purchase.createdAt.toDate();
+        monthKey = `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      }
+      byMonth[monthKey] = (byMonth[monthKey] || 0) + amount;
+
+      // Por miembro
+      if (createdBy) {
+        byMember[createdBy] = (byMember[createdBy] || 0) + amount;
+      }
+    });
+
+    const purchaseCount = purchaseDocs.length;
+    const avgPurchase = purchaseCount > 0 ? totalSpent / purchaseCount : 0;
+
+    // Ordenar tiendas y meses
+    const topStores = Object.entries(byStore)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const recentMonths = Object.entries(byMonth)
+      .sort((a, b) => {
+        const [mA, yA] = a[0].split('/');
+        const [mB, yB] = b[0].split('/');
+        return (yB + mB).localeCompare(yA + mA);
+      })
+      .slice(0, 6);
+
+    container.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">${totalSpent.toFixed(2)}€</div>
+          <div class="stat-label">Total gastado</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${purchaseCount}</div>
+          <div class="stat-label">Compras</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${avgPurchase.toFixed(2)}€</div>
+          <div class="stat-label">Media por compra</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${totalItems}</div>
+          <div class="stat-label">Productos</div>
+        </div>
+      </div>
+
+      ${topStores.length > 0 ? `
+        <div class="stats-section">
+          <h3>Por tienda</h3>
+          <div class="stats-bars">
+            ${topStores.map(([store, amount]) => {
+              const pct = totalSpent > 0 ? (amount / totalSpent) * 100 : 0;
+              return `
+                <div class="stats-bar-item">
+                  <div class="stats-bar-label">
+                    <span>${store}</span>
+                    <span>${amount.toFixed(2)}€</span>
+                  </div>
+                  <div class="stats-bar-track">
+                    <div class="stats-bar-fill" style="width: ${pct}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${recentMonths.length > 0 ? `
+        <div class="stats-section">
+          <h3>Últimos meses</h3>
+          <div class="stats-bars">
+            ${recentMonths.map(([month, amount]) => {
+              const maxMonth = Math.max(...recentMonths.map(m => m[1]));
+              const pct = maxMonth > 0 ? (amount / maxMonth) * 100 : 0;
+              return `
+                <div class="stats-bar-item">
+                  <div class="stats-bar-label">
+                    <span>${month}</span>
+                    <span>${amount.toFixed(2)}€</span>
+                  </div>
+                  <div class="stats-bar-track">
+                    <div class="stats-bar-fill month" style="width: ${pct}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${Object.keys(byMember).length > 0 ? `
+        <div class="stats-section">
+          <h3>Por miembro</h3>
+          <div class="stats-bars">
+            ${Object.entries(byMember)
+              .sort((a, b) => b[1] - a[1])
+              .map(([memberId, amount]) => {
+                const member = members[memberId];
+                const name = member?.displayName || member?.email || 'Miembro';
+                const pct = totalSpent > 0 ? (amount / totalSpent) * 100 : 0;
+                return `
+                  <div class="stats-bar-item">
+                    <div class="stats-bar-label">
+                      <span>${name}</span>
+                      <span>${amount.toFixed(2)}€</span>
+                    </div>
+                    <div class="stats-bar-track">
+                      <div class="stats-bar-fill member" style="width: ${pct}%"></div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+          </div>
+        </div>
+      ` : ''}
+    `;
+  }
+
   async function initPage(user) {
     const container = document.getElementById('balances-container');
+    const statsContainer = document.getElementById('stats-container');
     if (!container) return;
 
     const currentUser = user;
 
     if (!currentUser) {
+      if (statsContainer) statsContainer.innerHTML = '';
       container.innerHTML = '<p class="empty-state">Inicia sesión para ver los balances.</p>';
       return;
     }
@@ -37,6 +197,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
     const groupId = getCurrentGroupId();
 
     if (!groupId) {
+      if (statsContainer) statsContainer.innerHTML = '';
       container.innerHTML = `
         <div class="empty-state">
           <p>No tienes ningún grupo configurado.</p>
@@ -51,6 +212,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
       const group = await getGroup(groupId);
 
       if (!group) {
+        if (statsContainer) statsContainer.innerHTML = '';
         container.innerHTML = `
           <div class="empty-state">
             <p>El grupo seleccionado no existe.</p>
@@ -64,6 +226,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
       const memberIds = Object.keys(members);
 
       if (memberIds.length === 0) {
+        if (statsContainer) statsContainer.innerHTML = '';
         container.innerHTML = `
           <div class="empty-state">
             <p>El grupo no tiene miembros.</p>
@@ -77,6 +240,11 @@ import AppLayout from '../../layouts/AppLayout.astro';
       const purchasesRef = collection(db, 'groups', groupId, 'purchases');
       const q = query(purchasesRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
+
+      // Calcular estadísticas
+      if (statsContainer) {
+        renderStats(statsContainer, snapshot.docs, members);
+      }
 
       if (snapshot.empty) {
         container.innerHTML = `
@@ -263,6 +431,107 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
   .page-header p {
     color: var(--color-text-secondary);
+  }
+
+  /* Estadísticas */
+  .stats-container {
+    margin-bottom: var(--space-xl);
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+  }
+
+  @media (min-width: 480px) {
+    .stats-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .stat-card {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .stat-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-top: var(--space-xs);
+  }
+
+  .stats-section {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+  }
+
+  .stats-section h3 {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-md);
+    color: var(--color-text-secondary);
+  }
+
+  .stats-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .stats-bar-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .stats-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--font-size-sm);
+  }
+
+  .stats-bar-label span:first-child {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .stats-bar-label span:last-child {
+    color: var(--color-text-secondary);
+  }
+
+  .stats-bar-track {
+    height: 8px;
+    background: var(--color-bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .stats-bar-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+
+  .stats-bar-fill.month {
+    background: #10b981;
+  }
+
+  .stats-bar-fill.member {
+    background: #8b5cf6;
   }
 
   .balances-summary {
