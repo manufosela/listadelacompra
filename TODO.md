@@ -348,7 +348,7 @@ Este comando:
 
 Las listas son **únicas e independientes** (NO recurrentes). Cada lista representa una compra o evento específico.
 
-### Metadatos de lista
+### Metadatos de lista ✅ COMPLETADO
 
 Cada lista debe incluir:
 - `createdAt`: Fecha de creación
@@ -358,12 +358,10 @@ Cada lista debe incluir:
 - `archivedAt`: Fecha de archivado (null si está activa)
 - `archivedBy`: UID de quién archivó
 
-**Estado actual:** Solo tiene `createdAt` y `updatedAt`.
-
-**Pendiente:**
-- [ ] Añadir campos `createdBy`, `updatedBy`, `archivedAt`, `archivedBy` al modelo
-- [ ] Actualizar `updatedBy` en cada modificación de items
-- [ ] Registrar `archivedAt` y `archivedBy` al archivar
+**Implementado:**
+- [x] Añadir campos `createdBy`, `updatedBy`, `archivedAt`, `archivedBy` al modelo
+- [x] Actualizar `updatedBy` en cada modificación de items
+- [x] Registrar `archivedAt` y `archivedBy` al archivar
 
 ### Historial de listas
 
@@ -384,21 +382,21 @@ Cada lista puede tener **múltiples tickets** asociados (compras parciales).
 
 ---
 
-## Creación de listas desde Productos
+## Creación de listas desde Productos ✅ COMPLETADO
 
 ### Dos flujos de creación
 
-#### Flujo 1: Añadir productos manualmente a lista
-- [ ] Al escribir nombre de producto, buscar en productos existentes
-- [ ] Mostrar sugerencias con autocompletado (fuzzy matching)
-- [ ] Si el producto NO existe, crearlo automáticamente en `groups/{groupId}/products`
-- [ ] Usar datos del producto existente (categoría, unidad) si existe
+#### Flujo 1: Añadir productos manualmente a lista ✅
+- [x] Al escribir nombre de producto, buscar en productos existentes
+- [x] Mostrar sugerencias con autocompletado (fuzzy matching)
+- [x] Si el producto NO existe, crearlo automáticamente en `groups/{groupId}/products`
+- [x] Usar datos del producto existente (categoría, unidad) si existe
 
-#### Flujo 2: Seleccionar desde vista de Productos
-- [ ] En `/app/products`, añadir modo selección
-- [ ] Checkbox para marcar productos a añadir
-- [ ] Botón "Añadir a lista" → selector de lista destino (o crear nueva)
-- [ ] Crear items en la lista con los productos seleccionados
+#### Flujo 2: Seleccionar desde modal al crear lista ✅
+- [x] Modal "Añadir productos desde catálogo" en `/app/lists/new`
+- [x] Productos agrupados por categoría
+- [x] Selector de cantidad y unidad por producto
+- [x] Productos seleccionados se añaden al crear la lista
 
 ### Vista de Productos (`/app/products`)
 
@@ -688,30 +686,28 @@ localStorage.setItem(`prefs:${listId}`, JSON.stringify(prefs));
 
 ---
 
-### 4. Sincronización de Productos
+### 4. Sincronización de Productos ✅ COMPLETADO
 
 **Objetivo:** Los productos son la fuente de verdad. Las listas referencian productos existentes o crean nuevos automáticamente.
 
 **Requisitos:**
 
 #### Fase 1: Migración inicial
-- [ ] Script para extraer productos únicos de listas existentes
-- [ ] Normalizar nombres y fusionar duplicados
-- [ ] Poblar `groups/{groupId}/products`
+- [x] Script para extraer productos únicos de listas existentes (`migrateUserProductsToCatalog` en db.js)
+- [x] Normalizar nombres y fusionar duplicados (`normalizeProductName` en db.js)
+- [x] Poblar `groups/{groupId}/products`
 
-#### Fase 2: Autocompletado en listas
-- [ ] Al escribir nombre en lista, buscar en productos del grupo
-- [ ] Sugerencias con fuzzy matching ("Filetes de pollo" ≈ "filetes pollo")
-- [ ] Ordenar sugerencias por frecuencia de uso
-- [ ] Si no existe, crear producto automáticamente al añadir a lista
+#### Fase 2: Autocompletado en listas ✅
+- [x] Al escribir nombre en lista, buscar en productos del grupo (`searchProducts` en db.js)
+- [x] Sugerencias con fuzzy matching (`calculateSimilarity` en db.js)
+- [x] Ordenar sugerencias por frecuencia de uso (`purchaseCount`)
+- [x] Si no existe, crear producto automáticamente al añadir a lista (`findOrCreateProduct`)
 
 #### Fase 3: Vista de Productos mejorada
 - [ ] Tabla ordenable por nombre (A-Z) y categoría
-- [ ] Modo selección: checkbox para marcar productos
-- [ ] Acción "Añadir a lista" con selector de lista destino
-- [ ] Búsqueda/filtro rápido
-
-**Ver también:** Sección "Creación de listas desde Productos" más arriba.
+- [x] ~~Modo selección: checkbox para marcar productos~~ (No necesario - modal en nueva lista)
+- [x] ~~Acción "Añadir a lista" con selector de lista destino~~ (Implementado en new.astro)
+- [x] Búsqueda/filtro rápido (existe en /app/products)
 
 **Algoritmo de normalización:**
 ```javascript
@@ -824,9 +820,9 @@ function normalizeProductName(name) {
 
 1. ~~**Alta** - Sublistas/checklists~~ ✅ COMPLETADO
 2. ~~**Alta** - Gestión de categorías~~ ✅ IMPLEMENTADO
-3. **Alta** - Arquitectura de listas (metadatos, historial)
-4. **Alta** - Sincronización de productos + autocompletado
-5. **Alta** - Creación de listas desde Productos
+3. ~~**Alta** - Arquitectura de listas (metadatos, historial)~~ ✅ COMPLETADO
+4. ~~**Alta** - Sincronización de productos + autocompletado~~ ✅ COMPLETADO
+5. ~~**Alta** - Creación de listas desde Productos~~ ✅ COMPLETADO (modal en nueva lista)
 6. ~~**Media** - Categorías colapsables y ordenables (D&D)~~ ✅
 7. **Media** - Vista de productos ordenable
 8. **Media** - Mejoras tickets (resumen en lista)
