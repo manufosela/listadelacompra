@@ -39,6 +39,21 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     <div id="lists-container" class="lists-container">
       <!-- Se carga dinámicamente -->
     </div>
+
+    <!-- Modal de confirmación de borrado -->
+    <div id="delete-modal" class="confirm-modal" hidden>
+      <div class="confirm-modal-backdrop"></div>
+      <div class="confirm-modal-content">
+        <div class="confirm-modal-icon">🗑️</div>
+        <h3>Eliminar lista</h3>
+        <p id="delete-modal-message">¿Eliminar esta lista?</p>
+        <p class="confirm-modal-warning">Esta acción no se puede deshacer.</p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="btn btn-secondary" id="delete-cancel-btn">Cancelar</button>
+          <button type="button" class="btn btn-danger" id="delete-confirm-btn">Eliminar</button>
+        </div>
+      </div>
+    </div>
   </div>
 </AppLayout>
 
@@ -390,30 +405,77 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       });
     });
 
-    // Botones de eliminar
+    // Botones de eliminar - abrir modal de confirmación
     document.querySelectorAll('.delete-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
+      btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const listId = btn.dataset.listId;
         const listName = btn.dataset.listName;
-
-        if (!confirm(`¿Eliminar la lista "${listName}"?\n\nEsta acción no se puede deshacer.`)) {
-          return;
-        }
-
-        try {
-          btn.disabled = true;
-          await deleteList(listId);
-          toast.success('Lista eliminada');
-        } catch (error) {
-          console.error('Error al eliminar:', error);
-          toast.error('Error al eliminar la lista');
-          btn.disabled = false;
-        }
+        showDeleteModal(listId, listName);
       });
     });
   }
+
+  // Modal de confirmación de borrado
+  let pendingDeleteListId = null;
+
+  function showDeleteModal(listId, listName) {
+    pendingDeleteListId = listId;
+    const modal = document.getElementById('delete-modal');
+    const message = document.getElementById('delete-modal-message');
+
+    if (message) {
+      message.textContent = `¿Eliminar la lista "${listName}"?`;
+    }
+
+    if (modal) {
+      modal.hidden = false;
+    }
+  }
+
+  function hideDeleteModal() {
+    const modal = document.getElementById('delete-modal');
+    if (modal) {
+      modal.hidden = true;
+    }
+    pendingDeleteListId = null;
+  }
+
+  async function confirmDelete() {
+    if (!pendingDeleteListId) return;
+
+    try {
+      await deleteList(pendingDeleteListId);
+      toast.success('Lista eliminada');
+      hideDeleteModal();
+    } catch (error) {
+      console.error('Error al eliminar:', error);
+      toast.error('Error al eliminar la lista');
+    }
+  }
+
+  // Configurar listeners del modal (una sola vez)
+  function setupDeleteModalListeners() {
+    const modal = document.getElementById('delete-modal');
+    const cancelBtn = document.getElementById('delete-cancel-btn');
+    const confirmBtn = document.getElementById('delete-confirm-btn');
+    const backdrop = modal?.querySelector('.confirm-modal-backdrop');
+
+    cancelBtn?.addEventListener('click', hideDeleteModal);
+    confirmBtn?.addEventListener('click', confirmDelete);
+    backdrop?.addEventListener('click', hideDeleteModal);
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal?.hidden) {
+        hideDeleteModal();
+      }
+    });
+  }
+
+  // Inicializar listeners del modal
+  setupDeleteModalListeners();
 
   function renderLists() {
     const { container, archivedCount } = getElements();
@@ -954,5 +1016,91 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       width: 14px;
       height: 14px;
     }
+  }
+
+  /* Modal de confirmación */
+  .confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+  }
+
+  .confirm-modal[hidden] {
+    display: none;
+  }
+
+  .confirm-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+  }
+
+  .confirm-modal-content {
+    position: relative;
+    background: var(--color-bg);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    animation: modal-enter 0.2s ease-out;
+  }
+
+  @keyframes modal-enter {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .confirm-modal-icon {
+    font-size: 3rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .confirm-modal-content h3 {
+    margin-bottom: var(--space-sm);
+    font-size: var(--font-size-lg);
+  }
+
+  .confirm-modal-content p {
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-sm);
+  }
+
+  .confirm-modal-warning {
+    font-size: var(--font-size-sm);
+    color: #dc2626;
+  }
+
+  .confirm-modal-actions {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: center;
+    margin-top: var(--space-lg);
+  }
+
+  .confirm-modal-actions .btn {
+    min-width: 100px;
+  }
+
+  .btn-danger {
+    background: #dc2626;
+    color: white;
+    border: none;
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
   }
 </style>
