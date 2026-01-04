@@ -6,6 +6,7 @@ export class HcListItem extends LitElement {
     members: { type: Array },
     mode: { type: String }, // 'shopping' or 'edit'
     listType: { type: String }, // 'shopping' or 'agnostic'
+    card: { type: Boolean }, // Modo tarjeta (grid)
     expanded: { type: Boolean, state: true },
     showAssignMenu: { type: Boolean, state: true },
     showChecklist: { type: Boolean, state: true },
@@ -39,6 +40,59 @@ export class HcListItem extends LitElement {
 
     .item.clickable {
       cursor: pointer;
+    }
+
+    /* Modo tarjeta (card) */
+    .item.card {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 0.875rem;
+      min-height: 90px;
+    }
+
+    .item.card .checkbox {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      width: 24px;
+      height: 24px;
+    }
+
+    .item.card .item-content {
+      padding-right: 2rem;
+    }
+
+    .item.card .item-main {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+
+    .item.card .item-name {
+      font-size: 0.9375rem;
+      white-space: normal;
+      line-height: 1.3;
+    }
+
+    .item.card .item-quantity {
+      font-size: 0.8125rem;
+      color: #64748b;
+    }
+
+    .item.card .item-actions {
+      margin-top: auto;
+      padding-top: 0.5rem;
+      opacity: 1;
+      justify-content: flex-end;
+    }
+
+    .item.card .item-meta {
+      margin-top: 0.375rem;
+    }
+
+    .item.card.checked {
+      opacity: 0.7;
+      background: #f8fafc;
     }
 
     .checkbox {
@@ -592,6 +646,11 @@ export class HcListItem extends LitElement {
         color: #93c5fd;
       }
 
+      /* Card mode dark */
+      .item.card.checked {
+        background: #0f172a;
+      }
+
       .assign-menu {
         background: #1e293b;
         border-color: #334155;
@@ -988,7 +1047,8 @@ export class HcListItem extends LitElement {
       // Si es un item normal, usar checkbox
       return html`
         <div
-          class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass} ${isShoppingMode ? 'clickable' : ''}"
+          class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass} ${isShoppingMode ? 'clickable' : ''} ${this.card ? 'card' : ''}"
+          style="${this.card ? 'position: relative;' : ''}"
           @click=${isShoppingMode ? this._handleItemClick : null}
         >
           <!-- Checkbox solo en modo usar, no en modo edición -->
@@ -1081,7 +1141,8 @@ export class HcListItem extends LitElement {
     // Render para listas de compra (comportamiento original)
     return html`
       <div
-        class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''}"
+        class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''} ${this.card ? 'card' : ''}"
+        style="${this.card ? 'position: relative;' : ''}"
         @click=${isShoppingMode ? this._handleItemClick : null}
       >
         <!-- Checkbox only in shopping mode -->

@@ -566,9 +566,21 @@ export class HcShoppingList extends LitElement {
     }
 
     .items-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 900px) {
+      .items-list {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .items-list {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* View toggle buttons */
@@ -749,6 +761,33 @@ export class HcShoppingList extends LitElement {
       margin-left: 0.5rem;
     }
 
+    .items-table .category-row {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .items-table .category-row:hover td {
+      opacity: 0.85;
+    }
+
+    .items-table .category-row.dragging {
+      opacity: 0.5;
+    }
+
+    .items-table .category-row.drag-over td {
+      border-top: 2px solid #2563eb;
+    }
+
+    .items-table .category-row.drag-over-bottom td {
+      border-bottom: 2px solid #2563eb;
+    }
+
+    .category-chevron-table {
+      font-size: 0.65rem;
+      margin-right: 0.5rem;
+      opacity: 0.7;
+    }
+
     @media (prefers-color-scheme: dark) {
       .items-table th,
       .items-table td {
@@ -787,6 +826,14 @@ export class HcShoppingList extends LitElement {
 
       .items-table .category-row td {
         background: #1e293b;
+      }
+
+      .items-table .category-row.drag-over td {
+        border-top-color: #60a5fa;
+      }
+
+      .items-table .category-row.drag-over-bottom td {
+        border-bottom-color: #60a5fa;
       }
     }
 
@@ -1647,6 +1694,35 @@ export class HcShoppingList extends LitElement {
   }
 
   /**
+   * Comprueba si todas las categorías están colapsadas
+   */
+  get _allCategoriesCollapsed() {
+    const categoryIds = Object.keys(this._groupedItems).filter(id => id !== 'todos');
+    if (categoryIds.length === 0) return false;
+    return categoryIds.every(id => this._collapsedCategories[id]);
+  }
+
+  /**
+   * Alterna entre colapsar y expandir todas las categorías
+   */
+  _toggleAllCategories() {
+    if (this._allCategoriesCollapsed) {
+      this._expandAllCategories();
+    } else {
+      this._collapseAllCategories();
+    }
+  }
+
+  /**
+   * Handler para click en fila de categoría en tabla
+   */
+  _handleTableCategoryClick(e, categoryId) {
+    // No colapsar si se está arrastrando
+    if (this._draggedCategory) return;
+    this._toggleCategoryCollapse(categoryId);
+  }
+
+  /**
    * Obtiene las categorías ordenadas según el orden personalizado
    */
   get _orderedGroupedItems() {
@@ -1682,13 +1758,15 @@ export class HcShoppingList extends LitElement {
    * Handler para inicio de drag de categoría
    */
   _handleCategoryDragStart(e, categoryId) {
+    e.stopPropagation();
     this._draggedCategory = categoryId;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', categoryId);
 
-    // Añadir clase dragging al elemento
+    // Añadir clase dragging al elemento (soporta lista y tabla)
     requestAnimationFrame(() => {
-      e.target.closest('.category-group')?.classList.add('dragging');
+      const target = e.target.closest('.category-group') || e.target.closest('.category-row');
+      target?.classList.add('dragging');
     });
   }
 
@@ -1698,8 +1776,8 @@ export class HcShoppingList extends LitElement {
   _handleCategoryDragEnd(e) {
     this._draggedCategory = null;
 
-    // Limpiar clases de todos los elementos
-    this.shadowRoot.querySelectorAll('.category-group').forEach(el => {
+    // Limpiar clases de todos los elementos (lista y tabla)
+    this.shadowRoot.querySelectorAll('.category-group, .category-row').forEach(el => {
       el.classList.remove('dragging', 'drag-over', 'drag-over-bottom');
     });
   }
@@ -1713,11 +1791,12 @@ export class HcShoppingList extends LitElement {
 
     e.dataTransfer.dropEffect = 'move';
 
-    const target = e.target.closest('.category-group');
+    // Soportar lista (.category-group) y tabla (.category-row)
+    const target = e.target.closest('.category-group') || e.target.closest('.category-row');
     if (!target) return;
 
     // Limpiar clases previas
-    this.shadowRoot.querySelectorAll('.category-group').forEach(el => {
+    this.shadowRoot.querySelectorAll('.category-group, .category-row').forEach(el => {
       if (el !== target) {
         el.classList.remove('drag-over', 'drag-over-bottom');
       }
@@ -1740,7 +1819,7 @@ export class HcShoppingList extends LitElement {
    * Handler para cuando se sale del área de drop
    */
   _handleCategoryDragLeave(e) {
-    const target = e.target.closest('.category-group');
+    const target = e.target.closest('.category-group') || e.target.closest('.category-row');
     if (target && !target.contains(e.relatedTarget)) {
       target.classList.remove('drag-over', 'drag-over-bottom');
     }
@@ -1751,13 +1830,14 @@ export class HcShoppingList extends LitElement {
    */
   _handleCategoryDrop(e, targetCategoryId) {
     e.preventDefault();
+    e.stopPropagation();
 
     if (!this._draggedCategory || this._draggedCategory === targetCategoryId) {
       this._handleCategoryDragEnd(e);
       return;
     }
 
-    const target = e.target.closest('.category-group');
+    const target = e.target.closest('.category-group') || e.target.closest('.category-row');
     const isBottom = target?.classList.contains('drag-over-bottom');
 
     // Obtener el orden actual
@@ -2805,17 +2885,29 @@ export class HcShoppingList extends LitElement {
             ${this._orderedGroupedItems.map(([category, items]) => {
               const cat = this._getCategoryById(category);
               const headerStyle = cat?.bgColor ? `background: ${cat.bgColor}; color: ${cat.textColor || '#fff'}` : '';
+              const isCollapsed = this._collapsedCategories[category];
               return html`
                 ${category !== 'todos' ? html`
-                  <tr class="category-row">
+                  <tr
+                    class="category-row ${isCollapsed ? 'collapsed' : ''}"
+                    data-category="${category}"
+                    @click=${(e) => this._handleTableCategoryClick(e, category)}
+                    draggable="true"
+                    @dragstart=${(e) => this._handleCategoryDragStart(e, category)}
+                    @dragend=${this._handleCategoryDragEnd}
+                    @dragover=${(e) => this._handleCategoryDragOver(e, category)}
+                    @dragleave=${this._handleCategoryDragLeave}
+                    @drop=${(e) => this._handleCategoryDrop(e, category)}
+                  >
                     <td colspan="${colCount}" style="${headerStyle}">
+                      <span class="category-chevron-table">${isCollapsed ? '▶' : '▼'}</span>
                       <span>${cat?.icon || '📦'}</span>
                       <span>${cat?.name || category}</span>
                       <span class="category-count">(${items.length})</span>
                     </td>
                   </tr>
                 ` : ''}
-                ${items.map(item => this._renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, false))}
+                ${!isCollapsed ? items.map(item => this._renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, false)) : ''}
               `;
             })}
           ` : html`
@@ -2973,17 +3065,12 @@ export class HcShoppingList extends LitElement {
         >
           📁 Agrupar
         </button>
-        ${this.groupByCategory && this.viewMode === 'list' ? html`
+        ${this.groupByCategory ? html`
           <button
             class="control-btn control-btn-small"
-            @click=${this._expandAllCategories}
-            title="Expandir todas"
-          >⊞</button>
-          <button
-            class="control-btn control-btn-small"
-            @click=${this._collapseAllCategories}
-            title="Colapsar todas"
-          >⊟</button>
+            @click=${this._toggleAllCategories}
+            title="${this._allCategoriesCollapsed ? 'Expandir todas' : 'Colapsar todas'}"
+          >${this._allCategoriesCollapsed ? '⊞' : '⊟'}</button>
         ` : ''}
         ${this.mode === 'shopping' ? html`
           <button
@@ -3213,10 +3300,8 @@ export class HcShoppingList extends LitElement {
           return showHeader ? html`
           <details
             class="category-group"
+            data-category="${category}"
             ?open=${!isCollapsed}
-            draggable="true"
-            @dragstart=${(e) => this._handleCategoryDragStart(e, category)}
-            @dragend=${this._handleCategoryDragEnd}
             @dragover=${(e) => this._handleCategoryDragOver(e, category)}
             @dragleave=${this._handleCategoryDragLeave}
             @drop=${(e) => this._handleCategoryDrop(e, category)}
@@ -3232,7 +3317,14 @@ export class HcShoppingList extends LitElement {
             }}
           >
             <summary class="category-header" style="${headerStyle}">
-              <span class="drag-handle" title="Arrastrar para reordenar">⋮⋮</span>
+              <span
+                class="drag-handle"
+                draggable="true"
+                title="Arrastrar para reordenar"
+                @dragstart=${(e) => this._handleCategoryDragStart(e, category)}
+                @dragend=${this._handleCategoryDragEnd}
+                @click=${(e) => e.preventDefault()}
+              >⋮⋮</span>
               <span class="category-icon">${cat?.icon || '📦'}</span>
               <span class="category-name">${cat?.name || category}</span>
               <span class="category-count">${items.length}</span>
@@ -3245,6 +3337,7 @@ export class HcShoppingList extends LitElement {
                   .members=${this.members}
                   .mode=${this.mode}
                   .listType=${this.listType}
+                  .card=${true}
                   @toggle=${this._handleToggleItem}
                   @remove=${this._handleRemoveItem}
                   @assign=${this._handleAssignItem}
@@ -3265,6 +3358,7 @@ export class HcShoppingList extends LitElement {
                   .members=${this.members}
                   .mode=${this.mode}
                   .listType=${this.listType}
+                  .card=${true}
                   @toggle=${this._handleToggleItem}
                   @remove=${this._handleRemoveItem}
                   @assign=${this._handleAssignItem}
