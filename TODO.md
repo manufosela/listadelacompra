@@ -49,6 +49,84 @@ Tareas pendientes y features planificadas para desarrollo futuro.
    - Convertir `og-image.svg` → `og-image.png` (1200x630)
    - Crear iconos: 192x192, 512x512, 180x180 (apple), 32x32, 16x16
 
+---
+
+## Mejoras Sistema de Tickets (PENDIENTE)
+
+### Problema actual
+
+El sistema de tickets tiene varios problemas de usabilidad y precisión:
+
+1. **Matching de productos deficiente**
+   - Lista: "Puerros, 2 manojos" → Ticket: "PUERRO CRF BIO 750GR"
+   - No reconoce que son el mismo producto, lo añade como nuevo
+   - Necesita fuzzy matching inteligente (normalización, sinónimos, variantes)
+
+2. **Añade items no deseados**
+   - Detecta líneas como "Promoción 3x2", "Dto. socio", etc. como productos
+   - Necesita filtrar líneas que no son productos reales
+
+3. **No detecta el total correctamente**
+   - El OCR falla en detectar el importe total del ticket
+   - Hay que mejorar el prompt o la lógica de extracción
+
+4. **Flujo de confirmación inexistente**
+   - Actualmente añade todo directamente sin confirmar
+   - El usuario no puede revisar ni corregir antes de guardar
+
+### Solución propuesta
+
+#### Modal de revisión pre-guardado
+Antes de añadir items a la lista, mostrar un modal con:
+- Lista de productos detectados en el ticket
+- Para cada producto detectado:
+  - Selector para asociar con item existente de la lista
+  - Opción "Añadir como nuevo"
+  - Opción "Ignorar" (para promociones, descuentos, etc.)
+- Campo para el total (editable si no se detectó bien)
+- Campo para la fecha (editable)
+- Campo para la tienda (editable)
+
+#### Mejoras en el matching
+- Normalizar nombres (quitar acentos, mayúsculas, espacios extra)
+- Ignorar cantidades/pesos del ticket al comparar ("750GR", "1L", etc.)
+- Usar raíz de palabras ("PUERRO" ≈ "Puerros")
+- Mostrar score de coincidencia al usuario
+
+#### Filtrado de líneas no-producto
+Filtrar automáticamente líneas que contengan:
+- "PROMOCION", "DTO", "DESCUENTO", "OFERTA"
+- "SUBTOTAL", "IVA", "TOTAL"
+- "TARJETA", "EFECTIVO", "CAMBIO"
+- Líneas muy cortas o solo números
+
+### Archivos a modificar
+
+- `functions/index.js` - Mejorar prompt OCR, añadir filtrado
+- `public/components/hc-ticket-scanner.js` - Añadir modal de revisión
+- `public/components/hc-shopping-list.js` - Recibir items revisados del modal
+- Posible nuevo archivo: `public/js/ticket-matcher.js` - Lógica de matching
+
+### Modelo de datos del modal
+
+```javascript
+// Resultado del OCR
+{
+  detectedItems: [
+    {
+      name: "PUERRO CRF BIO 750GR",
+      price: 2.49,
+      suggestedMatch: "itemId123",  // ID del item de la lista que más se parece
+      matchScore: 0.75,  // Puntuación de coincidencia (0-1)
+      userAction: "match" | "new" | "ignore"  // Decisión del usuario
+    }
+  ],
+  total: 45.60,
+  date: "2026-01-04",
+  store: "CARREFOUR"
+}
+```
+
 ### Contexto técnico verificado
 
 **Storage Rules** (`firebase/storage.rules`):
