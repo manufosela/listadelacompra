@@ -51,20 +51,13 @@ function isMobileDevice() {
 
 /**
  * Inicia sesión con Google
- * En móviles usa redirect directamente (los popups no funcionan bien)
- * En desktop intenta popup primero, si falla usa redirect
+ * Siempre intenta popup primero (funciona en navegadores modernos incluso en móvil)
+ * Si el popup falla, usa redirect como fallback
  * @returns {Promise<User>} Usuario autenticado
  */
 export async function signInWithGoogle() {
-  // En móviles usar siempre redirect (los popups fallan silenciosamente)
-  if (isMobileDevice()) {
-    console.log('Dispositivo móvil detectado, usando redirect...');
-    await signInWithRedirect(auth, googleProvider);
-    return null;
-  }
-
-  // En desktop intentar popup
   try {
+    // Intentar popup primero (funciona en la mayoría de navegadores modernos)
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
 
@@ -73,9 +66,9 @@ export async function signInWithGoogle() {
 
     return user;
   } catch (error) {
-    // Si el popup falla por cualquier razón, usar redirect
+    // Si el popup falla, usar redirect como fallback
     if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-      console.log('Popup falló, usando redirect...');
+      console.log('Popup falló, usando redirect como fallback...');
       await signInWithRedirect(auth, googleProvider);
       return null;
     }
