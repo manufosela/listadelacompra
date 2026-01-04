@@ -110,10 +110,42 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   const emailForm = document.getElementById('email-form');
   const errorMessage = document.getElementById('error-message');
 
-  // Procesar resultado de redirect (si viene de un popup bloqueado)
-  handleGoogleRedirectResult().catch((error) => {
+  // Función para mostrar errores (definida primero para hoisting)
+  function showError(error) {
+    let message = 'Error al iniciar sesión. Inténtalo de nuevo.';
+
+    const errorMessages = {
+      'auth/popup-closed-by-user': 'Has cerrado la ventana de login.',
+      'auth/popup-blocked': 'Popup bloqueado. Redirigiendo...',
+      'auth/network-request-failed': 'Error de conexión. Verifica tu internet.',
+      'auth/user-not-found': 'No existe una cuenta con este email.',
+      'auth/wrong-password': 'Contraseña incorrecta.',
+      'auth/invalid-email': 'Email no válido.',
+      'auth/too-many-requests': 'Demasiados intentos. Espera un momento.',
+      'auth/invalid-credential': 'Credenciales inválidas.'
+    };
+
+    message = errorMessages[error?.code] || message;
+
+    errorMessage.textContent = message;
+    errorMessage.hidden = false;
+  }
+
+  // Procesar resultado de redirect (si viene de Google redirect)
+  try {
+    const redirectUser = await handleGoogleRedirectResult();
+    if (redirectUser) {
+      console.log('Usuario desde redirect:', redirectUser.email);
+      window.location.href = '/app/lists';
+      return; // Detener ejecución
+    }
+  } catch (error) {
     console.error('Error processing redirect:', error);
-  });
+    // Solo mostrar error si no es un error normal de "no hay redirect pendiente"
+    if (error?.code) {
+      showError(error);
+    }
+  }
 
   // Verificar si ya está autenticado
   onAuthStateChanged((user) => {
@@ -166,25 +198,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     }
   });
 
-  function showError(error) {
-    let message = 'Error al iniciar sesión. Inténtalo de nuevo.';
-
-    const errorMessages = {
-      'auth/popup-closed-by-user': 'Has cerrado la ventana de login.',
-      'auth/popup-blocked': 'Popup bloqueado. Redirigiendo...',
-      'auth/network-request-failed': 'Error de conexión. Verifica tu internet.',
-      'auth/user-not-found': 'No existe una cuenta con este email.',
-      'auth/wrong-password': 'Contraseña incorrecta.',
-      'auth/invalid-email': 'Email no válido.',
-      'auth/too-many-requests': 'Demasiados intentos. Espera un momento.',
-      'auth/invalid-credential': 'Credenciales inválidas.'
-    };
-
-    message = errorMessages[error.code] || message;
-
-    errorMessage.textContent = message;
-    errorMessage.hidden = false;
-  }
 </script>
 
 <style>
