@@ -1460,10 +1460,56 @@ export class HcShoppingList extends LitElement {
   updated(changedProperties) {
     if ((changedProperties.has('userId') || changedProperties.has('listId')) && this.userId && this.listId) {
       this._setupSubscriptions();
+      this._loadPreferences();
     }
     // Recargar categorías cuando cambia el tipo de lista
     if (changedProperties.has('listType') && this.userId && this.listId) {
       this._loadCategories();
+    }
+    // Guardar preferencias cuando cambien (no durante la carga inicial)
+    const prefProps = ['showCompleted', 'groupByCategory', 'viewMode', 'filterByAssignee'];
+    const prefChanged = prefProps.some(prop => changedProperties.has(prop));
+    const isInitialLoad = changedProperties.has('listId') || changedProperties.has('userId');
+    if (prefChanged && this.listId && !isInitialLoad) {
+      this._savePreferences();
+    }
+  }
+
+  /**
+   * Carga las preferencias de la lista desde localStorage
+   */
+  _loadPreferences() {
+    if (!this.listId) return;
+    try {
+      const stored = localStorage.getItem(`prefs:${this.listId}`);
+      if (stored) {
+        const prefs = JSON.parse(stored);
+        // Solo aplicar si existen en el objeto guardado
+        if (typeof prefs.showCompleted === 'boolean') this.showCompleted = prefs.showCompleted;
+        if (typeof prefs.groupByCategory === 'boolean') this.groupByCategory = prefs.groupByCategory;
+        if (prefs.viewMode) this.viewMode = prefs.viewMode;
+        if (typeof prefs.filterByAssignee === 'string') this.filterByAssignee = prefs.filterByAssignee;
+      }
+    } catch {
+      // Si hay error al parsear, ignorar y usar valores por defecto
+    }
+  }
+
+  /**
+   * Guarda las preferencias de la lista en localStorage
+   */
+  _savePreferences() {
+    if (!this.listId) return;
+    const prefs = {
+      showCompleted: this.showCompleted,
+      groupByCategory: this.groupByCategory,
+      viewMode: this.viewMode,
+      filterByAssignee: this.filterByAssignee
+    };
+    try {
+      localStorage.setItem(`prefs:${this.listId}`, JSON.stringify(prefs));
+    } catch {
+      // Si localStorage no está disponible, ignorar
     }
   }
 
@@ -1742,7 +1788,7 @@ export class HcShoppingList extends LitElement {
 
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
-      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
 
       // Incrementar contador de compras del producto (solo listas de compra, solo al marcar)
       if (checked && this.listType !== 'agnostic') {
@@ -1796,7 +1842,7 @@ export class HcShoppingList extends LitElement {
 
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
-      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
     } catch (error) {
       console.error('Error assigning item:', error);
     }
@@ -1834,7 +1880,7 @@ export class HcShoppingList extends LitElement {
 
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
-      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
     } catch (error) {
       console.error('Error toggling checklist item:', error);
     }
@@ -1864,7 +1910,7 @@ export class HcShoppingList extends LitElement {
 
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
-      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
     } catch (error) {
       console.error('Error adding checklist item:', error);
     }
@@ -1897,7 +1943,7 @@ export class HcShoppingList extends LitElement {
 
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
-      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
     } catch (error) {
       console.error('Error removing checklist item:', error);
     }
@@ -1970,7 +2016,7 @@ export class HcShoppingList extends LitElement {
 
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
-      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
 
       this._handleCancelEdit();
     } catch (error) {
@@ -2305,7 +2351,7 @@ export class HcShoppingList extends LitElement {
 
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
-      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
     } catch (error) {
       console.error('Error marking all items:', error);
     }
@@ -2330,7 +2376,7 @@ export class HcShoppingList extends LitElement {
 
       // Actualizar timestamp de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
-      await updateDoc(listRef, { updatedAt: serverTimestamp() });
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
     } catch (error) {
       console.error('Error unmarking all items:', error);
     }
@@ -2339,7 +2385,7 @@ export class HcShoppingList extends LitElement {
   async _handleTicketApplied(e) {
     // El ticket ha sido aplicado, la lista se actualiza automáticamente via onSnapshot
     // Guardamos el ticket en el historial
-    const { ticketData, results } = e.detail || {};
+    const { ticketData, imageUrl } = e.detail || {};
     if (ticketData && this.userId && this.listId) {
       try {
         const { saveTicketToHistory } = await import('/js/tickets.js');
@@ -2349,7 +2395,7 @@ export class HcShoppingList extends LitElement {
           listId: this.listId,
           groupId,
           ticketData,
-          imageUrl: null
+          imageUrl: imageUrl || null
         });
       } catch (error) {
         console.error('Error saving ticket to history:', error);

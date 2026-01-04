@@ -178,3 +178,24 @@ export async function saveTicketToHistory({ userId, listId, groupId, ticketData,
 
   return ticketDoc.id;
 }
+
+/**
+ * Actualiza un ticket existente
+ * @param {string} userId - ID del propietario de la lista
+ * @param {string} listId - ID de la lista
+ * @param {string} ticketId - ID del ticket
+ * @param {Object} updates - Campos a actualizar (store, date, total)
+ */
+export async function updateTicket({ userId, listId, ticketId, updates }) {
+  const ticketRef = doc(db, 'users', userId, 'lists', listId, 'tickets', ticketId);
+
+  const cleanUpdates = {};
+  if (updates.store !== undefined) cleanUpdates.store = updates.store;
+  if (updates.date !== undefined) cleanUpdates.date = updates.date;
+  if (updates.total !== undefined) cleanUpdates.total = Number(updates.total);
+
+  await updateDoc(ticketRef, {
+    ...cleanUpdates,
+    updatedAt: serverTimestamp()
+  });
+}

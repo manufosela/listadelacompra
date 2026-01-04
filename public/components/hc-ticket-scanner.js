@@ -4,8 +4,10 @@
  */
 
 import { LitElement, html, css } from '/js/vendor/lit.bundle.js';
-import { processTicket, applyTicketToList } from '/js/tickets.js';
+import { processTicket, applyTicketToList, compressImage } from '/js/tickets.js';
 import { getCurrentGroupId } from '/js/group.js';
+import { storage } from '/js/firebase-config.js';
+import { ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
 
 // Cargar pdf.js dinámicamente
 let pdfjsLib = null;
@@ -40,6 +42,7 @@ export class HcTicketScanner extends LitElement {
     this._ticketData = null;
     this._error = null;
     this._results = null;
+    this._imageFile = null; // Archivo de imagen para subir a Storage
   }
 
   static styles = css`
@@ -414,6 +417,7 @@ export class HcTicketScanner extends LitElement {
     this._ticketData = null;
     this._error = null;
     this._results = null;
+    this._imageFile = null;
   }
 
   close() {
@@ -493,6 +497,9 @@ export class HcTicketScanner extends LitElement {
       if (!groupId) {
         throw new Error('No hay grupo seleccionado');
       }
+
+      // Guardar el archivo para subirlo luego a Storage
+      this._imageFile = file;
 
       const result = await processTicket({
         imageFile: file,
@@ -574,11 +581,29 @@ export class HcTicketScanner extends LitElement {
         }
       });
 
+      // Subir imagen a Storage
+      let imageUrl = null;
+      if (this._imageFile) {
+        try {
+          const groupId = getCurrentGroupId();
+          const ticketId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const storageRef = ref(storage, `groups/${groupId}/tickets/${ticketId}.jpg`);
+
+          // Comprimir imagen antes de subir
+          const compressedBlob = await compressImage(this._imageFile, 1200, 0.8);
+          await uploadBytes(storageRef, compressedBlob, { contentType: 'image/jpeg' });
+          imageUrl = await getDownloadURL(storageRef);
+        } catch (uploadError) {
+          console.error('Error uploading ticket image:', uploadError);
+          // Continuar sin imagen si falla la subida
+        }
+      }
+
       this._results = results;
       this._step = 'done';
 
       this.dispatchEvent(new CustomEvent('ticket-applied', {
-        detail: { results, ticketData: this._ticketData },
+        detail: { results, ticketData: this._ticketData, imageUrl },
         bubbles: true,
         composed: true
       }));

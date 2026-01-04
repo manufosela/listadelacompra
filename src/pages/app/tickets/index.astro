@@ -21,9 +21,131 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
   import { db } from '/js/firebase-config.js';
   import { modal } from '/js/modal.js';
+  import { updateTicket } from '/js/tickets.js';
   import { collection, getDocs, query, orderBy, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
   let currentUser = null;
+
+  /**
+   * Muestra el modal de edición de ticket
+   */
+  async function editTicket(userId, listId, ticketId, currentData) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal-dialog modal-form" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <div class="modal-header">
+            <h2 class="modal-title" id="modal-title">Editar ticket</h2>
+          </div>
+          <form class="modal-body" id="edit-ticket-form">
+            <div class="form-group">
+              <label for="edit-store">Tienda</label>
+              <input type="text" id="edit-store" name="store" value="${currentData.store || ''}" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-date">Fecha</label>
+              <input type="date" id="edit-date" name="date" value="${currentData.date || ''}" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-total">Total (€)</label>
+              <input type="number" id="edit-total" name="total" value="${currentData.total || 0}" step="0.01" min="0" required>
+            </div>
+          </form>
+          <div class="modal-footer">
+            <button type="button" class="modal-btn modal-btn-cancel" data-action="cancel">
+              Cancelar
+            </button>
+            <button type="submit" form="edit-ticket-form" class="modal-btn modal-btn-confirm">
+              Guardar
+            </button>
+          </div>
+        </div>
+      `;
+
+      const close = (result) => {
+        overlay.classList.add('closing');
+        setTimeout(() => {
+          overlay.remove();
+          resolve(result);
+        }, 150);
+      };
+
+      // Manejar envío del formulario
+      const form = overlay.querySelector('#edit-ticket-form');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const updates = {
+          store: formData.get('store'),
+          date: formData.get('date'),
+          total: parseFloat(formData.get('total'))
+        };
+
+        try {
+          await updateTicket({ userId, listId, ticketId, updates });
+          close(true);
+        } catch (error) {
+          console.error('Error updating ticket:', error);
+          alert('Error al actualizar el ticket');
+        }
+      });
+
+      // Cancelar
+      overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => close(false));
+
+      // Click fuera del modal = cancelar
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close(false);
+      });
+
+      // Escape = cancelar
+      const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+          document.removeEventListener('keydown', handleEscape);
+          close(false);
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+
+      document.body.appendChild(overlay);
+      overlay.querySelector('#edit-store').focus();
+    });
+  }
+
+  /**
+   * Muestra la imagen del ticket en un modal
+   */
+  function viewTicketImage(imageUrl) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="image-viewer">
+        <button class="close-viewer" aria-label="Cerrar">×</button>
+        <img src="${imageUrl}" alt="Imagen del ticket" />
+      </div>
+    `;
+
+    const close = () => {
+      overlay.classList.add('closing');
+      setTimeout(() => overlay.remove(), 150);
+    };
+
+    overlay.querySelector('.close-viewer').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        document.removeEventListener('keydown', handleEscape);
+        close();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    document.body.appendChild(overlay);
+  }
 
   async function deleteTicket(userId, listId, ticketId) {
     const confirmed = await modal.confirm({
@@ -109,7 +231,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         const ticketDate = t.date || processedDate?.toLocaleDateString() || 'Fecha desconocida';
 
         return `
-          <div class="ticket-card" data-ticket-id="${t.id}" data-list-id="${t.listId}">
+          <div class="ticket-card" data-ticket-id="${t.id}" data-list-id="${t.listId}"
+               data-store="${(t.store || '').replace(/"/g, '&quot;')}"
+               data-date="${t.date || ''}"
+               data-total="${t.total || 0}"
+               data-image-url="${t.imageUrl || ''}">
             <a href="/app/list?id=${t.listId}" class="ticket-content">
               <div class="ticket-header">
                 <div>
@@ -121,16 +247,63 @@ import AppLayout from '../../../layouts/AppLayout.astro';
               <div class="ticket-meta">
                 <span class="list-badge">${t.listIcon} ${t.listName}</span>
                 <span class="items-badge">${t.itemCount || 0} productos</span>
+                ${t.imageUrl ? '<span class="image-badge">📷</span>' : ''}
               </div>
             </a>
-            <button class="btn-delete-ticket" aria-label="Eliminar ticket" title="Eliminar ticket">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-              </svg>
-            </button>
+            <div class="ticket-actions">
+              ${t.imageUrl ? `
+                <button class="btn-view-image" aria-label="Ver imagen del ticket" title="Ver imagen">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21,15 16,10 5,21"/>
+                  </svg>
+                </button>
+              ` : ''}
+              <button class="btn-edit-ticket" aria-label="Editar ticket" title="Editar ticket">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button class="btn-delete-ticket" aria-label="Eliminar ticket" title="Eliminar ticket">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                </svg>
+              </button>
+            </div>
           </div>
         `;
       }).join('');
+
+      // Añadir event listeners para ver imagen
+      container.querySelectorAll('.btn-view-image').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const card = btn.closest('.ticket-card');
+          const imageUrl = card.dataset.imageUrl;
+          if (imageUrl) viewTicketImage(imageUrl);
+        });
+      });
+
+      // Añadir event listeners para editar
+      container.querySelectorAll('.btn-edit-ticket').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const card = btn.closest('.ticket-card');
+          const ticketId = card.dataset.ticketId;
+          const listId = card.dataset.listId;
+          const currentData = {
+            store: card.dataset.store,
+            date: card.dataset.date,
+            total: parseFloat(card.dataset.total)
+          };
+          const updated = await editTicket(currentUser.uid, listId, ticketId, currentData);
+          if (updated) initPage(); // Recargar la lista
+        });
+      });
 
       // Añadir event listeners para eliminar
       container.querySelectorAll('.btn-delete-ticket').forEach(btn => {
@@ -213,22 +386,141 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     color: inherit;
   }
 
+  .ticket-actions {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-border);
+  }
+
+  .btn-edit-ticket,
   .btn-delete-ticket {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex: 1;
     padding: 0 var(--space-md);
     background: transparent;
     border: none;
-    border-left: 1px solid var(--color-border);
     color: var(--color-text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
 
+  .btn-edit-ticket {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .btn-edit-ticket:hover {
+    background: var(--color-primary);
+    color: white;
+  }
+
   .btn-delete-ticket:hover {
     background: var(--color-danger);
     color: white;
+  }
+
+  /* Estilos para modal de formulario */
+  .modal-form {
+    max-width: 400px;
+  }
+
+  .modal-form .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding-top: var(--space-md);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .form-group label {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text);
+  }
+
+  .form-group input {
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    background: var(--color-bg);
+    color: var(--color-text);
+    transition: border-color var(--transition-fast);
+  }
+
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  }
+
+  /* Visor de imagen del ticket */
+  .image-viewer {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+  }
+
+  .image-viewer img {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: var(--radius-md);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+
+  .close-viewer {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-fast);
+  }
+
+  .close-viewer:hover {
+    background: var(--color-danger);
+    color: white;
+    border-color: var(--color-danger);
+  }
+
+  .btn-view-image {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .btn-view-image:hover {
+    background: #16a34a;
+    color: white;
+  }
+
+  .image-badge {
+    background: #dbeafe;
+    color: #1d4ed8;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .image-badge {
+      background: #1e3a5f;
+      color: #93c5fd;
+    }
   }
 
   .ticket-header {

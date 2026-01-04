@@ -4,7 +4,56 @@ Tareas pendientes y features planificadas para desarrollo futuro.
 
 ---
 
-## Sesión actual (02/01/2026) - Sistema de Tickets
+## Sesión actual (04/01/2026) - Mejoras UX y Tickets
+
+### Implementado hoy ✅
+
+1. **Persistencia de preferencias por lista** ✅
+   - Guardado en localStorage: `showCompleted`, `groupByCategory`, `viewMode`, `filterByAssignee`
+   - Clave: `prefs:${listId}`
+   - Archivo modificado: `public/components/hc-shopping-list.js`
+
+2. **Editar ticket (fecha, tienda, total)** ✅
+   - Modal de edición con formulario
+   - Función `updateTicket` añadida en `public/js/tickets.js`
+   - Archivo modificado: `src/pages/app/tickets/index.astro`
+
+3. **Guardar imagen del ticket en Storage** ✅
+   - Subir a `groups/{groupId}/tickets/{ticketId}.jpg`
+   - Modificado: `public/components/hc-ticket-scanner.js`
+   - La `imageUrl` se pasa a `saveTicketToHistory` y se guarda
+   - Añadido botón "Ver imagen" y badge de imagen en página tickets
+
+4. **Campos metadatos de listas** ✅
+   - `createdBy` ya existía en `createList`
+   - `updatedBy` añadido en `updateList` y en `hc-shopping-list.js`
+   - Creadas funciones `archiveList` y `restoreList` en `public/js/lists.js`
+
+### Pendiente (próxima sesión)
+
+5. **SEO - Assets gráficos** (MANUAL - herramientas online)
+   - Convertir `og-image.svg` → `og-image.png` (1200x630)
+   - Crear iconos: 192x192, 512x512, 180x180 (apple), 32x32, 16x16
+
+6. **Categorías colapsables** (RAMA SEPARADA - feature/categories-collapsible)
+   - `<details><summary>` para categorías agrupadas
+   - Persistir estado expandido/colapsado
+
+### Contexto técnico verificado
+
+**Storage Rules** (`firebase/storage.rules`):
+- Ya existe ruta `groups/{groupId}/tickets/{ticketId}` con permisos
+
+**Modelo de categorías** (`public/js/categories.js`):
+- Items usan campo `category` (ID de categoría)
+- NO hay migración pendiente - modelo ya correcto
+
+**Enlace a Categorías en navegación**:
+- YA EXISTE en `src/components/Navigation.astro` (línea 13)
+
+---
+
+## Sesión anterior (02/01/2026) - Sistema de Tickets
 
 ### Implementado hoy ✅
 

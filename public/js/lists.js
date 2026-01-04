@@ -257,7 +257,52 @@ export async function updateList(listId, updates) {
   const listRef = doc(db, 'users', user.uid, 'lists', listId);
   await updateDoc(listRef, {
     ...updates,
-    updatedAt: serverTimestamp()
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid
+  });
+
+  // Invalidar caches
+  invalidateCache('lists', user.uid);
+  invalidateCache('list', `${user.uid}_${listId}`);
+}
+
+/**
+ * Archiva una lista
+ * @param {string} listId - ID de la lista
+ */
+export async function archiveList(listId) {
+  const user = getCurrentUser();
+  if (!user) throw new Error('No authenticated user');
+
+  const listRef = doc(db, 'users', user.uid, 'lists', listId);
+  await updateDoc(listRef, {
+    closed: true,
+    archivedAt: serverTimestamp(),
+    archivedBy: user.uid,
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid
+  });
+
+  // Invalidar caches
+  invalidateCache('lists', user.uid);
+  invalidateCache('list', `${user.uid}_${listId}`);
+}
+
+/**
+ * Restaura una lista archivada
+ * @param {string} listId - ID de la lista
+ */
+export async function restoreList(listId) {
+  const user = getCurrentUser();
+  if (!user) throw new Error('No authenticated user');
+
+  const listRef = doc(db, 'users', user.uid, 'lists', listId);
+  await updateDoc(listRef, {
+    closed: false,
+    archivedAt: null,
+    archivedBy: null,
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid
   });
 
   // Invalidar caches
