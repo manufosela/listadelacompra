@@ -39,6 +39,7 @@ export class HcShoppingList extends LitElement {
     showCompleted: { type: Boolean, state: true },
     filterByAssignee: { type: String, state: true },
     viewMode: { type: String, state: true }, // 'list' or 'table'
+    _collapsedCategories: { type: Object, state: true }, // Categorías colapsadas {categoryId: true}
     loading: { type: Boolean, state: true },
     newItemName: { type: String, state: true },
     newItemQuantity: { type: Number, state: true },
@@ -115,6 +116,11 @@ export class HcShoppingList extends LitElement {
       background: #eff6ff;
       border-color: #2563eb;
       color: #2563eb;
+    }
+
+    .control-btn-small {
+      padding: 0.25rem 0.5rem;
+      min-width: 2rem;
     }
 
     .mode-toggle {
@@ -452,6 +458,14 @@ export class HcShoppingList extends LitElement {
       margin-bottom: 1.5rem;
     }
 
+    /* Ocultar el triángulo nativo de details/summary */
+    details.category-group > summary {
+      list-style: none;
+    }
+    details.category-group > summary::-webkit-details-marker {
+      display: none;
+    }
+
     .category-header {
       display: flex;
       align-items: center;
@@ -464,6 +478,37 @@ export class HcShoppingList extends LitElement {
       font-size: 0.875rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
+      cursor: pointer;
+      user-select: none;
+      transition: opacity 0.2s;
+    }
+
+    summary.category-header:hover {
+      opacity: 0.85;
+    }
+
+    .category-name {
+      flex: 1;
+    }
+
+    .category-chevron {
+      width: 1rem;
+      height: 1rem;
+      transition: transform 0.2s ease;
+    }
+
+    .category-chevron::before {
+      content: '▼';
+      font-size: 0.6rem;
+      display: block;
+    }
+
+    details.category-group:not([open]) .category-chevron::before {
+      content: '▶';
+    }
+
+    details.category-group:not([open]) .items-list {
+      display: none;
     }
 
     .category-count {
@@ -1398,6 +1443,7 @@ export class HcShoppingList extends LitElement {
     this.showCompleted = true;
     this.filterByAssignee = '';
     this.viewMode = 'table'; // 'table' por defecto
+    this._collapsedCategories = {}; // Estado de categorías colapsadas
     this.loading = true;
     this.newItemName = '';
     this.newItemQuantity = 1;
@@ -1489,6 +1535,9 @@ export class HcShoppingList extends LitElement {
         if (typeof prefs.groupByCategory === 'boolean') this.groupByCategory = prefs.groupByCategory;
         if (prefs.viewMode) this.viewMode = prefs.viewMode;
         if (typeof prefs.filterByAssignee === 'string') this.filterByAssignee = prefs.filterByAssignee;
+        if (prefs.collapsedCategories && typeof prefs.collapsedCategories === 'object') {
+          this._collapsedCategories = prefs.collapsedCategories;
+        }
       }
     } catch {
       // Si hay error al parsear, ignorar y usar valores por defecto
@@ -1504,13 +1553,45 @@ export class HcShoppingList extends LitElement {
       showCompleted: this.showCompleted,
       groupByCategory: this.groupByCategory,
       viewMode: this.viewMode,
-      filterByAssignee: this.filterByAssignee
+      filterByAssignee: this.filterByAssignee,
+      collapsedCategories: this._collapsedCategories
     };
     try {
       localStorage.setItem(`prefs:${this.listId}`, JSON.stringify(prefs));
     } catch {
       // Si localStorage no está disponible, ignorar
     }
+  }
+
+  /**
+   * Alterna el estado colapsado de una categoría
+   */
+  _toggleCategoryCollapse(categoryId) {
+    this._collapsedCategories = {
+      ...this._collapsedCategories,
+      [categoryId]: !this._collapsedCategories[categoryId]
+    };
+    this._savePreferences();
+  }
+
+  /**
+   * Colapsa todas las categorías
+   */
+  _collapseAllCategories() {
+    const collapsed = {};
+    Object.keys(this._groupedItems).forEach(categoryId => {
+      if (categoryId !== 'todos') collapsed[categoryId] = true;
+    });
+    this._collapsedCategories = collapsed;
+    this._savePreferences();
+  }
+
+  /**
+   * Expande todas las categorías
+   */
+  _expandAllCategories() {
+    this._collapsedCategories = {};
+    this._savePreferences();
   }
 
   disconnectedCallback() {
@@ -2701,6 +2782,18 @@ export class HcShoppingList extends LitElement {
         >
           📁 Agrupar
         </button>
+        ${this.groupByCategory && this.viewMode === 'list' ? html`
+          <button
+            class="control-btn control-btn-small"
+            @click=${this._expandAllCategories}
+            title="Expandir todas"
+          >⊞</button>
+          <button
+            class="control-btn control-btn-small"
+            @click=${this._collapseAllCategories}
+            title="Colapsar todas"
+          >⊟</button>
+        ` : ''}
         ${this.mode === 'shopping' ? html`
           <button
             class="control-btn ${this.showCompleted ? 'active' : ''}"
@@ -2922,15 +3015,47 @@ export class HcShoppingList extends LitElement {
         ${Object.entries(this._groupedItems).map(([category, items]) => {
           const cat = this._getCategoryById(category);
           const headerStyle = cat?.bgColor ? `background: ${cat.bgColor}; color: ${cat.textColor || '#fff'}` : '';
-          return html`
+          const isCollapsed = this._collapsedCategories[category];
+          const showHeader = this.groupByCategory && category !== 'todos';
+
+          // Si hay header, usar details/summary; si no, solo div
+          return showHeader ? html`
+          <details class="category-group" ?open=${!isCollapsed} @toggle=${(e) => {
+            // Solo guardar si el usuario interactúa (no al renderizar)
+            if (e.target.open !== !isCollapsed) {
+              this._collapsedCategories = {
+                ...this._collapsedCategories,
+                [category]: !e.target.open
+              };
+              this._savePreferences();
+            }
+          }}>
+            <summary class="category-header" style="${headerStyle}">
+              <span class="category-icon">${cat?.icon || '📦'}</span>
+              <span class="category-name">${cat?.name || category}</span>
+              <span class="category-count">${items.length}</span>
+              <span class="category-chevron"></span>
+            </summary>
+            <div class="items-list">
+              ${items.map(item => html`
+                <hc-list-item
+                  .item=${item}
+                  .members=${this.members}
+                  .mode=${this.mode}
+                  .listType=${this.listType}
+                  @toggle=${this._handleToggleItem}
+                  @remove=${this._handleRemoveItem}
+                  @assign=${this._handleAssignItem}
+                  @edit=${this._handleEditItem}
+                  @checklist-toggle=${this._handleChecklistToggle}
+                  @checklist-add=${this._handleChecklistAdd}
+                  @checklist-remove=${this._handleChecklistRemove}
+                ></hc-list-item>
+              `)}
+            </div>
+          </details>
+        ` : html`
           <div class="category-group">
-            ${this.groupByCategory && category !== 'todos' ? html`
-              <div class="category-header" style="${headerStyle}">
-                <span>${cat?.icon || '📦'}</span>
-                <span>${cat?.name || category}</span>
-                <span class="category-count">${items.length}</span>
-              </div>
-            ` : ''}
             <div class="items-list">
               ${items.map(item => html`
                 <hc-list-item
