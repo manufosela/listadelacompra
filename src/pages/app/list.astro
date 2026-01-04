@@ -184,8 +184,8 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   function tryInit() {
-    // Solo ejecutar si estamos en la página de lista
-    if (!window.location.pathname.startsWith('/app/list')) return;
+    // Solo ejecutar si estamos en la página de lista (no /app/lists)
+    if (window.location.pathname !== '/app/list') return;
 
     if (isAuthResolved()) {
       const user = getCurrentUser();
