@@ -469,15 +469,28 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   // Cargar productos del catálogo
   async function loadCatalogProducts() {
+    productsList.innerHTML = '<p class="loading-text">Cargando productos...</p>';
+
     const groupId = getCurrentGroupId();
     if (!groupId) {
-      productsList.innerHTML = '<p class="no-products">No hay grupo activo</p>';
+      productsList.innerHTML = `
+        <div class="no-products">
+          <p>No hay grupo activo</p>
+          <small>Debes tener un grupo para ver el catálogo de productos</small>
+        </div>
+      `;
       return;
     }
 
     try {
-      catalogProducts = await getAllProducts(groupId);
-      productCategories = await getCategoriesForList(groupId, 'shopping');
+      // Cargar productos y categorías en paralelo
+      const [products, categories] = await Promise.all([
+        getAllProducts(groupId),
+        getCategoriesForList(groupId, 'shopping')
+      ]);
+
+      catalogProducts = products;
+      productCategories = categories;
 
       if (catalogProducts.length === 0) {
         productsList.innerHTML = `
@@ -492,7 +505,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       renderProductsList();
     } catch (error) {
       console.error('Error loading products:', error);
-      productsList.innerHTML = '<p class="error-text">Error al cargar productos</p>';
+      productsList.innerHTML = `<p class="error-text">Error al cargar productos: ${error.message}</p>`;
     }
   }
 
@@ -1233,6 +1246,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     align-items: center;
     justify-content: center;
     padding: var(--space-md);
+  }
+
+  .modal[hidden] {
+    display: none;
   }
 
   .modal-backdrop {
