@@ -31,6 +31,26 @@ service firebase.storage {
         && isValidImage();
     }
 
+    // ==================== LIST ICONS ====================
+
+    match /list-icons/{listId} {
+      // Cualquiera autenticado puede ver iconos de lista
+      allow read: if isAuthenticated();
+
+      // Usuarios autenticados pueden subir/actualizar iconos
+      allow write: if isAuthenticated() && isValidImage();
+    }
+
+    // ==================== GROUP ICONS ====================
+
+    match /group-icons/{fileName} {
+      // Cualquiera autenticado puede ver iconos de grupo
+      allow read: if true;
+
+      // Usuarios autenticados pueden subir/actualizar iconos (temporalmente permisivo)
+      allow write: if isAuthenticated();
+    }
+
     // ==================== GROUP TICKETS ====================
 
     match /groups/{groupId}/tickets/{ticketId} {
