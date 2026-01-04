@@ -28,7 +28,7 @@ async function analyzeTicketWithOpenAI(imageContent) {
   const prompt = `Analiza este ticket de compra ESPAÑOL y extrae la información en formato JSON.
 
 CONTEXTO: Es un ticket de supermercado o tienda española.
-- La fecha aparece en formato DD/MM/YYYY o DD-MM-YYYY
+- La fecha aparece en formato DD/MM/YYYY, DD-MM-YYYY, DD/MM/YY, o texto como "02 ENE 2026"
 - El total aparece junto a palabras como: TOTAL, IMPORTE, A PAGAR, TOTAL A PAGAR, VENTA, TOTAL EUR, TOTAL €
 - Los precios usan coma como separador decimal (ej: 3,50 = 3.50)
 
@@ -39,7 +39,7 @@ Extrae esta información:
   "date": "fecha convertida a formato YYYY-MM-DD",
   "items": [
     {
-      "name": "nombre del producto",
+      "name": "nombre del producto LIMPIO (sin códigos, sin pesos)",
       "quantity": 1,
       "unit": "unidad (kg, L, ud, pack, etc)",
       "unitPrice": 0.00,
@@ -53,12 +53,18 @@ Extrae esta información:
   "paymentMethod": "efectivo/tarjeta/otro"
 }
 
-IMPORTANTE:
-- Busca el TOTAL final (el importe más grande, normalmente al final del ticket)
-- Convierte la fecha de DD/MM/YYYY a YYYY-MM-DD
-- Convierte precios: reemplaza comas por puntos (3,50 → 3.50)
-- Si no puedes leer algún campo, usa null
-- Responde SOLO con el JSON, sin texto adicional`;
+REGLAS CRÍTICAS:
+1. BUSCA EL TOTAL FINAL - es el importe más grande, normalmente al final del ticket junto a "TOTAL", "A PAGAR" o similar
+2. Convierte la fecha de DD/MM/YYYY a YYYY-MM-DD
+3. Convierte precios: reemplaza comas por puntos (3,50 → 3.50)
+4. EXCLUYE estas líneas (NO son productos):
+   - Promociones: "PROMO", "DTO", "DESCUENTO", "OFERTA", "2X1", "3X2", "AHORRO"
+   - Totales: "SUBTOTAL", "TOTAL", "IVA", "BASE IMPONIBLE", "IMPORTE"
+   - Pagos: "TARJETA", "EFECTIVO", "CAMBIO", "VISA", "MASTERCARD"
+   - Info: "GRACIAS", "TICKET", "FACTURA", códigos de barras, líneas solo con números
+5. Para nombre del producto: quita códigos internos, referencias y pesos del nombre (ej: "PUERRO CRF BIO 750GR" → "Puerro bio")
+6. Si no puedes leer algún campo, usa null
+7. Responde SOLO con el JSON, sin texto adicional`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',

@@ -200,19 +200,65 @@ export class HcTicketScanner extends LitElement {
       margin-bottom: 1.5rem;
     }
 
+    .ticket-summary.editable {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
     .summary-row {
       display: flex;
       justify-content: space-between;
-      padding: 0.25rem 0;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .ticket-summary.editable .summary-row {
+      padding: 0;
     }
 
     .summary-label {
       color: var(--color-text-secondary, #6b7280);
+      min-width: 60px;
+      font-size: 0.875rem;
     }
 
     .summary-value {
       font-weight: 500;
       color: var(--color-text, #1f2937);
+    }
+
+    .summary-input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--color-border, #d1d5db);
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      background: var(--color-bg, #fff);
+      color: var(--color-text, #1f2937);
+    }
+
+    .summary-input:focus {
+      outline: none;
+      border-color: var(--color-primary, #6366f1);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    .summary-input-group {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .summary-input-group .summary-input {
+      flex: 1;
+      text-align: right;
+    }
+
+    .input-suffix {
+      color: var(--color-text-secondary, #6b7280);
+      font-weight: 500;
     }
 
     .items-header {
@@ -406,6 +452,9 @@ export class HcTicketScanner extends LitElement {
       .modal-footer { border-color: #334155; }
       .btn-secondary { background: #334155; border-color: #475569; color: #f1f5f9; }
       .match-selector select { background: #334155; border-color: #475569; color: #f1f5f9; }
+      .summary-input { background: #1e293b; border-color: #475569; color: #f1f5f9; }
+      .summary-input::placeholder { color: #64748b; }
+      .input-suffix { color: #94a3b8; }
       .error { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
       .done-title { color: #f1f5f9; }
     }
@@ -649,6 +698,10 @@ export class HcTicketScanner extends LitElement {
     `;
   }
 
+  _updateTicketField(field, value) {
+    this._ticketData = { ...this._ticketData, [field]: value };
+  }
+
   _renderReviewStep() {
     const data = this._ticketData;
     const activeItems = data.items.filter(i => i.status !== 'ignored');
@@ -656,10 +709,44 @@ export class HcTicketScanner extends LitElement {
     return html`
       <div class="modal-body">
         ${this._error ? html`<div class="error">${this._error}</div>` : ''}
-        <div class="ticket-summary">
-          ${data.store ? html`<div class="summary-row"><span class="summary-label">Tienda</span><span class="summary-value">${data.store}</span></div>` : ''}
-          ${data.date ? html`<div class="summary-row"><span class="summary-label">Fecha</span><span class="summary-value">${data.date}</span></div>` : ''}
-          <div class="summary-row"><span class="summary-label">Total</span><span class="summary-value">${data.total?.toFixed(2) || '?'} €</span></div>
+        <div class="ticket-summary editable">
+          <div class="summary-row">
+            <label class="summary-label" for="ticket-store">Tienda</label>
+            <input
+              type="text"
+              id="ticket-store"
+              class="summary-input"
+              .value=${data.store || ''}
+              @input=${(e) => this._updateTicketField('store', e.target.value)}
+              placeholder="Nombre de la tienda"
+            />
+          </div>
+          <div class="summary-row">
+            <label class="summary-label" for="ticket-date">Fecha</label>
+            <input
+              type="date"
+              id="ticket-date"
+              class="summary-input"
+              .value=${data.date || ''}
+              @input=${(e) => this._updateTicketField('date', e.target.value)}
+            />
+          </div>
+          <div class="summary-row">
+            <label class="summary-label" for="ticket-total">Total</label>
+            <div class="summary-input-group">
+              <input
+                type="number"
+                id="ticket-total"
+                class="summary-input"
+                step="0.01"
+                min="0"
+                .value=${data.total || ''}
+                @input=${(e) => this._updateTicketField('total', parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+              />
+              <span class="input-suffix">€</span>
+            </div>
+          </div>
         </div>
         <div class="items-header"><h3>Productos detectados (${activeItems.length})</h3></div>
         <div class="ticket-items">
