@@ -703,8 +703,10 @@ localStorage.setItem(`prefs:${listId}`, JSON.stringify(prefs));
 - [x] Ordenar sugerencias por frecuencia de uso (`purchaseCount`)
 - [x] Si no existe, crear producto automáticamente al añadir a lista (`findOrCreateProduct`)
 
-#### Fase 3: Vista de Productos mejorada
-- [ ] Tabla ordenable por nombre (A-Z) y categoría
+#### Fase 3: Vista de Productos mejorada ✅ COMPLETADO
+- [x] Tabla ordenable por nombre (A-Z) y categoría
+- [x] Indicador visual de orden actual (flechas ↑↓)
+- [x] Mantener orden en localStorage
 - [x] ~~Modo selección: checkbox para marcar productos~~ (No necesario - modal en nueva lista)
 - [x] ~~Acción "Añadir a lista" con selector de lista destino~~ (Implementado en new.astro)
 - [x] Búsqueda/filtro rápido (existe en /app/products)
@@ -824,10 +826,10 @@ function normalizeProductName(name) {
 4. ~~**Alta** - Sincronización de productos + autocompletado~~ ✅ COMPLETADO
 5. ~~**Alta** - Creación de listas desde Productos~~ ✅ COMPLETADO (modal en nueva lista)
 6. ~~**Media** - Categorías colapsables y ordenables (D&D)~~ ✅
-7. **Media** - Vista de productos ordenable
-8. **Media** - Mejoras tickets (resumen en lista)
-9. **Media** - Mejoras Balance (estadísticas)
-10. **Baja** - Imágenes/logos para listas
+7. ~~**Media** - Vista de productos ordenable~~ ✅ COMPLETADO
+8. ~~**Media** - Mejoras tickets (OCR y campos editables)~~ ✅ COMPLETADO
+9. ~~**Media** - Mejoras Balance (estadísticas)~~ ✅ COMPLETADO
+10. ~~**Baja** - Imágenes/logos para listas~~ ✅ YA IMPLEMENTADO (new.astro, edit.astro)
 
 ---
 
