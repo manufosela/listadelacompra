@@ -40,6 +40,8 @@ export class HcShoppingList extends LitElement {
     filterByAssignee: { type: String, state: true },
     viewMode: { type: String, state: true }, // 'list' or 'table'
     _collapsedCategories: { type: Object, state: true }, // Categorías colapsadas {categoryId: true}
+    _categoryOrder: { type: Array, state: true }, // Orden personalizado de categorías
+    _draggedCategory: { type: String, state: true }, // Categoría siendo arrastrada
     loading: { type: Boolean, state: true },
     newItemName: { type: String, state: true },
     newItemQuantity: { type: Number, state: true },
@@ -456,6 +458,50 @@ export class HcShoppingList extends LitElement {
 
     .category-group {
       margin-bottom: 1.5rem;
+    }
+
+    /* Drag & Drop para categorías */
+    .category-group[draggable="true"] .category-header {
+      cursor: grab;
+    }
+
+    .category-group.dragging {
+      opacity: 0.5;
+    }
+
+    .category-group.drag-over {
+      border-top: 2px solid #2563eb;
+      margin-top: -2px;
+    }
+
+    .category-group.drag-over-bottom {
+      border-bottom: 2px solid #2563eb;
+      margin-bottom: -2px;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      opacity: 0.5;
+      font-size: 0.75rem;
+      margin-right: 0.25rem;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .category-header:hover .drag-handle {
+      opacity: 1;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .category-group.drag-over {
+        border-top-color: #60a5fa;
+      }
+
+      .category-group.drag-over-bottom {
+        border-bottom-color: #60a5fa;
+      }
     }
 
     /* Ocultar el triángulo nativo de details/summary */
@@ -1444,6 +1490,8 @@ export class HcShoppingList extends LitElement {
     this.filterByAssignee = '';
     this.viewMode = 'table'; // 'table' por defecto
     this._collapsedCategories = {}; // Estado de categorías colapsadas
+    this._categoryOrder = []; // Orden personalizado de categorías
+    this._draggedCategory = null; // Categoría siendo arrastrada
     this.loading = true;
     this.newItemName = '';
     this.newItemQuantity = 1;
@@ -1538,6 +1586,9 @@ export class HcShoppingList extends LitElement {
         if (prefs.collapsedCategories && typeof prefs.collapsedCategories === 'object') {
           this._collapsedCategories = prefs.collapsedCategories;
         }
+        if (Array.isArray(prefs.categoryOrder)) {
+          this._categoryOrder = prefs.categoryOrder;
+        }
       }
     } catch {
       // Si hay error al parsear, ignorar y usar valores por defecto
@@ -1554,7 +1605,8 @@ export class HcShoppingList extends LitElement {
       groupByCategory: this.groupByCategory,
       viewMode: this.viewMode,
       filterByAssignee: this.filterByAssignee,
-      collapsedCategories: this._collapsedCategories
+      collapsedCategories: this._collapsedCategories,
+      categoryOrder: this._categoryOrder
     };
     try {
       localStorage.setItem(`prefs:${this.listId}`, JSON.stringify(prefs));
@@ -1592,6 +1644,145 @@ export class HcShoppingList extends LitElement {
   _expandAllCategories() {
     this._collapsedCategories = {};
     this._savePreferences();
+  }
+
+  /**
+   * Obtiene las categorías ordenadas según el orden personalizado
+   */
+  get _orderedGroupedItems() {
+    const grouped = this._groupedItems;
+    const categoryIds = Object.keys(grouped);
+
+    // Si no hay orden personalizado, devolver en orden natural
+    if (this._categoryOrder.length === 0) {
+      return Object.entries(grouped);
+    }
+
+    // Ordenar según el orden guardado
+    const ordered = [];
+
+    // Primero añadir las categorías en el orden guardado
+    this._categoryOrder.forEach(catId => {
+      if (grouped[catId]) {
+        ordered.push([catId, grouped[catId]]);
+      }
+    });
+
+    // Añadir categorías nuevas que no estén en el orden guardado
+    categoryIds.forEach(catId => {
+      if (!this._categoryOrder.includes(catId)) {
+        ordered.push([catId, grouped[catId]]);
+      }
+    });
+
+    return ordered;
+  }
+
+  /**
+   * Handler para inicio de drag de categoría
+   */
+  _handleCategoryDragStart(e, categoryId) {
+    this._draggedCategory = categoryId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', categoryId);
+
+    // Añadir clase dragging al elemento
+    requestAnimationFrame(() => {
+      e.target.closest('.category-group')?.classList.add('dragging');
+    });
+  }
+
+  /**
+   * Handler para fin de drag de categoría
+   */
+  _handleCategoryDragEnd(e) {
+    this._draggedCategory = null;
+
+    // Limpiar clases de todos los elementos
+    this.shadowRoot.querySelectorAll('.category-group').forEach(el => {
+      el.classList.remove('dragging', 'drag-over', 'drag-over-bottom');
+    });
+  }
+
+  /**
+   * Handler para cuando se arrastra sobre una categoría
+   */
+  _handleCategoryDragOver(e, categoryId) {
+    e.preventDefault();
+    if (!this._draggedCategory || this._draggedCategory === categoryId) return;
+
+    e.dataTransfer.dropEffect = 'move';
+
+    const target = e.target.closest('.category-group');
+    if (!target) return;
+
+    // Limpiar clases previas
+    this.shadowRoot.querySelectorAll('.category-group').forEach(el => {
+      if (el !== target) {
+        el.classList.remove('drag-over', 'drag-over-bottom');
+      }
+    });
+
+    // Determinar si estamos en la parte superior o inferior
+    const rect = target.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+
+    if (e.clientY < midpoint) {
+      target.classList.add('drag-over');
+      target.classList.remove('drag-over-bottom');
+    } else {
+      target.classList.add('drag-over-bottom');
+      target.classList.remove('drag-over');
+    }
+  }
+
+  /**
+   * Handler para cuando se sale del área de drop
+   */
+  _handleCategoryDragLeave(e) {
+    const target = e.target.closest('.category-group');
+    if (target && !target.contains(e.relatedTarget)) {
+      target.classList.remove('drag-over', 'drag-over-bottom');
+    }
+  }
+
+  /**
+   * Handler para soltar categoría
+   */
+  _handleCategoryDrop(e, targetCategoryId) {
+    e.preventDefault();
+
+    if (!this._draggedCategory || this._draggedCategory === targetCategoryId) {
+      this._handleCategoryDragEnd(e);
+      return;
+    }
+
+    const target = e.target.closest('.category-group');
+    const isBottom = target?.classList.contains('drag-over-bottom');
+
+    // Obtener el orden actual
+    const currentOrder = this._orderedGroupedItems.map(([id]) => id);
+
+    // Quitar la categoría arrastrada de su posición actual
+    const draggedIndex = currentOrder.indexOf(this._draggedCategory);
+    if (draggedIndex > -1) {
+      currentOrder.splice(draggedIndex, 1);
+    }
+
+    // Encontrar la nueva posición
+    let targetIndex = currentOrder.indexOf(targetCategoryId);
+    if (isBottom) {
+      targetIndex += 1;
+    }
+
+    // Insertar en la nueva posición
+    currentOrder.splice(targetIndex, 0, this._draggedCategory);
+
+    // Guardar el nuevo orden
+    this._categoryOrder = currentOrder;
+    this._savePreferences();
+
+    this._handleCategoryDragEnd(e);
   }
 
   disconnectedCallback() {
@@ -2611,7 +2802,7 @@ export class HcShoppingList extends LitElement {
         </thead>
         <tbody>
           ${this.groupByCategory ? html`
-            ${Object.entries(this._groupedItems).map(([category, items]) => {
+            ${this._orderedGroupedItems.map(([category, items]) => {
               const cat = this._getCategoryById(category);
               const headerStyle = cat?.bgColor ? `background: ${cat.bgColor}; color: ${cat.textColor || '#fff'}` : '';
               return html`
@@ -3012,7 +3203,7 @@ export class HcShoppingList extends LitElement {
       ` : this.viewMode === 'table' ? html`
         ${this._renderTableView()}
       ` : html`
-        ${Object.entries(this._groupedItems).map(([category, items]) => {
+        ${this._orderedGroupedItems.map(([category, items]) => {
           const cat = this._getCategoryById(category);
           const headerStyle = cat?.bgColor ? `background: ${cat.bgColor}; color: ${cat.textColor || '#fff'}` : '';
           const isCollapsed = this._collapsedCategories[category];
@@ -3020,17 +3211,28 @@ export class HcShoppingList extends LitElement {
 
           // Si hay header, usar details/summary; si no, solo div
           return showHeader ? html`
-          <details class="category-group" ?open=${!isCollapsed} @toggle=${(e) => {
-            // Solo guardar si el usuario interactúa (no al renderizar)
-            if (e.target.open !== !isCollapsed) {
-              this._collapsedCategories = {
-                ...this._collapsedCategories,
-                [category]: !e.target.open
-              };
-              this._savePreferences();
-            }
-          }}>
+          <details
+            class="category-group"
+            ?open=${!isCollapsed}
+            draggable="true"
+            @dragstart=${(e) => this._handleCategoryDragStart(e, category)}
+            @dragend=${this._handleCategoryDragEnd}
+            @dragover=${(e) => this._handleCategoryDragOver(e, category)}
+            @dragleave=${this._handleCategoryDragLeave}
+            @drop=${(e) => this._handleCategoryDrop(e, category)}
+            @toggle=${(e) => {
+              // Solo guardar si el usuario interactúa (no al renderizar)
+              if (e.target.open !== !isCollapsed) {
+                this._collapsedCategories = {
+                  ...this._collapsedCategories,
+                  [category]: !e.target.open
+                };
+                this._savePreferences();
+              }
+            }}
+          >
             <summary class="category-header" style="${headerStyle}">
+              <span class="drag-handle" title="Arrastrar para reordenar">⋮⋮</span>
               <span class="category-icon">${cat?.icon || '📦'}</span>
               <span class="category-name">${cat?.name || category}</span>
               <span class="category-count">${items.length}</span>

@@ -29,15 +29,18 @@ Tareas pendientes y features planificadas para desarrollo futuro.
    - `updatedBy` añadido en `updateList` y en `hc-shopping-list.js`
    - Creadas funciones `archiveList` y `restoreList` en `public/js/lists.js`
 
+5. **Categorías colapsables** ✅
+   - Implementado en rama `feature/categories-collapsible` (mergeada)
+   - `<details><summary>` para categorías agrupadas
+   - Botones 'Colapsar todas' / 'Expandir todas'
+   - Estado persistido en localStorage por lista
+   - Al borrar categoría: limpia `categoryId` de items afectados
+
 ### Pendiente (próxima sesión)
 
-5. **SEO - Assets gráficos** (MANUAL - herramientas online)
+6. **SEO - Assets gráficos** (MANUAL - herramientas online)
    - Convertir `og-image.svg` → `og-image.png` (1200x630)
    - Crear iconos: 192x192, 512x512, 180x180 (apple), 32x32, 16x16
-
-6. **Categorías colapsables** (RAMA SEPARADA - feature/categories-collapsible)
-   - `<details><summary>` para categorías agrupadas
-   - Persistir estado expandido/colapsado
 
 ### Contexto técnico verificado
 
@@ -330,15 +333,17 @@ Cada lista puede tener **múltiples tickets** asociados (compras parciales).
 - [ ] Guardar orden personalizado por lista o globalmente
 - [ ] Usar biblioteca ligera (ej: SortableJS) o nativo con Drag API
 
-### Categorías colapsables (summary/details)
+### Categorías colapsables (summary/details) ✅ COMPLETADO
 
-- [ ] Cada categoría agrupada usa `<details><summary>` nativo
-- [ ] Estado expandido/colapsado persistido
-- [ ] Botón "Colapsar todas" / "Expandir todas"
-- [ ] Mostrar contador de items por categoría en el summary
+- [x] Cada categoría agrupada usa `<details><summary>` nativo
+- [x] Estado expandido/colapsado persistido
+- [x] Botón "Colapsar todas" / "Expandir todas"
+- [x] Mostrar contador de items por categoría en el summary
+- [x] Chevron indicador de estado (rotación CSS)
 
-**Archivos a modificar:**
+**Archivos modificados:**
 - `public/components/hc-shopping-list.js` - render de categorías agrupadas
+- `public/components/hc-categories-manager.js` - limpieza de categoryId al borrar
 
 ---
 
@@ -489,7 +494,7 @@ localStorage.setItem(`prefs:${listId}`, JSON.stringify(prefs));
 - [x] Campos: `name`, `icon` (emoji, solo shopping), `bgColor`, `textColor`, `listType`, `isDefault`, `order`
 - [x] Poder editar nombre, colores
 - [x] Poder borrar (solo las custom)
-- [ ] Al borrar categoría: quitar categoryId de todos los items que la usen
+- [x] Al borrar categoría: quitar categoryId de todos los items que la usen
 
 #### Apariencia
 - [x] Listas de compra: emoji + nombre
@@ -737,7 +742,7 @@ function normalizeProductName(name) {
 3. **Alta** - Arquitectura de listas (metadatos, historial)
 4. **Alta** - Sincronización de productos + autocompletado
 5. **Alta** - Creación de listas desde Productos
-6. **Media** - Categorías colapsables y ordenables (D&D)
+6. ~~**Media** - Categorías colapsables~~ ✅ / ordenables (D&D) pendiente
 7. **Media** - Vista de productos ordenable
 8. **Media** - Mejoras tickets (resumen en lista)
 9. **Media** - Mejoras Balance (estadísticas)
