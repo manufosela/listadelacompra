@@ -11,8 +11,10 @@ import {
   createGroupCategory,
   updateGroupCategory,
   deleteGroupCategory,
-  getNextAvailableColor
+  getNextAvailableColor,
+  removeCategoryFromItems
 } from '/js/categories.js';
+import { getUserLists } from '/js/lists.js';
 
 export class HcCategoriesManager extends LitElement {
   static properties = {
@@ -547,6 +549,14 @@ export class HcCategoriesManager extends LitElement {
     }
 
     try {
+      // Primero, limpiar la categoría de todos los items que la usen
+      if (this.userId) {
+        const lists = await getUserLists();
+        const listIds = lists.map(l => l.id);
+        await removeCategoryFromItems(this.userId, listIds, category.id);
+      }
+
+      // Luego, eliminar la categoría
       await deleteGroupCategory(this.groupId, category.id);
       await this._loadCategories();
     } catch (error) {
