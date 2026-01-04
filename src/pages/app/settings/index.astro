@@ -106,7 +106,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { auth } from '/js/firebase-config.js';
   import { updateProfile } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
   import { getEffectiveTheme, setTheme, initTheme } from '/js/theme.js';
-  import { navigateTo } from '/js/navigate.js';
 
   let currentUser = null;
 
@@ -184,7 +183,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         });
         if (confirmed) {
           await signOut();
-          navigateTo('/login');
+          window.location.href = '/login';
         }
       });
     }

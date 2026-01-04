@@ -124,12 +124,7 @@ const { redirectTo = '/login' } = Astro.props;
       } else {
         globalScope.__authUser = null;
         var redirectTo = authGuard.dataset.redirect || '/login';
-        // Usar navigateTo para View Transitions
-        import('/js/navigate.js').then(function(m) {
-          m.navigateTo(redirectTo);
-        }).catch(function() {
-          window.location.href = redirectTo;
-        });
+        window.location.href = redirectTo;
       }
     }
 
@@ -181,11 +176,7 @@ const { redirectTo = '/login' } = Astro.props;
             if (authContent) authContent.classList.remove('hidden');
           } else {
             var redirectTo = authGuard.dataset.redirect || '/login';
-            import('/js/navigate.js').then(function(m) {
-              m.navigateTo(redirectTo);
-            }).catch(function() {
-              window.location.href = redirectTo;
-            });
+            window.location.href = redirectTo;
           }
         }
       } catch (e) {

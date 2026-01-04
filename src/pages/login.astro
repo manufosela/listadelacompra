@@ -104,7 +104,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 <script type="module">
   import { signInWithGoogle, signInWithEmail, onAuthStateChanged, handleGoogleRedirectResult } from '/js/auth.js';
-  import { navigateTo } from '/js/navigate.js';
 
   const googleBtn = document.getElementById('google-signin-btn');
   const emailToggle = document.getElementById('email-toggle');
@@ -119,7 +118,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   // Verificar si ya está autenticado
   onAuthStateChanged((user) => {
     if (user) {
-      navigateTo('/app/lists');
+      window.location.href = '/app/lists';
     }
   });
 
