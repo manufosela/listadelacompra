@@ -207,6 +207,45 @@ Este comando:
 
 ## Pendiente Inmediato
 
+### Persistencia de preferencias de usuario
+
+Las selecciones del usuario deben recordarse entre sesiones y recargas de página.
+
+**Estado actual:**
+- Las opciones como "Mostrar completados", "Agrupar por categoría", vista tabla/lista, etc. se resetean al recargar
+- Solo `listsViewMode` se guarda en localStorage
+
+**Requisitos:**
+- [ ] Guardar estado de filtros y opciones en localStorage (por lista o global según contexto)
+- [ ] Opciones a persistir en `hc-shopping-list`:
+  - `showCompleted` - Mostrar/ocultar completados
+  - `groupByCategory` - Agrupar por categoría
+  - `viewMode` - Vista lista/tabla
+  - `filterByAssignee` - Filtro por asignado
+- [ ] Opciones a persistir en páginas:
+  - Tab activo (mis listas / archivadas / compartidas)
+  - Modo de vista (grid/list)
+- [ ] Restaurar preferencias al cargar componente/página
+- [ ] Considerar guardar preferencias por lista vs globales
+
+**Implementación sugerida:**
+```javascript
+// Clave: `prefs:${listId}` o `prefs:global`
+const prefs = {
+  showCompleted: false,
+  groupByCategory: true,
+  viewMode: 'list',
+  filterByAssignee: ''
+};
+localStorage.setItem(`prefs:${listId}`, JSON.stringify(prefs));
+```
+
+**Archivos a modificar:**
+- `public/components/hc-shopping-list.js`
+- `src/pages/app/lists/index.astro`
+
+---
+
 ### Modo claro/oscuro ✅ COMPLETADO
 
 - [x] Asegurar que el cambio de tema funciona correctamente en toda la aplicación
