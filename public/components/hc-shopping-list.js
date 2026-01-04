@@ -16,7 +16,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { getCurrentUser } from '/js/auth.js';
 import { getCurrentGroupId } from '/js/group.js';
-import { searchProducts, UNITS, PRIORITIES, incrementProductPurchaseByName, normalizeProductName } from '/js/db.js';
+import { searchProducts, UNITS, PRIORITIES, incrementProductPurchaseByName, normalizeProductName, findOrCreateProduct } from '/js/db.js';
 import {
   DEFAULT_SHOPPING_CATEGORIES,
   CATEGORY_COLORS,
@@ -2058,6 +2058,20 @@ export class HcShoppingList extends LitElement {
       } else {
         itemData.quantity = this.newItemQuantity || 1;
         itemData.unit = this.newItemUnit || 'unidad';
+
+        // Sincronizar con el catálogo de productos del grupo
+        const groupId = getCurrentGroupId();
+        if (groupId) {
+          // Si ya seleccionó un producto, usar su ID; si no, buscar/crear
+          if (this._selectedProduct?.id) {
+            itemData.productId = this._selectedProduct.id;
+          } else {
+            const productId = await this._syncWithProductCatalog(groupId, name, category, itemData.unit);
+            if (productId) {
+              itemData.productId = productId;
+            }
+          }
+        }
       }
 
       await addDoc(itemsRef, itemData);
@@ -2068,14 +2082,6 @@ export class HcShoppingList extends LitElement {
         itemCount: increment(1),
         updatedAt: serverTimestamp()
       });
-
-      // Sincronizar con el catálogo de productos del grupo (solo para listas de compra)
-      if (!isAgnostic) {
-        const groupId = getCurrentGroupId();
-        if (groupId && !this._selectedProduct) {
-          this._addToProductCatalog(groupId, name, category);
-        }
-      }
 
       // Resetear formulario
       this.newItemName = '';
@@ -2096,31 +2102,75 @@ export class HcShoppingList extends LitElement {
     }
   }
 
-  async _addToProductCatalog(groupId, name, category) {
+  /**
+   * Sincroniza un item con el catálogo de productos del grupo
+   * @returns {string|null} productId del producto encontrado/creado
+   */
+  async _syncWithProductCatalog(groupId, name, category, unit) {
     try {
-      const normalizedName = normalizeProductName(name);
-      if (!normalizedName) return;
+      if (!name?.trim()) return null;
 
-      // Verificar si el producto ya existe en el catálogo
-      const productsRef = collection(db, 'groups', groupId, 'products');
-      const { getDocs, query: firestoreQuery, where } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
-      const q = firestoreQuery(productsRef, where('normalizedName', '==', normalizedName));
-      const snapshot = await getDocs(q);
+      // Buscar o crear el producto en el catálogo
+      const product = await findOrCreateProduct(groupId, name, {
+        category: category || 'otros',
+        defaultUnit: unit || 'unidad'
+      });
 
-      if (snapshot.empty) {
-        // Producto no existe, añadirlo al catálogo
-        await addDoc(productsRef, {
-          name: name.trim(),
-          normalizedName,
-          category: category || 'otros',
-          createdAt: serverTimestamp(),
-          createdBy: this.userId
-        });
-      }
+      return product?.id || null;
     } catch (error) {
       // Error silencioso - no es crítico si falla
       console.warn('Could not sync product to catalog:', error);
+      return null;
     }
+  }
+
+  /**
+   * Migra todos los items de la lista actual que no tienen productId
+   * Crea los productos en el catálogo y vincula los items
+   * @returns {Object} Estadísticas de la migración
+   */
+  async migrateItemsToProducts() {
+    const groupId = getCurrentGroupId();
+    if (!groupId || !this.userId || !this.listId) {
+      return { error: 'Faltan datos necesarios', migrated: 0 };
+    }
+
+    const isAgnostic = this.listType === 'agnostic';
+    if (isAgnostic) {
+      return { error: 'Solo para listas de compra', migrated: 0 };
+    }
+
+    const stats = { migrated: 0, skipped: 0, errors: 0 };
+
+    // Filtrar items sin productId
+    const itemsToMigrate = this.items.filter(item =>
+      !item.productId && item.itemType !== 'general'
+    );
+
+    for (const item of itemsToMigrate) {
+      try {
+        const productId = await this._syncWithProductCatalog(
+          groupId,
+          item.name,
+          item.category,
+          item.unit
+        );
+
+        if (productId) {
+          // Actualizar el item con el productId
+          const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', item.id);
+          await updateDoc(itemRef, { productId });
+          stats.migrated++;
+        } else {
+          stats.skipped++;
+        }
+      } catch (error) {
+        console.warn('Error migrating item:', item.name, error);
+        stats.errors++;
+      }
+    }
+
+    return stats;
   }
 
   async _handleToggleItem(e) {
@@ -2786,6 +2836,15 @@ export class HcShoppingList extends LitElement {
       if (!isAgnostic) {
         itemData.quantity = 1;
         itemData.unit = 'unidad';
+
+        // Sincronizar con el catálogo de productos del grupo
+        const groupId = getCurrentGroupId();
+        if (groupId) {
+          const productId = await this._syncWithProductCatalog(groupId, name, null, 'unidad');
+          if (productId) {
+            itemData.productId = productId;
+          }
+        }
       }
 
       await addDoc(itemsRef, itemData);
