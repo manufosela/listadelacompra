@@ -185,6 +185,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
             const isActive = g.id === currentGroupId;
             return `
               <article class="group-card ${isActive ? 'is-active' : ''}" data-id="${g.id}">
+                <div class="group-icon">
+                  ${g.iconUrl
+                    ? `<img src="${g.iconUrl}" alt="" class="group-icon-img" />`
+                    : `<span class="group-icon-default">🏠</span>`
+                  }
+                </div>
                 <div class="group-card-main">
                   <div class="group-card-header">
                     <h3 class="group-name">${g.name}</h3>
@@ -435,12 +441,38 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .group-card {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     gap: var(--space-md);
     padding: var(--space-md) var(--space-lg);
     background: var(--color-bg);
     transition: background var(--transition-fast);
+  }
+
+  .group-icon {
+    flex-shrink: 0;
+  }
+
+  .group-icon-img {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+  }
+
+  .group-icon-default {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+  }
+
+  .group-card-main {
+    flex: 1;
+    min-width: 0;
   }
 
   .group-card:hover {

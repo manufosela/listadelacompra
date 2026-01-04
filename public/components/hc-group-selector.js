@@ -43,6 +43,35 @@ export class HcGroupSelector extends LitElement {
 
     .group-icon {
       font-size: 1.25rem;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .group-icon-img {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      object-fit: cover;
+    }
+
+    .group-item-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .group-item-icon img {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      object-fit: cover;
     }
 
     .chevron {
@@ -333,7 +362,12 @@ export class HcGroupSelector extends LitElement {
 
     return html`
       <button class="selector-button" @click=${this._toggleDropdown}>
-        <span class="group-icon">🏠</span>
+        <span class="group-icon">
+          ${this.currentGroup?.iconUrl
+            ? html`<img src="${this.currentGroup.iconUrl}" alt="" class="group-icon-img" />`
+            : html`🏠`
+          }
+        </span>
         <span>${this.currentGroup?.name || 'Seleccionar grupo'}</span>
         <span class="chevron ${this.open ? 'open' : ''}">▼</span>
       </button>
@@ -347,6 +381,12 @@ export class HcGroupSelector extends LitElement {
                 class="group-item ${this.currentGroup?.id === h.id ? 'active' : ''}"
                 @click=${() => this._selectGroup(h)}
               >
+                <span class="group-item-icon">
+                  ${h.iconUrl
+                    ? html`<img src="${h.iconUrl}" alt="" />`
+                    : html`🏠`
+                  }
+                </span>
                 <span class="group-name">${h.name}</span>
                 <span class="group-role">
                   ${h.members[user?.uid]?.role || 'member'}
