@@ -187,7 +187,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { createList } from '/js/lists.js';
   import { uploadListIcon, resizeImage } from '/js/storage.js';
   import { navigateTo } from '/js/navigate.js';
-  import { getProducts, UNITS } from '/js/db.js';
+  import { getAllProducts, UNITS } from '/js/db.js';
   import { getCategoriesForList, DEFAULT_SHOPPING_CATEGORIES } from '/js/categories.js';
 
   // Iconos disponibles según tipo de lista
@@ -476,7 +476,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
 
     try {
-      catalogProducts = await getProducts(groupId);
+      catalogProducts = await getAllProducts(groupId);
       productCategories = await getCategoriesForList(groupId, 'shopping');
 
       if (catalogProducts.length === 0) {
