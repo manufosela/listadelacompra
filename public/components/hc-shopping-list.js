@@ -14,6 +14,7 @@ import {
   orderBy,
   increment
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+import { withTimeout } from '/js/firestore-utils.js';
 import { getCurrentUser } from '/js/auth.js';
 import { getCurrentGroupId } from '/js/group.js';
 import { searchProducts, UNITS, PRIORITIES, incrementProductPurchaseByName, normalizeProductName, findOrCreateProduct } from '/js/db.js';
@@ -43,6 +44,7 @@ export class HcShoppingList extends LitElement {
     _categoryOrder: { type: Array, state: true }, // Orden personalizado de categorías
     _draggedCategory: { type: String, state: true }, // Categoría siendo arrastrada
     loading: { type: Boolean, state: true },
+    loadError: { type: String, state: true },
     newItemName: { type: String, state: true },
     newItemQuantity: { type: Number, state: true },
     newItemUnit: { type: String, state: true },
@@ -1006,6 +1008,41 @@ export class HcShoppingList extends LitElement {
       color: #dc2626;
     }
 
+    .load-error {
+      text-align: center;
+      padding: 2rem;
+      color: #dc2626;
+      background: #fef2f2;
+      border-radius: 0.5rem;
+      border: 1px solid #fecaca;
+    }
+
+    .load-error p {
+      margin-bottom: 1rem;
+    }
+
+    .retry-btn {
+      padding: 0.5rem 1rem;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .retry-btn:hover {
+      background: #1d4ed8;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .load-error {
+        background: #450a0a;
+        border-color: #7f1d1d;
+        color: #fca5a5;
+      }
+    }
+
     /* Estilos para formulario agnóstico */
     .notes-input {
       flex: 1;
@@ -1540,6 +1577,7 @@ export class HcShoppingList extends LitElement {
     this._categoryOrder = []; // Orden personalizado de categorías
     this._draggedCategory = null; // Categoría siendo arrastrada
     this.loading = true;
+    this.loadError = null;
     this.newItemName = '';
     this.newItemQuantity = 1;
     this.newItemUnit = 'unidad';
@@ -1882,13 +1920,29 @@ export class HcShoppingList extends LitElement {
     const newPath = `${this.userId}/${this.listId}`;
     if (this._subscribedPath === newPath) return;
 
-    // Limpiar suscripciones anteriores
+    // Limpiar suscripciones anteriores y estado de error
     this._unsubscribers.forEach(unsub => unsub());
     this._unsubscribers = [];
     this._subscribedPath = newPath;
+    this.loadError = null;
 
-    // Cargar categorías del grupo
-    await this._loadCategories();
+    // Cargar categorías del grupo (con timeout)
+    try {
+      await withTimeout(this._loadCategories(), 10000, 'Cargar categorías');
+    } catch (error) {
+      console.error('Error cargando categorías:', error);
+      // Continuar sin categorías
+    }
+
+    // Timeout para la primera carga de datos
+    let hasReceivedItems = false;
+    const loadTimeout = setTimeout(() => {
+      if (!hasReceivedItems && this.loading) {
+        this.loading = false;
+        this.loadError = 'La conexión tardó demasiado. Verifica tu conexión a internet.';
+        console.error('Timeout: no se recibieron datos en 15s');
+      }
+    }, 15000);
 
     // Suscribirse a la lista para obtener groupIds
     const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
@@ -1898,8 +1952,14 @@ export class HcShoppingList extends LitElement {
         const groupIds = listData.groupIds || [];
 
         // Cargar miembros de todos los grupos
-        await this._loadMembersFromGroups(groupIds);
+        try {
+          await withTimeout(this._loadMembersFromGroups(groupIds), 10000, 'Cargar miembros');
+        } catch (error) {
+          console.error('Error cargando miembros:', error);
+        }
       }
+    }, (error) => {
+      console.error('Error en suscripción a lista:', error);
     });
     this._unsubscribers.push(unsubList);
 
@@ -1908,13 +1968,21 @@ export class HcShoppingList extends LitElement {
     const q = query(itemsRef, orderBy('createdAt', 'desc'));
 
     const unsubItems = onSnapshot(q, (snapshot) => {
+      hasReceivedItems = true;
+      clearTimeout(loadTimeout);
       this.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       this.loading = false;
+      this.loadError = null;
     }, (error) => {
+      clearTimeout(loadTimeout);
       console.error('Error en suscripción a items:', error);
       this.loading = false;
+      this.loadError = 'Error al cargar los items. ' + (error.message || '');
     });
     this._unsubscribers.push(unsubItems);
+
+    // Guardar timeout para poder cancelarlo
+    this._unsubscribers.push(() => clearTimeout(loadTimeout));
   }
 
   async _loadMembersFromGroups(groupIds) {
@@ -3033,6 +3101,20 @@ export class HcShoppingList extends LitElement {
   render() {
     if (this.loading) {
       return html`<div class="loading">Cargando items...</div>`;
+    }
+
+    if (this.loadError) {
+      return html`
+        <div class="load-error">
+          <p>${this.loadError}</p>
+          <button class="retry-btn" @click=${() => {
+            this.loading = true;
+            this.loadError = null;
+            this._subscribedPath = null;
+            this._setupSubscriptions();
+          }}>Reintentar</button>
+        </div>
+      `;
     }
 
     const isAgnostic = this.listType === 'agnostic';
