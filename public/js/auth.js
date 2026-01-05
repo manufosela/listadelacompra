@@ -231,19 +231,26 @@ export async function getUserProfile(userId) {
 }
 
 /**
- * Espera a que se resuelva el estado de autenticación
+ * Espera a que se resuelva el estado de autenticación con timeout
+ * @param {number} timeout - Tiempo máximo de espera en ms (default 10s)
  * @returns {Promise<User|null>} Usuario autenticado o null
+ * @throws {Error} Si el timeout expira
  */
-export function waitForAuth() {
-  return new Promise((resolve) => {
+export function waitForAuth(timeout = 10000) {
+  return new Promise((resolve, reject) => {
     // Si auth ya resolvió, retornar el estado actual
     if (authResolved) {
       resolve(currentUser);
       return;
     }
 
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Auth timeout: Firebase no respondió a tiempo'));
+    }, timeout);
+
     // Si no, esperar al evento auth-ready
     window.addEventListener('auth-ready', (e) => {
+      clearTimeout(timeoutId);
       resolve(e.detail.user);
     }, { once: true });
   });

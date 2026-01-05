@@ -18,11 +18,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 </AppLayout>
 
 <script type="module">
-  import { isAuthResolved, getCurrentUser } from '/js/auth.js';
+  import { isAuthResolved, getCurrentUser, waitForAuth } from '/js/auth.js';
   import { db } from '/js/firebase-config.js';
   import { modal } from '/js/modal.js';
   import { updateTicket } from '/js/tickets.js';
-  import { collection, getDocs, query, orderBy, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { getDocsWithTimeout } from '/js/firestore-utils.js';
+  import { collection, query, orderBy, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
   let currentUser = null;
 
@@ -181,22 +182,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       return;
     }
 
-    // Timeout de seguridad para evitar carga infinita
-    const loadingTimeout = setTimeout(() => {
-      if (container.querySelector('.loading')) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <p>La carga está tardando demasiado.</p>
-            <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
-          </div>
-        `;
-      }
-    }, 15000);
-
     try {
-      // Obtener todas las listas del usuario
+      // Obtener todas las listas del usuario (con timeout de 10s)
       const listsRef = collection(db, 'users', currentUser.uid, 'lists');
-      const listsSnapshot = await getDocs(listsRef);
+      const listsSnapshot = await getDocsWithTimeout(listsRef, 10000);
 
       // Obtener tickets de cada lista
       const allTickets = [];
@@ -209,7 +198,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
           const ticketsRef = collection(db, 'users', currentUser.uid, 'lists', listDoc.id, 'tickets');
           const ticketsQuery = query(ticketsRef, orderBy('processedAt', 'desc'));
-          const ticketsSnapshot = await getDocs(ticketsQuery);
+          // Timeout de 5s por lista (son consultas pequeñas)
+          const ticketsSnapshot = await getDocsWithTimeout(ticketsQuery, 5000);
 
           ticketsSnapshot.docs.forEach(ticketDoc => {
             allTickets.push({
@@ -225,8 +215,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
           // Continuar con la siguiente lista
         }
       }
-
-      clearTimeout(loadingTimeout);
 
       // Ordenar todos los tickets por fecha
       allTickets.sort((a, b) => {
@@ -336,11 +324,20 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         });
       });
     } catch (error) {
-      clearTimeout(loadingTimeout);
       console.error('Error loading tickets:', error);
+      const isTimeout = error.message?.includes('timeout');
+      const isNetwork = error.message?.includes('network') || error.message?.includes('Failed to fetch') || error.name === 'TypeError';
+
+      let errorMessage = 'Error al cargar los tickets.';
+      if (isTimeout) {
+        errorMessage = 'La conexión tardó demasiado. Verifica tu conexión a internet.';
+      } else if (isNetwork) {
+        errorMessage = 'Error de conexión. Verifica tu conexión a internet.';
+      }
+
       container.innerHTML = `
         <div class="empty-state">
-          <p class="error">Error al cargar los tickets.</p>
+          <p class="error">${errorMessage}</p>
           <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
         </div>
       `;
@@ -348,10 +345,27 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   function tryInit() {
+    const container = document.getElementById('tickets-list');
+
     if (isAuthResolved()) {
       if (getCurrentUser()) initPage();
     } else {
-      window.addEventListener('auth-ready', () => initPage(), { once: true });
+      // Timeout de 10s para auth
+      const authTimeout = setTimeout(() => {
+        if (container && container.querySelector('.loading')) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <p class="error">Error de autenticación. Por favor, recarga la página.</p>
+              <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
+            </div>
+          `;
+        }
+      }, 10000);
+
+      window.addEventListener('auth-ready', () => {
+        clearTimeout(authTimeout);
+        if (getCurrentUser()) initPage();
+      }, { once: true });
     }
   }
 

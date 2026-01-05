@@ -16,13 +16,29 @@ import AppLayout from '../../layouts/AppLayout.astro';
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
   import '/components/hc-shopping-list.js';
   import { db } from '/js/firebase-config.js';
-  import { doc, onSnapshot, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { doc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { onSnapshotWithTimeout } from '/js/firestore-utils.js';
   import { toast } from '/js/toast.js';
 
   let unsubscribe = null;
   let currentListId = null;
   let currentUser = null;
-  let loadingTimeout = null;
+
+  function showError(headerEl, message, isNetwork = false) {
+    const errorText = isNetwork
+      ? 'Error de conexión. Verifica tu conexión a internet.'
+      : message;
+
+    headerEl.innerHTML = `
+      <div class="list-error">
+        <p>${errorText}</p>
+        <div class="list-error-actions">
+          <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
+          <a href="/app/lists" class="btn btn-secondary">Volver a listas</a>
+        </div>
+      </div>
+    `;
+  }
 
   function initPage(user) {
     currentUser = user;
@@ -54,37 +70,14 @@ import AppLayout from '../../layouts/AppLayout.astro';
       unsubscribe = null;
     }
 
-    // Limpiar timeout anterior
-    if (loadingTimeout) {
-      clearTimeout(loadingTimeout);
-    }
-
-    // Timeout de seguridad para evitar carga infinita
-    loadingTimeout = setTimeout(() => {
-      const headerEl = document.getElementById('list-header');
-      if (headerEl && headerEl.querySelector('.list-header-loading')) {
-        headerEl.innerHTML = `
-          <div class="list-error">
-            <p>La carga está tardando demasiado.</p>
-            <div class="list-error-actions">
-              <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
-              <a href="/app/lists" class="btn btn-secondary">Volver a listas</a>
-            </div>
-          </div>
-        `;
-      }
-    }, 15000);
-
     // Usar ownerId para la referencia (puede ser de otro usuario)
     const listRef = doc(db, 'users', ownerId, 'lists', listId);
     const isOwner = ownerId === user.uid;
 
-    unsubscribe = onSnapshot(listRef, (snapshot) => {
-      // Limpiar timeout cuando llegan los datos
-      if (loadingTimeout) {
-        clearTimeout(loadingTimeout);
-        loadingTimeout = null;
-      }
+    // Usar onSnapshot con timeout real (15s para la primera respuesta)
+    unsubscribe = onSnapshotWithTimeout(
+      listRef,
+      (snapshot) => {
       const headerEl = document.getElementById('list-header');
       const container = document.getElementById('list-container');
       if (!headerEl) return;
@@ -201,26 +194,18 @@ import AppLayout from '../../layouts/AppLayout.astro';
           }
         }
       }
-    }, (error) => {
-      // Limpiar timeout en caso de error
-      if (loadingTimeout) {
-        clearTimeout(loadingTimeout);
-        loadingTimeout = null;
-      }
-      console.error('Error loading list:', error);
-      const headerEl = document.getElementById('list-header');
-      if (headerEl) {
-        headerEl.innerHTML = `
-          <div class="list-error">
-            <p>Error al cargar la lista</p>
-            <div class="list-error-actions">
-              <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
-              <a href="/app/lists" class="btn btn-secondary">Volver a listas</a>
-            </div>
-          </div>
-        `;
-      }
-    });
+      },
+      (error) => {
+        console.error('Error loading list:', error);
+        const headerEl = document.getElementById('list-header');
+        if (headerEl) {
+          const isTimeout = error.message?.includes('timeout');
+          const isNetwork = error.message?.includes('network') || error.message?.includes('Failed to fetch') || error.name === 'TypeError';
+          showError(headerEl, 'Error al cargar la lista', isTimeout || isNetwork);
+        }
+      },
+      15000 // timeout 15s para primera respuesta
+    );
   }
 
   function tryInit() {
@@ -231,7 +216,18 @@ import AppLayout from '../../layouts/AppLayout.astro';
       const user = getCurrentUser();
       if (user) initPage(user);
     } else {
-      window.addEventListener('auth-ready', (e) => initPage(e.detail.user), { once: true });
+      // Timeout de 10s para auth
+      const authTimeout = setTimeout(() => {
+        const headerEl = document.getElementById('list-header');
+        if (headerEl && headerEl.querySelector('.list-header-loading')) {
+          showError(headerEl, 'Error de autenticación. Por favor, recarga la página.', true);
+        }
+      }, 10000);
+
+      window.addEventListener('auth-ready', (e) => {
+        clearTimeout(authTimeout);
+        if (e.detail.user) initPage(e.detail.user);
+      }, { once: true });
     }
   }
 
@@ -242,10 +238,6 @@ import AppLayout from '../../layouts/AppLayout.astro';
     if (unsubscribe) {
       unsubscribe();
       unsubscribe = null;
-    }
-    if (loadingTimeout) {
-      clearTimeout(loadingTimeout);
-      loadingTimeout = null;
     }
     currentListId = null;
   });
