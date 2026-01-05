@@ -1,7 +1,7 @@
 {
   "name": "myhomecart",
   "type": "module",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "scripts": {
     "generate:config": "node scripts/generate-firebase-config.js",
@@ -27,6 +27,7 @@
     "firebase:emulators:clean": "firebase emulators:start",
     "firebase:deploy": "firebase deploy",
     "deploy": "pnpm build && firebase deploy --only hosting",
+    "commit": "node scripts/commit.js",
     "prepare": "husky"
   },
   "dependencies": {
