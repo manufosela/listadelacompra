@@ -22,6 +22,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
   let unsubscribe = null;
   let currentListId = null;
   let currentUser = null;
+  let loadingTimeout = null;
 
   function initPage(user) {
     currentUser = user;
@@ -53,11 +54,37 @@ import AppLayout from '../../layouts/AppLayout.astro';
       unsubscribe = null;
     }
 
+    // Limpiar timeout anterior
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout);
+    }
+
+    // Timeout de seguridad para evitar carga infinita
+    loadingTimeout = setTimeout(() => {
+      const headerEl = document.getElementById('list-header');
+      if (headerEl && headerEl.querySelector('.list-header-loading')) {
+        headerEl.innerHTML = `
+          <div class="list-error">
+            <p>La carga está tardando demasiado.</p>
+            <div class="list-error-actions">
+              <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
+              <a href="/app/lists" class="btn btn-secondary">Volver a listas</a>
+            </div>
+          </div>
+        `;
+      }
+    }, 15000);
+
     // Usar ownerId para la referencia (puede ser de otro usuario)
     const listRef = doc(db, 'users', ownerId, 'lists', listId);
     const isOwner = ownerId === user.uid;
 
     unsubscribe = onSnapshot(listRef, (snapshot) => {
+      // Limpiar timeout cuando llegan los datos
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+        loadingTimeout = null;
+      }
       const headerEl = document.getElementById('list-header');
       const container = document.getElementById('list-container');
       if (!headerEl) return;
@@ -175,10 +202,23 @@ import AppLayout from '../../layouts/AppLayout.astro';
         }
       }
     }, (error) => {
+      // Limpiar timeout en caso de error
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+        loadingTimeout = null;
+      }
       console.error('Error loading list:', error);
       const headerEl = document.getElementById('list-header');
       if (headerEl) {
-        headerEl.innerHTML = `<div class="list-error">Error al cargar la lista</div>`;
+        headerEl.innerHTML = `
+          <div class="list-error">
+            <p>Error al cargar la lista</p>
+            <div class="list-error-actions">
+              <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
+              <a href="/app/lists" class="btn btn-secondary">Volver a listas</a>
+            </div>
+          </div>
+        `;
       }
     });
   }
@@ -202,6 +242,10 @@ import AppLayout from '../../layouts/AppLayout.astro';
     if (unsubscribe) {
       unsubscribe();
       unsubscribe = null;
+    }
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout);
+      loadingTimeout = null;
     }
     currentListId = null;
   });
@@ -362,8 +406,31 @@ import AppLayout from '../../layouts/AppLayout.astro';
     color: var(--color-text-secondary);
   }
 
-  .list-not-found p {
+  .list-not-found p,
+  .list-error p {
     margin-bottom: var(--space-md);
+  }
+
+  .list-error-actions {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: center;
+    margin-top: var(--space-md);
+  }
+
+  .btn-secondary {
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-border);
   }
 
   /* Owner badge */

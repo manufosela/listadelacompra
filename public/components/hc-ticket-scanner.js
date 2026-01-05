@@ -92,9 +92,23 @@ export class HcTicketScanner extends LitElement {
       border-radius: 1rem;
       max-width: 600px;
       width: 100%;
-      max-height: 90vh;
+      max-height: 85vh;
       overflow-y: auto;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    /* En móvil, dejar espacio para la navegación fija */
+    @media (max-width: 767px) {
+      .modal {
+        max-height: calc(100vh - 140px); /* Espacio para nav (60px) + margen */
+        margin-bottom: 70px;
+      }
+
+      .modal-backdrop {
+        padding-bottom: 70px;
+        align-items: flex-start;
+        padding-top: 1rem;
+      }
     }
 
     .modal-header {

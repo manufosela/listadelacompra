@@ -181,6 +181,18 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       return;
     }
 
+    // Timeout de seguridad para evitar carga infinita
+    const loadingTimeout = setTimeout(() => {
+      if (container.querySelector('.loading')) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p>La carga está tardando demasiado.</p>
+            <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
+          </div>
+        `;
+      }
+    }, 15000);
+
     try {
       // Obtener todas las listas del usuario
       const listsRef = collection(db, 'users', currentUser.uid, 'lists');
@@ -191,23 +203,30 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       const listNames = {};
 
       for (const listDoc of listsSnapshot.docs) {
-        const listData = listDoc.data();
-        listNames[listDoc.id] = listData.name || 'Lista';
+        try {
+          const listData = listDoc.data();
+          listNames[listDoc.id] = listData.name || 'Lista';
 
-        const ticketsRef = collection(db, 'users', currentUser.uid, 'lists', listDoc.id, 'tickets');
-        const ticketsQuery = query(ticketsRef, orderBy('processedAt', 'desc'));
-        const ticketsSnapshot = await getDocs(ticketsQuery);
+          const ticketsRef = collection(db, 'users', currentUser.uid, 'lists', listDoc.id, 'tickets');
+          const ticketsQuery = query(ticketsRef, orderBy('processedAt', 'desc'));
+          const ticketsSnapshot = await getDocs(ticketsQuery);
 
-        ticketsSnapshot.docs.forEach(ticketDoc => {
-          allTickets.push({
-            id: ticketDoc.id,
-            listId: listDoc.id,
-            listName: listData.name || 'Lista',
-            listIcon: listData.icon || '🛒',
-            ...ticketDoc.data()
+          ticketsSnapshot.docs.forEach(ticketDoc => {
+            allTickets.push({
+              id: ticketDoc.id,
+              listId: listDoc.id,
+              listName: listData.name || 'Lista',
+              listIcon: listData.icon || '🛒',
+              ...ticketDoc.data()
+            });
           });
-        });
+        } catch (listError) {
+          console.warn(`Error loading tickets for list ${listDoc.id}:`, listError);
+          // Continuar con la siguiente lista
+        }
       }
+
+      clearTimeout(loadingTimeout);
 
       // Ordenar todos los tickets por fecha
       allTickets.sort((a, b) => {
@@ -317,8 +336,14 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         });
       });
     } catch (error) {
+      clearTimeout(loadingTimeout);
       console.error('Error loading tickets:', error);
-      container.innerHTML = '<p class="error">Error al cargar los tickets.</p>';
+      container.innerHTML = `
+        <div class="empty-state">
+          <p class="error">Error al cargar los tickets.</p>
+          <button onclick="location.reload()" class="btn btn-primary">Reintentar</button>
+        </div>
+      `;
     }
   }
 
