@@ -235,10 +235,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
               <td class="product-image-cell">
                 ${p.imageUrl ? `<img class="product-thumb" src="${p.imageUrl}" alt="">` : '<span class="product-thumb-placeholder">—</span>'}
               </td>
-              <td class="product-name">${p.name}</td>
+              <td class="product-name">
+                ${p.name}
+                <button class="btn btn-sm btn-ghost edit-btn edit-inline" aria-label="Editar producto" title="Editar">
+                  ✏️
+                </button>
+              </td>
               <td class="product-category">${getCategoryDisplay(p.category)}</td>
               <td class="product-actions">
-                <button class="btn btn-sm btn-ghost edit-btn">Editar</button>
+                <button class="btn btn-sm btn-ghost edit-btn" aria-label="Editar producto" title="Editar">
+                  ✏️
+                </button>
               </td>
             </tr>
           `).join('')}
@@ -571,6 +578,34 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .product-actions {
     text-align: right;
+  }
+
+  .product-actions .edit-btn {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .edit-inline {
+    display: none;
+    margin-left: var(--space-xs);
+  }
+
+  @media (max-width: 640px) {
+    .products-table {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .products-table thead,
+    .products-table th:last-child,
+    .products-table td.product-actions {
+      display: none;
+    }
+
+    .edit-inline {
+      display: inline-flex;
+    }
   }
 
   .btn-sm {
