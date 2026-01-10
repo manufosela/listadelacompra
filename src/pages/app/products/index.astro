@@ -107,6 +107,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   let selectedImageFile = null;
   let removeImage = false;
   let previewUrl = null;
+  let editingProduct = null;
 
   function updateCategorySelectSize() {
     if (!productCategory) return;
@@ -334,6 +335,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     const form = document.getElementById('product-form');
 
     if (product) {
+      editingProduct = product;
       if (modalTitle) modalTitle.textContent = 'Editar Producto';
       if (productId) productId.value = product.id;
       if (productName) productName.value = product.name;
@@ -348,6 +350,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         removeProductImageBtn.hidden = !product.imageUrl;
       }
     } else {
+      editingProduct = null;
       if (modalTitle) modalTitle.textContent = 'Nuevo Producto';
       if (productId) productId.value = '';
       form?.reset();
@@ -362,6 +365,37 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     if (productModal?.isConnected) {
       productModal.showModal();
+    }
+  }
+
+  async function updateListItemsCategory(productId, category) {
+    const user = getCurrentUser();
+    if (!user || !productId) return;
+
+    try {
+      const { db } = await import('/js/firebase-config.js');
+      const { collection, getDocs, query, where, updateDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
+
+      const listsRef = collection(db, 'users', user.uid, 'lists');
+      const listsSnap = await getDocs(listsRef);
+
+      const updates = [];
+      for (const listDoc of listsSnap.docs) {
+        const itemsRef = collection(db, 'users', user.uid, 'lists', listDoc.id, 'items');
+        const itemsQuery = query(itemsRef, where('productId', '==', productId));
+        const itemsSnap = await getDocs(itemsQuery);
+        itemsSnap.forEach(itemDoc => {
+          updates.push(updateDoc(doc(db, 'users', user.uid, 'lists', listDoc.id, 'items', itemDoc.id), {
+            category
+          }));
+        });
+      }
+
+      if (updates.length > 0) {
+        await Promise.all(updates);
+      }
+    } catch (error) {
+      console.warn('No se pudieron actualizar las categorías en listas:', error);
     }
   }
 
@@ -434,9 +468,14 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     try {
       let productId = id;
+      const previousCategory = editingProduct?.category || null;
+      const nextCategory = data.category || 'otros';
 
       if (id) {
         await updateProduct(groupId, id, data);
+        if ((previousCategory || 'otros') !== nextCategory) {
+          await updateListItemsCategory(id, nextCategory);
+        }
       } else {
         productId = await createProduct(groupId, data);
       }
