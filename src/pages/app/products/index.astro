@@ -360,7 +360,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       if (removeProductImageBtn) removeProductImageBtn.hidden = true;
     }
 
-    productModal?.showModal();
+    if (productModal?.isConnected) {
+      productModal.showModal();
+    }
   }
 
   function editProduct(id) {
