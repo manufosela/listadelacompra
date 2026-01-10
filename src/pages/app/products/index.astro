@@ -639,10 +639,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   .product-store-inline {
-    display: none;
+    display: block;
     font-size: 0.75rem;
     color: var(--color-text-secondary);
-    margin-left: var(--space-xs);
+    margin-top: 2px;
   }
 
   .product-image-cell {
@@ -697,10 +697,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     .products-table td.product-store,
     .products-table th[data-sort="storeTag"] {
       display: none;
-    }
-
-    .product-store-inline {
-      display: inline-block;
     }
 
     .edit-inline {
