@@ -920,8 +920,8 @@ export class HcShoppingList extends LitElement {
         padding: 0.5rem;
       }
 
-      .items-table .hide-mobile {
-        display: none;
+      .items-table .table-quantity {
+        min-width: 72px;
       }
     }
 
@@ -3260,9 +3260,9 @@ export class HcShoppingList extends LitElement {
             <th class="sortable ${this._sortColumn === 'name' ? 'sorted' : ''}" data-sort="name">
               Nombre ${this._sortColumn === 'name' ? (this._sortDirection === 'asc' ? '↑' : '↓') : ''}
             </th>
-            ${!isAgnostic ? html`<th class="hide-mobile">Cantidad</th>` : ''}
+            ${!isAgnostic ? html`<th class="table-quantity">Cantidad</th>` : ''}
             ${!this.groupByCategory ? html`
-              <th class="hide-mobile sortable ${this._sortColumn === 'category' ? 'sorted' : ''}" data-sort="category">
+              <th class="sortable ${this._sortColumn === 'category' ? 'sorted' : ''}" data-sort="category">
                 Categoría ${this._sortColumn === 'category' ? (this._sortDirection === 'asc' ? '↑' : '↓') : ''}
               </th>
             ` : ''}
@@ -3344,12 +3344,12 @@ export class HcShoppingList extends LitElement {
           ${isChecklist ? html`<span class="sublist-item-qty">(${progress})</span>` : ''}
         </td>
         ${!isAgnostic ? html`
-          <td class="table-quantity hide-mobile">
+          <td class="table-quantity">
             ${item.isChecklist ? '—' : `${item.quantity} ${item.unit}`}
           </td>
         ` : ''}
         ${showCategory ? html`
-          <td class="hide-mobile">
+          <td>
             ${cat ? html`<span>${cat.icon || ''} ${cat.name}</span>` : '—'}
           </td>
         ` : ''}
