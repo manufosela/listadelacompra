@@ -316,7 +316,6 @@ export function openImageCropper(options = {}) {
   const { title = 'Editar imagen', size = 200 } = options;
 
   return new Promise((resolve) => {
-    let imageFile = null;
     let imageElement = null;
     let scale = 1;
     let offsetX = 0;
@@ -423,7 +422,6 @@ export function openImageCropper(options = {}) {
 
     // Cargar imagen
     const loadImage = (file) => {
-      imageFile = file;
       const reader = new FileReader();
 
       reader.onload = (e) => {

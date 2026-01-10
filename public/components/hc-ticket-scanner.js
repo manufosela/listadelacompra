@@ -865,4 +865,6 @@ export class HcTicketScanner extends LitElement {
   }
 }
 
-customElements.define('hc-ticket-scanner', HcTicketScanner);
+if (!customElements.get('hc-ticket-scanner')) {
+  customElements.define('hc-ticket-scanner', HcTicketScanner);
+}

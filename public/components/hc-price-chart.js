@@ -110,4 +110,6 @@ export class HcPriceChart extends LitElement {
   }
 }
 
-customElements.define('hc-price-chart', HcPriceChart);
+if (!customElements.get('hc-price-chart')) {
+  customElements.define('hc-price-chart', HcPriceChart);
+}

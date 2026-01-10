@@ -25,12 +25,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
           Archivadas
           <span id="archived-count" class="tab-badge" hidden>0</span>
         </button>
-        <button id="tab-shared" class="tab">
-          Compartidas
-          <span id="shared-count" class="tab-badge" hidden>0</span>
-        </button>
       </div>
       <div class="view-toggle">
+        <button id="filter-shared" class="view-toggle-btn" title="Solo compartidas" aria-pressed="false">🤝</button>
         <button id="view-grid" class="view-toggle-btn" title="Vista iconos">☷</button>
         <button id="view-list" class="view-toggle-btn active" title="Vista lista">☰</button>
       </div>
@@ -59,9 +56,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
 <script type="module">
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
-  import { getUserLists, getSharedListsForUser, cloneList, deleteList } from '/js/lists.js';
+  import { getUserLists, cloneList, deleteList } from '/js/lists.js';
   import { db } from '/js/firebase-config.js';
-  import { collection, query, onSnapshot, orderBy, doc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+  import { collection, query, onSnapshot, orderBy, doc, updateDoc, serverTimestamp, where } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
   import { toast } from '/js/toast.js';
   import '/components/hc-ticket-scanner.js';
 
@@ -72,30 +69,27 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  function formatDateTime(timestamp) {
-    if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  }
-
   let currentTab = 'mine';
   let viewMode = localStorage.getItem('listsViewMode') || 'list';
+  let showSharedOnly = localStorage.getItem('listsSharedOnly') === 'true';
   let myLists = [];
   let sharedLists = [];
   let unsubscribe = null;
   let currentUser = null;
   let initialized = false;
   let tabsInitialized = false;
+  let sharedRefsUnsub = null;
+  const sharedListUnsubs = new Map();
+  const sharedListsMap = new Map();
 
   function getElements() {
     return {
       container: document.getElementById('lists-container'),
       tabMine: document.getElementById('tab-mine'),
       tabArchived: document.getElementById('tab-archived'),
-      tabShared: document.getElementById('tab-shared'),
       archivedCount: document.getElementById('archived-count'),
-      sharedCount: document.getElementById('shared-count'),
       greeting: document.getElementById('user-greeting'),
+      filterShared: document.getElementById('filter-shared'),
       viewGrid: document.getElementById('view-grid'),
       viewList: document.getElementById('view-list')
     };
@@ -105,12 +99,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     if (tabsInitialized) return;
     tabsInitialized = true;
 
-    const { tabMine, tabArchived, tabShared, viewGrid, viewList } = getElements();
+    const { tabMine, tabArchived, viewGrid, viewList, filterShared } = getElements();
 
     function setActiveTab(tab) {
       tabMine?.classList.remove('active');
       tabArchived?.classList.remove('active');
-      tabShared?.classList.remove('active');
       tab?.classList.add('active');
     }
 
@@ -125,10 +118,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       setActiveTab(tabArchived);
       renderLists();
     });
+    currentTab = 'mine';
 
-    tabShared?.addEventListener('click', () => {
-      currentTab = 'shared';
-      setActiveTab(tabShared);
+    filterShared?.addEventListener('click', () => {
+      showSharedOnly = !showSharedOnly;
+      localStorage.setItem('listsSharedOnly', String(showSharedOnly));
+      filterShared.setAttribute('aria-pressed', String(showSharedOnly));
+      filterShared.classList.toggle('active', showSharedOnly);
       renderLists();
     });
 
@@ -157,26 +153,87 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       viewGrid?.classList.add('active');
       viewList?.classList.remove('active');
     }
+
+    if (filterShared) {
+      filterShared.setAttribute('aria-pressed', String(showSharedOnly));
+      filterShared.classList.toggle('active', showSharedOnly);
+    }
   }
 
-  async function loadSharedLists() {
-    const { sharedCount } = getElements();
+  function clearSharedSubscriptions() {
+    if (sharedRefsUnsub) {
+      sharedRefsUnsub();
+      sharedRefsUnsub = null;
+    }
+    sharedListUnsubs.forEach(unsub => unsub());
+    sharedListUnsubs.clear();
+    sharedListsMap.clear();
+  }
 
-    try {
-      sharedLists = await getSharedListsForUser();
+  function updateSharedLists() {
+    sharedLists = Array.from(sharedListsMap.values());
+    renderLists();
+  }
 
-      if (sharedCount) {
-        if (sharedLists.length > 0) {
-          sharedCount.textContent = sharedLists.length;
-          sharedCount.hidden = false;
-        } else {
-          sharedCount.hidden = true;
+  async function setupSharedListSubscriptions() {
+    clearSharedSubscriptions();
+
+    const groupId = getCurrentGroupId();
+    if (!groupId || !currentUser?.uid) {
+      sharedLists = [];
+      renderLists();
+      return;
+    }
+
+    const refsRef = collection(db, 'groups', groupId, 'sharedListRefs');
+    const refsQuery = query(refsRef, where('members', 'array-contains', currentUser.uid));
+
+    sharedRefsUnsub = onSnapshot(refsQuery, (snapshot) => {
+      const refs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      const refKeys = new Set(refs.map(ref => `${ref.ownerId}:${ref.listId}`));
+
+      // Eliminar listeners que ya no aplican
+      for (const [key, unsub] of sharedListUnsubs.entries()) {
+        if (!refKeys.has(key)) {
+          unsub();
+          sharedListUnsubs.delete(key);
+          sharedListsMap.delete(key);
         }
       }
-    } catch (e) {
-      console.warn('Error loading shared lists:', e);
+
+      // Añadir listeners nuevos
+      refs.forEach((ref) => {
+        const key = `${ref.ownerId}:${ref.listId}`;
+        if (sharedListUnsubs.has(key)) return;
+
+        const listRef = doc(db, 'users', ref.ownerId, 'lists', ref.listId);
+        const unsub = onSnapshot(listRef, (listSnap) => {
+          if (!listSnap.exists()) {
+            sharedListsMap.delete(key);
+            updateSharedLists();
+            return;
+          }
+
+          const listData = listSnap.data();
+          sharedListsMap.set(key, {
+            id: ref.listId,
+            ...listData,
+            ownerId: ref.ownerId,
+            ownerName: ref.ownerName,
+            shared: true
+          });
+          updateSharedLists();
+        });
+
+        sharedListUnsubs.set(key, unsub);
+      });
+
+      updateSharedLists();
+    }, (error) => {
+      console.error('Error loading shared list refs:', error);
       sharedLists = [];
-    }
+      renderLists();
+    });
   }
 
   async function initPage(user) {
@@ -198,8 +255,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     const displayName = user.displayName?.split(' ')[0] || 'Usuario';
     if (greeting) greeting.textContent = `Hola, ${displayName}`;
 
-    // Cargar listas compartidas
-    await loadSharedLists();
+    // Cargar listas compartidas en tiempo real
+    await setupSharedListSubscriptions();
 
     // Primero mostrar datos cacheados de mis listas
     try {
@@ -241,6 +298,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       unsubscribe();
       unsubscribe = null;
     }
+    clearSharedSubscriptions();
     initialized = false;
     tabsInitialized = false;
   });
@@ -253,11 +311,20 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     return list.icon || '🛒';
   }
 
+  function isSharedList(list) {
+    if (!list) return false;
+    if (list.shared) return true;
+    if (list.ownerId === currentUser?.uid && Array.isArray(list.members)) {
+      return list.members.length > 1;
+    }
+    return false;
+  }
+
   // Helper para generar los botones de acción
-  function renderActionButtons(list, isOwner, isSharedTab) {
+  function renderActionButtons(list, isOwner) {
     const isAgnostic = list.listType === 'agnostic';
-    const listId = isSharedTab ? list.listId : list.id;
-    const ownerId = isSharedTab ? list.ownerId : currentUser.uid;
+    const listId = list.id;
+    const ownerId = list.ownerId || currentUser.uid;
 
     let buttons = '';
 
@@ -350,7 +417,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
         try {
           const listRef = doc(db, 'users', ownerId, 'lists', listId);
-          await updateDoc(listRef, { closed: newClosed, updatedAt: serverTimestamp() });
+          await updateDoc(listRef, {
+            closed: newClosed,
+            archivedAt: newClosed ? serverTimestamp() : null,
+            archivedBy: newClosed ? currentUser?.uid : null,
+            updatedAt: serverTimestamp(),
+            updatedBy: currentUser?.uid
+          });
           toast.success(newClosed ? 'Lista archivada' : 'Lista reabierta');
         } catch (error) {
           console.error('Error al archivar:', error);
@@ -395,7 +468,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
             closed: false,
             archivedAt: null,
             archivedBy: null,
-            updatedAt: serverTimestamp()
+            updatedAt: serverTimestamp(),
+            updatedBy: currentUser?.uid
           });
           toast.success('Lista reabierta');
         } catch (error) {
@@ -481,9 +555,33 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     const { container, archivedCount } = getElements();
     if (!container) return;
 
+    const combinedLists = [
+      ...myLists.map(list => ({
+        ...list,
+        ownerId: list.ownerId || currentUser.uid,
+        ownerName: list.ownerName || currentUser.displayName || currentUser.email?.split('@')[0] || 'Usuario',
+        shared: false
+      })),
+      ...sharedLists
+    ];
+
+    const orderedCombinedLists = [...combinedLists].sort((a, b) => {
+      const getTime = (value) => {
+        if (!value) return 0;
+        if (typeof value.toMillis === 'function') return value.toMillis();
+        if (typeof value.toDate === 'function') return value.toDate().getTime();
+        return new Date(value).getTime();
+      };
+      return getTime(b.updatedAt) - getTime(a.updatedAt);
+    });
+
     // Filtrar listas abiertas y cerradas
-    const openLists = myLists.filter(l => !l.closed);
-    const archivedLists = myLists.filter(l => l.closed);
+    const filteredLists = showSharedOnly
+      ? orderedCombinedLists.filter(isSharedList)
+      : orderedCombinedLists;
+
+    const openLists = filteredLists.filter(l => !l.closed);
+    const archivedLists = filteredLists.filter(l => l.closed);
 
     // Actualizar badge de archivadas
     if (archivedCount) {
@@ -496,29 +594,25 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
 
     let lists;
-    if (currentTab === 'mine') {
-      lists = openLists;
-    } else if (currentTab === 'archived') {
+    if (currentTab === 'archived') {
       lists = archivedLists;
     } else {
-      lists = sharedLists;
+      lists = openLists;
     }
 
-    const isSharedTab = currentTab === 'shared';
     const isArchivedTab = currentTab === 'archived';
+    const hasShared = orderedCombinedLists.some(list => list.ownerId && list.ownerId !== currentUser.uid);
 
     if (lists.length === 0) {
       let emptyMessage = 'No tienes listas todavía';
-      if (isSharedTab) {
-        emptyMessage = 'No tienes listas compartidas contigo';
-      } else if (isArchivedTab) {
+      if (isArchivedTab) {
         emptyMessage = 'No tienes listas archivadas';
       }
 
       container.innerHTML = `
         <div class="empty-state">
           <p>${emptyMessage}</p>
-          ${!isSharedTab && !isArchivedTab ? '<a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>' : ''}
+          ${!isArchivedTab ? '<a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>' : ''}
         </div>
       `;
       return;
@@ -535,18 +629,19 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                 <th>Nombre</th>
                 <th>Elementos</th>
                 ${isArchivedTab ? '<th>Creada</th><th>Archivada</th>' : ''}
-                ${isSharedTab ? '<th>Propietario</th>' : ''}
+                ${hasShared ? '<th>Propietario</th>' : ''}
                 <th></th>
               </tr>
             </thead>
             <tbody>
               ${lists.map(list => {
-                const listId = isSharedTab ? list.listId : list.id;
-                const ownerId = isSharedTab ? list.ownerId : currentUser.uid;
-                const isOwner = !isSharedTab;
-                const listUrl = isSharedTab
-                  ? `/app/list?id=${list.listId}&owner=${list.ownerId}`
-                  : `/app/list?id=${list.id}`;
+                const isOwner = list.ownerId === currentUser.uid;
+                const listUrl = isOwner
+                  ? `/app/list?id=${list.id}`
+                  : `/app/list?id=${list.id}&owner=${list.ownerId}`;
+                const sharedBadge = isSharedList(list)
+                  ? `<span class="shared-badge">Compartida</span>`
+                  : '';
 
                 return `
                   <tr>
@@ -555,6 +650,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                       <a href="${listUrl}">
                         ${list.name}
                         ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
+                        ${!isOwner ? `<span class="owner-badge">De ${list.ownerName || 'otra persona'}</span>` : ''}
+                        ${sharedBadge}
                       </a>
                     </td>
                     <td class="count-cell"><a href="${listUrl}">${list.itemCount || 0}</a></td>
@@ -562,8 +659,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                       <td class="date-cell"><a href="${listUrl}">${formatDate(list.createdAt)}</a></td>
                       <td class="date-cell"><a href="${listUrl}">${formatDate(list.archivedAt)}</a></td>
                     ` : ''}
-                    ${isSharedTab ? `<td class="owner-cell"><a href="${listUrl}">${list.ownerName || ''}</a></td>` : ''}
-                    <td class="actions-cell">${renderActionButtons(list, isOwner, isSharedTab)}</td>
+                    ${hasShared ? `<td class="owner-cell"><a href="${listUrl}">${list.ownerName || ''}</a></td>` : ''}
+                    <td class="actions-cell">${renderActionButtons(list, isOwner)}</td>
                   </tr>
                 `;
               }).join('')}
@@ -576,25 +673,31 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       container.innerHTML = `
         <div class="lists-grid">
           ${lists.map(list => {
-            const listId = isSharedTab ? list.listId : list.id;
-            const ownerId = isSharedTab ? list.ownerId : currentUser.uid;
-            const isOwner = !isSharedTab;
-            const listUrl = isSharedTab
-              ? `/app/list?id=${list.listId}&owner=${list.ownerId}`
-              : `/app/list?id=${list.id}`;
+            const isOwner = list.ownerId === currentUser.uid;
+            const listUrl = isOwner
+              ? `/app/list?id=${list.id}`
+              : `/app/list?id=${list.id}&owner=${list.ownerId}`;
+            const sharedBadge = isSharedList(list)
+              ? `<span class="shared-badge">Compartida</span>`
+              : '';
 
             return `
               <div class="list-card-wrapper">
                 <a href="${listUrl}" class="list-card">
                   <div class="list-card-icon">${renderIcon(list)}</div>
                   <div class="list-card-name">${list.name}</div>
-                  ${isSharedTab ? `
+                  ${!isOwner ? `
                     <div class="list-card-owner">
                       <span class="owner-badge">De ${list.ownerName}</span>
                     </div>
                   ` : ''}
+                  ${sharedBadge ? `
+                    <div class="list-card-owner">
+                      ${sharedBadge}
+                    </div>
+                  ` : ''}
                   <div class="list-card-meta">
-                    ${!isSharedTab && !isArchivedTab ? `<span>${list.itemCount || 0} elementos</span>` : ''}
+                    ${!isArchivedTab ? `<span>${list.itemCount || 0} elementos</span>` : ''}
                     ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
                   </div>
                   ${isArchivedTab ? `
@@ -604,7 +707,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                     </div>
                   ` : ''}
                 </a>
-                ${renderActionButtons(list, isOwner, isSharedTab)}
+                ${renderActionButtons(list, isOwner)}
               </div>
             `;
           }).join('')}
@@ -684,6 +787,15 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     background: var(--color-bg);
     color: var(--color-primary);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .shared-badge {
+    font-size: var(--font-size-xs);
+    color: #0f766e;
+    background: rgba(13, 148, 136, 0.12);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    margin-left: var(--space-xs);
   }
 
   .tab {

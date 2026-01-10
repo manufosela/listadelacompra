@@ -753,4 +753,6 @@ export class HcCategoriesManager extends LitElement {
   }
 }
 
-customElements.define('hc-categories-manager', HcCategoriesManager);
+if (!customElements.get('hc-categories-manager')) {
+  customElements.define('hc-categories-manager', HcCategoriesManager);
+}

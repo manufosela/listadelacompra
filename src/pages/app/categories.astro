@@ -34,8 +34,6 @@ import AppLayout from '../../layouts/AppLayout.astro';
   import { getCurrentGroupId, getGroup } from '/js/group.js';
 
   let currentTab = 'shopping';
-  let currentUser = null;
-  let currentGroup = null;
 
   function getElements() {
     return {
@@ -68,10 +66,9 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   async function initPage(user) {
-    currentUser = user;
     const groupId = getCurrentGroupId();
     if (groupId) {
-      currentGroup = await getGroup(groupId);
+      await getGroup(groupId);
     }
 
     const { manager } = getElements();

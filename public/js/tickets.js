@@ -4,7 +4,7 @@
  */
 
 import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js';
-import { db, functions, storage } from './firebase-config.js';
+import { db, functions } from './firebase-config.js';
 import {
   collection,
   doc,
@@ -92,7 +92,7 @@ export async function processTicket({ imageFile, groupId, listId, userId }) {
  * @param {Array} params.listItems - Items actuales de la lista
  * @param {Object} params.ticketMeta - Metadata del ticket (store, date, total)
  */
-export async function applyTicketToList({ userId, listId, ticketItems, listItems, ticketMeta }) {
+export async function applyTicketToList({ userId, listId, ticketItems, listItems: _listItems, ticketMeta }) {
   const itemsRef = collection(db, 'users', userId, 'lists', listId, 'items');
   const listRef = doc(db, 'users', userId, 'lists', listId);
 

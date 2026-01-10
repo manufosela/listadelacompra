@@ -58,15 +58,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 <script type="module">
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
   import { toast } from '/js/toast.js';
-  import {
-    getUserGroups,
-    getCurrentGroupId,
-    setCurrentGroup,
-    createGroup,
-    getPendingInvitations,
-    acceptInvitation,
-    rejectInvitation
-  } from '/js/group.js';
+  import { getUserGroups, getCurrentGroupId, setCurrentGroup, createGroup, getPendingInvitations, acceptInvitation, rejectInvitation } from '/js/group.js';
   import { navigateTo } from '/js/navigate.js';
 
   let currentGroupId = null;

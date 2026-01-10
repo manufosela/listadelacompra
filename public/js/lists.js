@@ -21,7 +21,7 @@ import {
   writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { getCurrentGroupId } from './group.js';
-import { getCachedOrFetch, setInCache, invalidateCache } from './cache.js';
+import { getCachedOrFetch, invalidateCache } from './cache.js';
 
 /**
  * Obtiene las listas del usuario (con cache)

@@ -416,4 +416,6 @@ export class HcGroupSelector extends LitElement {
   }
 }
 
-customElements.define('hc-group-selector', HcGroupSelector);
+if (!customElements.get('hc-group-selector')) {
+  customElements.define('hc-group-selector', HcGroupSelector);
+}

@@ -196,3 +196,57 @@ export async function deleteListIcon(listId) {
     }
   }
 }
+
+/**
+ * Sube una imagen para un producto
+ * @param {File} file - Archivo de imagen
+ * @param {string} groupId - ID del grupo
+ * @param {string} productId - ID del producto
+ * @returns {Promise<string>} URL de descarga de la imagen
+ */
+export async function uploadProductImage(file, groupId, productId) {
+  if (!file) throw new Error('No se proporcionó archivo');
+  if (!groupId || !productId) throw new Error('Faltan IDs para subir la imagen');
+
+  // Validar tipo de archivo
+  const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!validTypes.includes(file.type)) {
+    throw new Error('Tipo de archivo no válido. Usa JPG, PNG, GIF o WebP.');
+  }
+
+  // Validar tamaño (máximo 2MB)
+  const maxSize = 2 * 1024 * 1024;
+  if (file.size > maxSize) {
+    throw new Error('La imagen es demasiado grande. Máximo 2MB.');
+  }
+
+  const resized = await cropSquareImage(file, 400);
+  const fileName = `product-images/${groupId}/${productId}.webp`;
+  const storageRef = ref(storage, fileName);
+
+  const snapshot = await uploadBytes(storageRef, resized, {
+    contentType: 'image/webp'
+  });
+
+  return getDownloadURL(snapshot.ref);
+}
+
+/**
+ * Elimina la imagen de un producto
+ * @param {string} groupId - ID del grupo
+ * @param {string} productId - ID del producto
+ * @returns {Promise<void>}
+ */
+export async function deleteProductImage(groupId, productId) {
+  if (!groupId || !productId) throw new Error('Faltan IDs para eliminar la imagen');
+
+  const fileName = `product-images/${groupId}/${productId}.webp`;
+  const storageRef = ref(storage, fileName);
+  try {
+    await deleteObject(storageRef);
+  } catch (error) {
+    if (error.code !== 'storage/object-not-found') {
+      throw error;
+    }
+  }
+}

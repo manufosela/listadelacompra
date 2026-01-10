@@ -230,4 +230,6 @@ export class HcStatsDashboard extends LitElement {
   }
 }
 
-customElements.define('hc-stats-dashboard', HcStatsDashboard);
+if (!customElements.get('hc-stats-dashboard')) {
+  customElements.define('hc-stats-dashboard', HcStatsDashboard);
+}

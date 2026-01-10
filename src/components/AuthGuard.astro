@@ -9,10 +9,6 @@
  * - Si no hay usuario: redirige a login
  */
 
-interface Props {
-  redirectTo?: string;
-}
-
 const { redirectTo = '/login' } = Astro.props;
 ---
 

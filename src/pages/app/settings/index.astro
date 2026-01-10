@@ -72,8 +72,35 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       </button>
     </section>
 
-    <!-- Versión -->
-    <p class="app-version">MyHomeCart v1.1.3</p>
+    <!-- Sobre la app -->
+    <section class="settings-section">
+      <h2>Acerca de</h2>
+      <div class="settings-list">
+        <div class="settings-item">
+          <div class="item-content">
+            <span class="item-icon">📱</span>
+            <div class="card-details">
+              <span class="card-title">Versión</span>
+              <span class="card-subtitle" id="app-version-info">Cargando...</span>
+            </div>
+          </div>
+        </div>
+        <div class="settings-item clickable" id="check-updates-btn">
+          <div class="item-content">
+            <span class="item-icon">🔄</span>
+            <span class="item-label">Buscar actualizaciones</span>
+          </div>
+          <span class="card-arrow">›</span>
+        </div>
+        <div class="settings-item clickable" id="force-refresh-btn">
+          <div class="item-content">
+            <span class="item-icon">🗑️</span>
+            <span class="item-label">Limpiar caché y recargar</span>
+          </div>
+          <span class="card-arrow">›</span>
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- Modal para editar perfil -->
@@ -156,7 +183,113 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
   }
 
+  // Mostrar versión actual
+  function showVersionInfo() {
+    const versionInfo = document.getElementById('app-version-info');
+    if (versionInfo) {
+      const version = window.APP_VERSION || '?';
+      const hash = window.BUILD_HASH || '?';
+      versionInfo.textContent = `v${version} (${hash})`;
+    }
+  }
+
+  // Función para limpiar caches y recargar (copiada de BaseLayout para acceso directo)
+  async function clearCachesAndReload() {
+    const btn = document.getElementById('force-refresh-btn');
+    if (btn) {
+      btn.querySelector('.item-label').textContent = 'Limpiando...';
+    }
+
+    // 1. Limpiar Cache API
+    if ('caches' in window) {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      } catch (e) {
+        console.warn('[Settings] Error limpiando Cache API:', e);
+      }
+    }
+
+    // 2. Desregistrar Service Workers
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(r => r.unregister()));
+      } catch (e) {
+        console.warn('[Settings] Error desregistrando SW:', e);
+      }
+    }
+
+    // 3. Limpiar localStorage de versión para forzar recarga
+    localStorage.removeItem('app_build_hash');
+
+    // 4. Forzar recarga con URL nueva
+    const url = new URL(window.location.origin + '/app/settings');
+    url.searchParams.set('_refresh', Date.now().toString());
+    window.location.replace(url.toString());
+  }
+
+  // Verificar si hay actualizaciones
+  async function checkForUpdates() {
+    const btn = document.getElementById('check-updates-btn');
+    const originalText = btn?.querySelector('.item-label')?.textContent;
+
+    if (btn) {
+      btn.querySelector('.item-label').textContent = 'Verificando...';
+    }
+
+    try {
+      const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('No se pudo verificar');
+
+      const data = await res.json();
+      const currentHash = window.BUILD_HASH;
+
+      if (data.hash && data.hash !== currentHash) {
+        toast.success('Nueva versión disponible. Actualizando...');
+        setTimeout(() => clearCachesAndReload(), 1000);
+      } else {
+        toast.success('Ya tienes la última versión');
+        if (btn) {
+          btn.querySelector('.item-label').textContent = originalText;
+        }
+      }
+    } catch (error) {
+      toast.error('Error al verificar: ' + error.message);
+      if (btn) {
+        btn.querySelector('.item-label').textContent = originalText;
+      }
+    }
+  }
+
   function setupEventListeners() {
+    // Version info
+    showVersionInfo();
+
+    // Check updates button
+    const checkUpdatesBtn = document.getElementById('check-updates-btn');
+    if (checkUpdatesBtn && !checkUpdatesBtn.dataset.initialized) {
+      checkUpdatesBtn.dataset.initialized = 'true';
+      checkUpdatesBtn.addEventListener('click', checkForUpdates);
+    }
+
+    // Force refresh button
+    const forceRefreshBtn = document.getElementById('force-refresh-btn');
+    if (forceRefreshBtn && !forceRefreshBtn.dataset.initialized) {
+      forceRefreshBtn.dataset.initialized = 'true';
+      forceRefreshBtn.addEventListener('click', async () => {
+        const confirmed = await modal.confirm({
+          title: 'Limpiar caché',
+          message: 'Esto limpiará todos los datos en caché y recargará la aplicación. ¿Continuar?',
+          confirmText: 'Limpiar y recargar',
+          cancelText: 'Cancelar'
+        });
+        if (confirmed) {
+          clearCachesAndReload();
+        }
+      });
+    }
+
     // Dark mode toggle
     const darkModeCheckbox = document.getElementById('dark-mode-checkbox');
     if (darkModeCheckbox && !darkModeCheckbox.dataset.initialized) {
@@ -378,6 +511,19 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .settings-item:not(:last-child) {
     border-bottom: 1px solid var(--color-border);
+  }
+
+  .settings-item.clickable {
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .settings-item.clickable:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .settings-item.clickable:active {
+    background: var(--color-border);
   }
 
   .item-content {

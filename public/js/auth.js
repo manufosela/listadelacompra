@@ -28,7 +28,7 @@ import {
   updateDoc,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
-import { getFromCache, setInCache, invalidateCache, clearAllCache } from './cache.js';
+import { setInCache, invalidateCache, clearAllCache } from './cache.js';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -39,15 +39,6 @@ googleProvider.addScope('profile');
 let authResolved = false;
 let currentUser = null;
 let authReadyFired = false;
-
-/**
- * Detecta si el navegador es móvil
- * @returns {boolean}
- */
-function isMobileDevice() {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    (navigator.maxTouchPoints > 0 && window.innerWidth < 768);
-}
 
 /**
  * Inicia sesión con Google
@@ -67,12 +58,11 @@ export async function signInWithGoogle() {
     return user;
   } catch (error) {
     // Si el popup falla, usar redirect como fallback
-    if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-      console.log('Popup falló, usando redirect como fallback...');
+    if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
       await signInWithRedirect(auth, googleProvider);
       return null;
     }
-    console.error('Error signing in with Google:', error);
+    console.error('[Auth] Error signing in with Google:', error);
     throw error;
   }
 }
@@ -91,7 +81,7 @@ export async function handleGoogleRedirectResult() {
     }
     return null;
   } catch (error) {
-    console.error('Error processing Google redirect:', error);
+    console.error('[Auth] Error processing Google redirect:', error.code, error.message);
     throw error;
   }
 }
@@ -203,7 +193,6 @@ async function createOrUpdateUserProfile(user) {
       createdAt: serverTimestamp(),
       groupIds: []
     });
-    console.log('User profile created');
   } else {
     // Actualizar datos que pueden haber cambiado
     await updateDoc(userRef, {

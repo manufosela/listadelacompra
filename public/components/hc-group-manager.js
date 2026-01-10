@@ -392,4 +392,6 @@ export class HcMemberManager extends LitElement {
   }
 }
 
-customElements.define('hc-group-manager', HcMemberManager);
+if (!customElements.get('hc-group-manager')) {
+  customElements.define('hc-group-manager', HcMemberManager);
+}

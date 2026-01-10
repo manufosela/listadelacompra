@@ -349,4 +349,6 @@ export class HcProductSearch extends LitElement {
   }
 }
 
-customElements.define('hc-product-search', HcProductSearch);
+if (!customElements.get('hc-product-search')) {
+  customElements.define('hc-product-search', HcProductSearch);
+}

@@ -1,4 +1,5 @@
 import { LitElement, html, css } from '/js/vendor/lit.bundle.js';
+import { UNITS } from '/js/db.js';
 
 export class HcListItem extends LitElement {
   static properties = {
@@ -10,7 +11,9 @@ export class HcListItem extends LitElement {
     expanded: { type: Boolean, state: true },
     showAssignMenu: { type: Boolean, state: true },
     showChecklist: { type: Boolean, state: true },
-    newChecklistItem: { type: String, state: true }
+    newChecklistItem: { type: String, state: true },
+    newChecklistItemQuantity: { type: Number, state: true },
+    newChecklistItemUnit: { type: String, state: true }
   };
 
   static styles = css`
@@ -72,6 +75,19 @@ export class HcListItem extends LitElement {
       font-size: 0.9375rem;
       white-space: normal;
       line-height: 1.3;
+    }
+
+    .item-image {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid #e2e8f0;
+    }
+
+    .item-image.card {
+      width: 36px;
+      height: 36px;
     }
 
     .item.card .item-quantity {
@@ -489,6 +505,13 @@ export class HcListItem extends LitElement {
       color: #94a3b8;
     }
 
+    .checklist-item-qty {
+      font-size: 0.8125rem;
+      color: #64748b;
+      margin-left: 0.5rem;
+      white-space: nowrap;
+    }
+
     .checklist-item-remove {
       width: 20px;
       height: 20px;
@@ -529,6 +552,24 @@ export class HcListItem extends LitElement {
       font-size: 0.875rem;
       background: white;
       color: #1e293b;
+    }
+
+    .checklist-add-qty,
+    .checklist-add-unit {
+      padding: 0.375rem 0.5rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+      background: white;
+      color: #1e293b;
+    }
+
+    .checklist-add-qty {
+      width: 70px;
+    }
+
+    .checklist-add-unit {
+      width: 120px;
     }
 
     .checklist-add-input::placeholder {
@@ -748,6 +789,13 @@ export class HcListItem extends LitElement {
       .checklist-add-input::placeholder {
         color: #64748b;
       }
+
+      .checklist-add-qty,
+      .checklist-add-unit {
+        background: #0f172a;
+        color: #f1f5f9;
+        border-color: #334155;
+      }
     }
   `;
 
@@ -757,6 +805,8 @@ export class HcListItem extends LitElement {
     this.showAssignMenu = false;
     this.showChecklist = false;
     this.newChecklistItem = '';
+    this.newChecklistItemQuantity = 1;
+    this.newChecklistItemUnit = 'unidad';
     this.members = [];
     this.mode = 'shopping';
     this.listType = 'shopping';
@@ -909,6 +959,18 @@ export class HcListItem extends LitElement {
     }));
   }
 
+  _handleChecklistItemUpdate(index, updates) {
+    this.dispatchEvent(new CustomEvent('checklist-update', {
+      detail: {
+        itemId: this.item.id,
+        checklistIndex: index,
+        ...updates
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
+
   _handleNewChecklistItemChange(e) {
     this.newChecklistItem = e.target.value;
   }
@@ -923,20 +985,30 @@ export class HcListItem extends LitElement {
   _addChecklistItem() {
     if (!this.newChecklistItem.trim()) return;
 
+    const detail = {
+      itemId: this.item.id,
+      text: this.newChecklistItem.trim()
+    };
+
+    if (this.listType === 'shopping') {
+      detail.quantity = this.newChecklistItemQuantity || 1;
+      detail.unit = this.newChecklistItemUnit || 'unidad';
+    }
+
     this.dispatchEvent(new CustomEvent('checklist-add', {
-      detail: {
-        itemId: this.item.id,
-        text: this.newChecklistItem.trim()
-      },
+      detail,
       bubbles: true,
       composed: true
     }));
 
     this.newChecklistItem = '';
+    this.newChecklistItemQuantity = 1;
+    this.newChecklistItemUnit = 'unidad';
   }
 
   _renderChecklistItems() {
     const isEditMode = this.mode === 'edit';
+    const isShoppingList = this.listType === 'shopping';
     const checklist = this.item.checklist || [];
 
     return html`
@@ -953,7 +1025,37 @@ export class HcListItem extends LitElement {
             >
               ${item.checked ? '✓' : ''}
             </div>
-            <span class="checklist-item-text ${item.checked ? 'checked' : ''}">${item.text}</span>
+            ${isEditMode ? html`
+              <input
+                type="text"
+                class="checklist-add-input"
+                .value=${item.text}
+                @change=${(e) => this._handleChecklistItemUpdate(index, { text: e.target.value })}
+              />
+              ${isShoppingList ? html`
+                <input
+                  type="number"
+                  min="1"
+                  class="checklist-add-qty"
+                  .value=${item.quantity ?? 1}
+                  @change=${(e) => this._handleChecklistItemUpdate(index, { quantity: e.target.value })}
+                />
+                <select
+                  class="checklist-add-unit"
+                  .value=${item.unit || 'unidad'}
+                  @change=${(e) => this._handleChecklistItemUpdate(index, { unit: e.target.value })}
+                >
+                  ${UNITS.map(unit => html`
+                    <option value="${unit.id}">${unit.name}</option>
+                  `)}
+                </select>
+              ` : ''}
+            ` : html`
+              <span class="checklist-item-text ${item.checked ? 'checked' : ''}">${item.text}</span>
+              ${isShoppingList ? html`
+                <span class="checklist-item-qty">${item.quantity ?? 1} ${item.unit || 'unidad'}</span>
+              ` : ''}
+            `}
             ${isEditMode ? html`
               <button
                 class="checklist-item-remove"
@@ -977,6 +1079,24 @@ export class HcListItem extends LitElement {
             @input=${this._handleNewChecklistItemChange}
             @keydown=${this._handleNewChecklistItemKeydown}
           />
+          ${isShoppingList ? html`
+            <input
+              type="number"
+              min="1"
+              class="checklist-add-qty"
+              .value=${this.newChecklistItemQuantity}
+              @input=${(e) => this.newChecklistItemQuantity = parseInt(e.target.value) || 1}
+            />
+            <select
+              class="checklist-add-unit"
+              .value=${this.newChecklistItemUnit}
+              @change=${(e) => this.newChecklistItemUnit = e.target.value}
+            >
+              ${UNITS.map(unit => html`
+                <option value="${unit.id}">${unit.name}</option>
+              `)}
+            </select>
+          ` : ''}
           <button
             class="checklist-add-btn"
             @click=${this._addChecklistItem}
@@ -998,53 +1118,51 @@ export class HcListItem extends LitElement {
     const isShoppingMode = this.mode === 'shopping';
     const isEditMode = this.mode === 'edit';
     const isAgnosticList = this.listType === 'agnostic';
+    const priorityClass = item.priority ? `priority-${item.priority}` : '';
+    const checklistState = this._getChecklistState();
+    const hasChecklist = this._hasChecklist();
+    const isChecklist = item.isChecklist && hasChecklist;
+
+    // Si es una sublista, usar details/summary (para cualquier tipo de lista)
+    if (isChecklist) {
+      const progressClass = checklistState.checked ? 'complete' : (checklistState.indeterminate ? 'partial' : '');
+
+      return html`
+        <div class="item-checklist ${isAgnosticList ? priorityClass : ''}">
+          <details>
+            <summary>
+              <div class="summary-content">
+                <span class="summary-name">${item.name}</span>
+                ${isAgnosticList && item.priority ? html`
+                  <span class="priority-badge ${item.priority}">
+                    ${this._getPriorityLabel(item.priority)}
+                  </span>
+                ` : ''}
+                <span class="summary-progress ${progressClass}">
+                  ${this._getChecklistProgress()}
+                </span>
+              </div>
+              ${isEditMode ? html`
+                <div class="summary-actions">
+                  <button class="action-btn" @click=${(e) => { e.preventDefault(); this._handleEdit(); }} title="Editar">
+                    ✏️
+                  </button>
+                  <button class="action-btn danger" @click=${(e) => { e.preventDefault(); this._handleRemove(); }} title="Eliminar">
+                    🗑️
+                  </button>
+                </div>
+              ` : ''}
+            </summary>
+            <div class="checklist-content">
+              ${this._renderChecklistItems()}
+            </div>
+          </details>
+        </div>
+      `;
+    }
 
     // Render para listas agnósticas
     if (isAgnosticList) {
-      const priorityClass = item.priority ? `priority-${item.priority}` : '';
-      const checklistState = this._getChecklistState();
-      const hasChecklist = this._hasChecklist();
-      const isChecklist = item.isChecklist && hasChecklist;
-
-      // Si es una sublista, usar details/summary
-      if (isChecklist) {
-        const progressClass = checklistState.checked ? 'complete' : (checklistState.indeterminate ? 'partial' : '');
-
-        return html`
-          <div class="item-checklist ${priorityClass}">
-            <details>
-              <summary>
-                <div class="summary-content">
-                  <span class="summary-name">${item.name}</span>
-                  ${item.priority ? html`
-                    <span class="priority-badge ${item.priority}">
-                      ${this._getPriorityLabel(item.priority)}
-                    </span>
-                  ` : ''}
-                  <span class="summary-progress ${progressClass}">
-                    ${this._getChecklistProgress()}
-                  </span>
-                </div>
-                ${isEditMode ? html`
-                  <div class="summary-actions">
-                    <button class="action-btn" @click=${(e) => { e.preventDefault(); this._handleEdit(); }} title="Editar">
-                      ✏️
-                    </button>
-                    <button class="action-btn danger" @click=${(e) => { e.preventDefault(); this._handleRemove(); }} title="Eliminar">
-                      🗑️
-                    </button>
-                  </div>
-                ` : ''}
-              </summary>
-              <div class="checklist-content">
-                ${this._renderChecklistItems()}
-              </div>
-            </details>
-          </div>
-        `;
-      }
-
-      // Si es un item normal, usar checkbox
       return html`
         <div
           class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass} ${isShoppingMode ? 'clickable' : ''} ${this.card ? 'card' : ''}"
@@ -1139,6 +1257,7 @@ export class HcListItem extends LitElement {
     }
 
     // Render para listas de compra (comportamiento original)
+    const productImageUrl = item.productImageUrl || item.imageUrl || null;
     return html`
       <div
         class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''} ${this.card ? 'card' : ''}"
@@ -1161,6 +1280,9 @@ export class HcListItem extends LitElement {
 
         <div class="item-content">
           <div class="item-main">
+            ${productImageUrl ? html`
+              <img class="item-image ${this.card ? 'card' : ''}" src="${productImageUrl}" alt="">
+            ` : ''}
             <span class="item-name">${item.name || item.productName}</span>
             <span class="item-quantity">
               ${item.quantity} ${item.unit}
@@ -1243,4 +1365,6 @@ export class HcListItem extends LitElement {
   }
 }
 
-customElements.define('hc-list-item', HcListItem);
+if (!customElements.get('hc-list-item')) {
+  customElements.define('hc-list-item', HcListItem);
+}

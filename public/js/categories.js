@@ -12,7 +12,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  setDoc,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -231,7 +230,7 @@ export async function deleteGroupCategory(groupId, categoryId) {
  * @param {string} categoryId
  * @returns {Promise<number>}
  */
-export async function countItemsWithCategory(userId, categoryId) {
+export async function countItemsWithCategory(_userId, _categoryId) {
   // Esta función se implementa en el componente porque requiere
   // iterar sobre las listas del usuario y sus items
   // Aquí dejamos un placeholder

@@ -447,7 +447,6 @@ export async function migrateUserProductsToCatalog(userId, groupId) {
       }
     }
 
-    console.log('✅ Migración completada:', stats);
     return stats;
   } catch (error) {
     console.error('Error en migración:', error);

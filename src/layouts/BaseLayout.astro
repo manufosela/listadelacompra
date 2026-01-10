@@ -1,17 +1,18 @@
 ---
 import { ViewTransitions } from 'astro:transitions';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
-interface Props {
-  title: string;
-  description?: string;
-  image?: string;
-  type?: string;
-}
-
-// Versión para cache busting de assets estáticos (leída de package.json)
+// Versión para cache busting de assets estáticos
 const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
 const APP_VERSION = pkg.version;
+
+// Hash de build para cache busting más agresivo (cambia si cualquier JS/CSS cambia)
+let BUILD_HASH = APP_VERSION;
+if (existsSync('public/version.json')) {
+  const versionData = JSON.parse(readFileSync('public/version.json', 'utf-8'));
+  BUILD_HASH = versionData.hash || APP_VERSION;
+}
+const CACHE_BUSTER = `v=${APP_VERSION}&h=${BUILD_HASH}`;
 
 const {
   title,
@@ -32,8 +33,100 @@ const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopp
     <meta charset="UTF-8" />
     <!-- Versión de la app para cache busting -->
     <meta name="app-version" content={APP_VERSION} />
-    <script is:inline define:vars={{ APP_VERSION }}>
+    <meta name="build-hash" content={BUILD_HASH} />
+    <script is:inline define:vars={{ APP_VERSION, BUILD_HASH, CACHE_BUSTER }}>
       window.APP_VERSION = APP_VERSION;
+      window.BUILD_HASH = BUILD_HASH;
+      window.CACHE_BUSTER = CACHE_BUSTER;
+
+      // Sistema agresivo de cache busting
+      (function checkVersion() {
+        const STORAGE_KEY = 'app_build_hash';
+        const RELOAD_KEY = 'app_reload_pending';
+        const storedHash = localStorage.getItem(STORAGE_KEY);
+
+        // Función para limpiar todos los caches y recargar
+        async function clearCachesAndReload() {
+          // 1. Limpiar Cache API (usado por Service Workers y fetch)
+          if ('caches' in window) {
+            try {
+              const cacheNames = await caches.keys();
+              await Promise.all(cacheNames.map(name => caches.delete(name)));
+            } catch (e) {
+              console.warn('[VersionCheck] Error limpiando Cache API:', e);
+            }
+          }
+
+          // 2. Desregistrar Service Workers si existen
+          if ('serviceWorker' in navigator) {
+            try {
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(registrations.map(r => r.unregister()));
+            } catch (e) {
+              console.warn('[VersionCheck] Error desregistrando SW:', e);
+            }
+          }
+
+          // 3. Marcar que ya recargamos para evitar loop infinito
+          localStorage.setItem(RELOAD_KEY, 'true');
+
+          // 4. Forzar recarga navegando a URL con timestamp (bypasa cache de navegación)
+          const url = new URL(window.location.href);
+          url.searchParams.set('_refresh', Date.now().toString());
+          window.location.replace(url.toString());
+        }
+
+        // Si venimos de un reload forzado, limpiar el flag y quitar el param de URL
+        const reloadPending = localStorage.getItem(RELOAD_KEY);
+        if (reloadPending) {
+          localStorage.removeItem(RELOAD_KEY);
+          // Limpiar el query param _refresh de la URL sin recargar
+          const url = new URL(window.location.href);
+          if (url.searchParams.has('_refresh')) {
+            url.searchParams.delete('_refresh');
+            history.replaceState(null, '', url.pathname + url.search + url.hash);
+          }
+          return;
+        }
+
+        // Si es la primera visita, guardar hash y continuar
+        if (!storedHash) {
+          localStorage.setItem(STORAGE_KEY, BUILD_HASH);
+          return;
+        }
+
+        // Si el hash cambió, limpiar caches y recargar
+        if (storedHash !== BUILD_HASH) {
+          localStorage.setItem(STORAGE_KEY, BUILD_HASH);
+          clearCachesAndReload();
+          return;
+        }
+
+        // Verificar periódicamente con el servidor
+        async function checkServerVersion() {
+          try {
+            const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.hash && data.hash !== BUILD_HASH) {
+              localStorage.setItem(STORAGE_KEY, data.hash);
+              clearCachesAndReload();
+            }
+          } catch {
+            // Ignorar errores de red
+          }
+        }
+
+        // Verificar al volver a la pestaña
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            checkServerVersion();
+          }
+        });
+
+        // Verificar cada 5 minutos
+        setInterval(checkServerVersion, 5 * 60 * 1000);
+      })();
     </script>
 
     <!-- Script inline para evitar flash de tema incorrecto -->
@@ -95,16 +188,16 @@ const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopp
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
 
-    <!-- CSS (con cache busting) -->
-    <link rel="stylesheet" href={`/css/reset.css?v=${APP_VERSION}`} />
-    <link rel="stylesheet" href={`/css/variables.css?v=${APP_VERSION}`} />
-    <link rel="stylesheet" href={`/css/global.css?v=${APP_VERSION}`} />
-    <link rel="stylesheet" href={`/css/components.css?v=${APP_VERSION}`} />
+    <!-- CSS (con cache busting usando hash de build) -->
+    <link rel="stylesheet" href={`/css/reset.css?${CACHE_BUSTER}`} />
+    <link rel="stylesheet" href={`/css/variables.css?${CACHE_BUSTER}`} />
+    <link rel="stylesheet" href={`/css/global.css?${CACHE_BUSTER}`} />
+    <link rel="stylesheet" href={`/css/components.css?${CACHE_BUSTER}`} />
 
     <!-- Firebase -->
-    <script type="module" src={`/js/firebase-config.js?v=${APP_VERSION}`}></script>
+    <script type="module" src={`/js/firebase-config.js?${CACHE_BUSTER}`}></script>
     <!-- Sistema de temas -->
-    <script type="module" src={`/js/theme.js?v=${APP_VERSION}`}></script>
+    <script type="module" src={`/js/theme.js?${CACHE_BUSTER}`}></script>
 
     <!-- View Transitions para navegación fluida tipo SPA -->
     <ViewTransitions />

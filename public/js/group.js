@@ -23,7 +23,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js';
 import { functions } from './firebase-config.js';
-import { getCachedOrFetch, setInCache, invalidateCache, invalidateNamespace } from './cache.js';
+import { getCachedOrFetch, invalidateCache } from './cache.js';
 
 
 /**

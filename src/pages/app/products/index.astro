@@ -38,6 +38,20 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         <select id="product-category"></select>
       </div>
 
+      <div class="form-group">
+        <label for="product-image">Foto</label>
+        <div class="product-image-row">
+          <div class="product-image-preview" id="product-image-preview">
+            <span>Sin foto</span>
+          </div>
+          <div class="product-image-actions">
+            <input type="file" id="product-image" accept="image/*" />
+            <button type="button" class="btn btn-ghost" id="remove-product-image" hidden>Quitar foto</button>
+          </div>
+        </div>
+        <small class="form-hint">JPG/PNG/WebP, máximo 2MB</small>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="cancel-modal">Cancelar</button>
         <button type="button" class="btn btn-danger" id="delete-product" hidden>Eliminar</button>
@@ -54,6 +68,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { getAllProducts, createProduct, updateProduct, deleteProduct } from '/js/db.js';
   import { getCurrentGroupId } from '/js/group.js';
   import { getCategoriesForList } from '/js/categories.js';
+  import { uploadProductImage, deleteProductImage } from '/js/storage.js';
 
   let allProducts = [];
   let allCategories = []; // Incluye default + custom
@@ -61,6 +76,36 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   let sortDirection = localStorage.getItem('productsSortDirection') || 'asc';
   const productModal = document.getElementById('product-modal');
   const productCategory = document.getElementById('product-category');
+  const productImageInput = document.getElementById('product-image');
+  const productImagePreview = document.getElementById('product-image-preview');
+  const removeProductImageBtn = document.getElementById('remove-product-image');
+  let selectedImageFile = null;
+  let removeImage = false;
+  let previewUrl = null;
+
+  function resetImageState() {
+    selectedImageFile = null;
+    removeImage = false;
+    if (productImageInput) productImageInput.value = '';
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+    }
+  }
+
+  function setImagePreview(url) {
+    if (!productImagePreview) return;
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+    }
+
+    if (url) {
+      productImagePreview.innerHTML = `<img src="${url}" alt="Foto del producto" />`;
+    } else {
+      productImagePreview.innerHTML = '<span>Sin foto</span>';
+    }
+  }
 
   async function loadCategories(groupId) {
     try {
@@ -174,6 +219,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       <table class="products-table">
         <thead>
           <tr>
+            <th>Foto</th>
             <th class="sortable" data-sort="name">
               Producto ${getSortIcon('name')}
             </th>
@@ -186,6 +232,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         <tbody>
           ${sorted.map(p => `
             <tr data-id="${p.id}">
+              <td class="product-image-cell">
+                ${p.imageUrl ? `<img class="product-thumb" src="${p.imageUrl}" alt="">` : '<span class="product-thumb-placeholder">—</span>'}
+              </td>
               <td class="product-name">${p.name}</td>
               <td class="product-category">${getCategoryDisplay(p.category)}</td>
               <td class="product-actions">
@@ -225,11 +274,19 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       if (productName) productName.value = product.name;
       if (prodCategory) prodCategory.value = product.category || '';
       if (deleteBtn) deleteBtn.hidden = false;
+      resetImageState();
+      setImagePreview(product.imageUrl || '');
+      if (removeProductImageBtn) {
+        removeProductImageBtn.hidden = !product.imageUrl;
+      }
     } else {
       if (modalTitle) modalTitle.textContent = 'Nuevo Producto';
       if (productId) productId.value = '';
       form?.reset();
       if (deleteBtn) deleteBtn.hidden = true;
+      resetImageState();
+      setImagePreview('');
+      if (removeProductImageBtn) removeProductImageBtn.hidden = true;
     }
 
     productModal?.showModal();
@@ -266,6 +323,24 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   document.getElementById('add-product-btn')?.addEventListener('click', () => openModal());
   document.getElementById('cancel-modal')?.addEventListener('click', () => productModal?.close());
 
+  productImageInput?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    selectedImageFile = file;
+    removeImage = false;
+    previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+    if (removeProductImageBtn) removeProductImageBtn.hidden = false;
+  });
+
+  removeProductImageBtn?.addEventListener('click', () => {
+    selectedImageFile = null;
+    removeImage = true;
+    if (productImageInput) productImageInput.value = '';
+    setImagePreview('');
+    if (removeProductImageBtn) removeProductImageBtn.hidden = true;
+  });
+
   document.getElementById('product-form')?.addEventListener('submit', async e => {
     e.preventDefault();
     const groupId = getCurrentGroupId();
@@ -281,11 +356,27 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     };
 
     try {
+      let productId = id;
+
       if (id) {
         await updateProduct(groupId, id, data);
+      } else {
+        productId = await createProduct(groupId, data);
+      }
+
+      if (removeImage && productId) {
+        await deleteProductImage(groupId, productId);
+        await updateProduct(groupId, productId, { imageUrl: null });
+      }
+
+      if (selectedImageFile && productId) {
+        const imageUrl = await uploadProductImage(selectedImageFile, groupId, productId);
+        await updateProduct(groupId, productId, { imageUrl });
+      }
+
+      if (id) {
         toast.success('Producto actualizado');
       } else {
-        await createProduct(groupId, data);
         toast.success('Producto añadido');
       }
 
@@ -394,6 +485,42 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     background: var(--color-border);
   }
 
+  .product-image-row {
+    display: flex;
+    gap: var(--space-md);
+    align-items: center;
+  }
+
+  .product-image-preview {
+    width: 72px;
+    height: 72px;
+    border-radius: 12px;
+    border: 1px dashed var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #f8fafc;
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+  }
+
+  .product-image-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .product-image-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .product-image-actions input[type="file"] {
+    font-size: 0.875rem;
+  }
+
   .sort-icon {
     margin-left: 0.5rem;
     opacity: 0.4;
@@ -415,6 +542,31 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .product-category {
     color: var(--color-text-secondary);
+  }
+
+  .product-image-cell {
+    width: 56px;
+  }
+
+  .product-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+    background: #fff;
+  }
+
+  .product-thumb-placeholder {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px dashed var(--color-border);
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
   }
 
   .product-actions {

@@ -5,10 +5,6 @@ import Header from '../components/Header.astro';
 import Navigation from '../components/Navigation.astro';
 import { readFileSync } from 'node:fs';
 
-interface Props {
-  title: string;
-}
-
 const { title } = Astro.props;
 const currentYear = new Date().getFullYear();
 

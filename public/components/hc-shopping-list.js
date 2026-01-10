@@ -17,7 +17,7 @@ import {
 import { withTimeout } from '/js/firestore-utils.js';
 import { getCurrentUser } from '/js/auth.js';
 import { getCurrentGroupId } from '/js/group.js';
-import { searchProducts, UNITS, PRIORITIES, incrementProductPurchaseByName, normalizeProductName, findOrCreateProduct } from '/js/db.js';
+import { searchProducts, UNITS, PRIORITIES, incrementProductPurchaseByName, findOrCreateProduct, getProduct } from '/js/db.js';
 import {
   DEFAULT_SHOPPING_CATEGORIES,
   CATEGORY_COLORS,
@@ -43,6 +43,8 @@ export class HcShoppingList extends LitElement {
     _collapsedCategories: { type: Object, state: true }, // Categorías colapsadas {categoryId: true}
     _categoryOrder: { type: Array, state: true }, // Orden personalizado de categorías
     _draggedCategory: { type: String, state: true }, // Categoría siendo arrastrada
+    _expandedItems: { type: Object, state: true }, // Sublistas expandidas {itemId: true}
+    _productImageMap: { type: Object, state: true }, // productId -> imageUrl|null
     loading: { type: Boolean, state: true },
     loadError: { type: String, state: true },
     newItemName: { type: String, state: true },
@@ -52,6 +54,8 @@ export class HcShoppingList extends LitElement {
     newItemPriority: { type: String, state: true }, // Para listas agnósticas
     newItemIsChecklist: { type: Boolean, state: true }, // Si el item es una sublista
     newChecklistItems: { type: Array, state: true }, // Items de la sublista al crear
+    newChecklistItemQuantity: { type: Number, state: true },
+    newChecklistItemUnit: { type: String, state: true },
     suggestions: { type: Array, state: true },
     showSuggestions: { type: Boolean, state: true },
     selectedSuggestionIndex: { type: Number, state: true },
@@ -67,6 +71,8 @@ export class HcShoppingList extends LitElement {
     editItemIsChecklist: { type: Boolean, state: true },
     editChecklistItems: { type: Array, state: true },
     editChecklistItemText: { type: String, state: true },
+    editChecklistItemQuantity: { type: Number, state: true },
+    editChecklistItemUnit: { type: String, state: true },
     // Estado para categorías
     _categories: { type: Array, state: true },
     newItemCategory: { type: String, state: true },
@@ -98,6 +104,7 @@ export class HcShoppingList extends LitElement {
 
     .list-controls {
       display: flex;
+      flex-wrap: wrap;
       gap: 0.5rem;
       margin-bottom: 1rem;
     }
@@ -156,6 +163,74 @@ export class HcShoppingList extends LitElement {
       background: white;
       color: #2563eb;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .sublist-toggle {
+      margin-right: 0.5rem;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: #64748b;
+    }
+
+    .sublist-toggle[aria-expanded="true"] {
+      color: #1e293b;
+    }
+
+    .sublist-row td {
+      padding: 0.5rem 1rem;
+      background: #f8fafc;
+    }
+
+    .sublist-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+      padding: 0.25rem 0;
+    }
+
+    .sublist-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: #1e293b;
+    }
+
+    .sublist-check {
+      width: 18px;
+      height: 18px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 3px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.625rem;
+      background: white;
+      color: #1e293b;
+    }
+
+    .sublist-check.checked {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: white;
+    }
+
+    .sublist-item-qty {
+      color: #64748b;
+      font-size: 0.8125rem;
+      white-space: nowrap;
+    }
+
+    .product-image-inline {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      object-fit: cover;
+      margin-right: 0.5rem;
+      border: 1px solid #e2e8f0;
     }
 
     .filter-select {
@@ -1343,14 +1418,28 @@ export class HcShoppingList extends LitElement {
       gap: 0.5rem;
     }
 
-    .checklist-builder-add input {
-      flex: 1;
+    .checklist-builder-add input,
+    .checklist-builder-add select {
       padding: 0.375rem 0.5rem;
       border: 1px solid #e2e8f0;
       border-radius: 0.25rem;
       font-size: 0.875rem;
       background: white;
       color: #1e293b;
+    }
+
+    .checklist-builder-add .checklist-builder-text {
+      flex: 1;
+    }
+
+    .checklist-builder-add .checklist-builder-qty {
+      width: 70px;
+      flex: 0 0 auto;
+    }
+
+    .checklist-builder-add .checklist-builder-unit {
+      width: 120px;
+      flex: 0 0 auto;
     }
 
     .checklist-builder-add input::placeholder {
@@ -1576,6 +1665,8 @@ export class HcShoppingList extends LitElement {
     this._collapsedCategories = {}; // Estado de categorías colapsadas
     this._categoryOrder = []; // Orden personalizado de categorías
     this._draggedCategory = null; // Categoría siendo arrastrada
+    this._expandedItems = {};
+    this._productImageMap = {};
     this.loading = true;
     this.loadError = null;
     this.newItemName = '';
@@ -1586,6 +1677,8 @@ export class HcShoppingList extends LitElement {
     this.newItemIsChecklist = false;
     this.newChecklistItems = [];
     this.newChecklistItemText = '';
+    this.newChecklistItemQuantity = 1;
+    this.newChecklistItemUnit = 'unidad';
     this.suggestions = [];
     this.showSuggestions = false;
     this.selectedSuggestionIndex = -1;
@@ -1603,6 +1696,8 @@ export class HcShoppingList extends LitElement {
     this.editItemIsChecklist = false;
     this.editChecklistItems = [];
     this.editChecklistItemText = '';
+    this.editChecklistItemQuantity = 1;
+    this.editChecklistItemUnit = 'unidad';
     // Categorías
     this._categories = [];
     this.newItemCategory = '';
@@ -1811,7 +1906,7 @@ export class HcShoppingList extends LitElement {
   /**
    * Handler para fin de drag de categoría
    */
-  _handleCategoryDragEnd(e) {
+  _handleCategoryDragEnd(_e) {
     this._draggedCategory = null;
 
     // Limpiar clases de todos los elementos (lista y tabla)
@@ -1918,7 +2013,9 @@ export class HcShoppingList extends LitElement {
 
     // Evitar suscripciones duplicadas al mismo path
     const newPath = `${this.userId}/${this.listId}`;
-    if (this._subscribedPath === newPath) return;
+    if (this._subscribedPath === newPath) {
+      return;
+    }
 
     // Limpiar suscripciones anteriores y estado de error
     this._unsubscribers.forEach(unsub => unsub());
@@ -1930,7 +2027,7 @@ export class HcShoppingList extends LitElement {
     try {
       await withTimeout(this._loadCategories(), 10000, 'Cargar categorías');
     } catch (error) {
-      console.error('Error cargando categorías:', error);
+      console.error('[hc-shopping-list] Error cargando categorías:', error);
       // Continuar sin categorías
     }
 
@@ -1940,7 +2037,7 @@ export class HcShoppingList extends LitElement {
       if (!hasReceivedItems && this.loading) {
         this.loading = false;
         this.loadError = 'La conexión tardó demasiado. Verifica tu conexión a internet.';
-        console.error('Timeout: no se recibieron datos en 15s');
+        console.error('[hc-shopping-list] Timeout: no se recibieron datos en 15s');
       }
     }, 15000);
 
@@ -1970,7 +2067,9 @@ export class HcShoppingList extends LitElement {
     const unsubItems = onSnapshot(q, (snapshot) => {
       hasReceivedItems = true;
       clearTimeout(loadTimeout);
-      this.items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      this.items = items;
+      this._loadProductImagesForItems(items);
       this.loading = false;
       this.loadError = null;
     }, (error) => {
@@ -2018,6 +2117,46 @@ export class HcShoppingList extends LitElement {
       console.error('Error loading members:', error);
       this.members = [];
     }
+  }
+
+  async _loadProductImagesForItems(items) {
+    if (this.listType !== 'shopping') return;
+
+    const groupId = getCurrentGroupId();
+    if (!groupId) return;
+
+    const productIds = Array.from(new Set(
+      items.map(item => item.productId).filter(Boolean)
+    ));
+
+    const missingIds = productIds.filter((id) => !(id in this._productImageMap));
+    if (missingIds.length === 0) return;
+
+    try {
+      const products = await Promise.all(
+        missingIds.map((id) => getProduct(groupId, id).catch(() => null))
+      );
+
+      const nextMap = { ...this._productImageMap };
+      products.forEach((product, index) => {
+        const productId = missingIds[index];
+        nextMap[productId] = product?.imageUrl || null;
+      });
+
+      this._productImageMap = nextMap;
+    } catch (error) {
+      console.warn('Error loading product images:', error);
+    }
+  }
+
+  _getProductImageUrl(item) {
+    if (!item?.productId) return null;
+    return this._productImageMap[item.productId] || null;
+  }
+
+  _withProductImage(item) {
+    const imageUrl = this._getProductImageUrl(item);
+    return imageUrl ? { ...item, productImageUrl: imageUrl } : item;
   }
 
   async _loadCategories() {
@@ -2117,13 +2256,7 @@ export class HcShoppingList extends LitElement {
       if (isAgnostic) {
         itemData.notes = this.newItemNotes || null;
         itemData.priority = this.newItemPriority || null;
-
-        // Si es sublista, añadir el checklist
-        if (this.newItemIsChecklist && this.newChecklistItems.length > 0) {
-          itemData.isChecklist = true;
-          itemData.checklist = this.newChecklistItems;
-        }
-      } else {
+      } else if (!this.newItemIsChecklist) {
         itemData.quantity = this.newItemQuantity || 1;
         itemData.unit = this.newItemUnit || 'unidad';
 
@@ -2140,6 +2273,12 @@ export class HcShoppingList extends LitElement {
             }
           }
         }
+      }
+
+      // Si es sublista, añadir el checklist (para cualquier tipo de lista)
+      if (this.newItemIsChecklist && this.newChecklistItems.length > 0) {
+        itemData.isChecklist = true;
+        itemData.checklist = this.newChecklistItems;
       }
 
       await addDoc(itemsRef, itemData);
@@ -2161,6 +2300,8 @@ export class HcShoppingList extends LitElement {
       this.newItemIsChecklist = false;
       this.newChecklistItems = [];
       this.newChecklistItemText = '';
+      this.newChecklistItemQuantity = 1;
+      this.newChecklistItemUnit = 'unidad';
       this.suggestions = [];
       this.showSuggestions = false;
       this._selectedProduct = null;
@@ -2357,7 +2498,7 @@ export class HcShoppingList extends LitElement {
   }
 
   async _handleChecklistAdd(e) {
-    const { itemId, text } = e.detail;
+    const { itemId, text, quantity, unit } = e.detail;
 
     if (!this.userId || !this.listId || !text.trim()) return;
 
@@ -2367,10 +2508,17 @@ export class HcShoppingList extends LitElement {
       const currentChecklist = item?.checklist || [];
 
       // Añadir nuevo elemento al checklist
-      const updatedChecklist = [
-        ...currentChecklist,
-        { text: text.trim(), checked: false }
-      ];
+      const newItem = {
+        text: text.trim(),
+        checked: false
+      };
+
+      if (this.listType === 'shopping') {
+        newItem.quantity = quantity || 1;
+        newItem.unit = unit || 'unidad';
+      }
+
+      const updatedChecklist = [...currentChecklist, newItem];
 
       const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', itemId);
       await updateDoc(itemRef, {
@@ -2419,6 +2567,52 @@ export class HcShoppingList extends LitElement {
     }
   }
 
+  async _handleChecklistUpdate(e) {
+    const { itemId, checklistIndex, text, quantity, unit } = e.detail;
+
+    if (!this.userId || !this.listId) return;
+
+    try {
+      const item = this.items.find(i => i.id === itemId);
+      if (!item || !item.checklist) return;
+
+      const updatedChecklist = item.checklist.map((checkItem, index) => {
+        if (index !== checklistIndex) return checkItem;
+
+        const updated = { ...checkItem };
+
+        if (typeof text === 'string') {
+          const trimmed = text.trim();
+          if (trimmed) {
+            updated.text = trimmed;
+          }
+        }
+
+        if (this.listType === 'shopping') {
+          if (typeof quantity !== 'undefined') {
+            updated.quantity = parseInt(quantity, 10) || 1;
+          }
+          if (typeof unit === 'string' && unit) {
+            updated.unit = unit;
+          }
+        }
+
+        return updated;
+      });
+
+      const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', itemId);
+      await updateDoc(itemRef, {
+        checklist: updatedChecklist,
+        updatedAt: serverTimestamp()
+      });
+
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
+    } catch (error) {
+      console.error('Error updating checklist item:', error);
+    }
+  }
+
   _handleEditItem(e) {
     const { item } = e.detail;
     this.editingItem = item;
@@ -2430,8 +2624,18 @@ export class HcShoppingList extends LitElement {
     this.editItemCategory = item.category || '';
     // Cargar datos de sublista
     this.editItemIsChecklist = item.isChecklist || false;
-    this.editChecklistItems = item.checklist ? [...item.checklist] : [];
+    if (item.checklist && this.listType === 'shopping') {
+      this.editChecklistItems = item.checklist.map((checkItem) => ({
+        ...checkItem,
+        quantity: checkItem.quantity ?? 1,
+        unit: checkItem.unit || 'unidad'
+      }));
+    } else {
+      this.editChecklistItems = item.checklist ? [...item.checklist] : [];
+    }
     this.editChecklistItemText = '';
+    this.editChecklistItemQuantity = 1;
+    this.editChecklistItemUnit = 'unidad';
   }
 
   _handleCancelEdit() {
@@ -2445,6 +2649,8 @@ export class HcShoppingList extends LitElement {
     this.editItemIsChecklist = false;
     this.editChecklistItems = [];
     this.editChecklistItemText = '';
+    this.editChecklistItemQuantity = 1;
+    this.editChecklistItemUnit = 'unidad';
     this._showNewCategoryForm = false;
   }
 
@@ -2467,19 +2673,23 @@ export class HcShoppingList extends LitElement {
       if (isAgnostic) {
         updates.notes = this.editItemNotes || null;
         updates.priority = this.editItemPriority || null;
-        // Datos de sublista
-        updates.isChecklist = this.editItemIsChecklist;
-        updates.checklist = this.editItemIsChecklist ? this.editChecklistItems : null;
-        // Recalcular estado checked si es sublista
-        if (this.editItemIsChecklist && this.editChecklistItems.length > 0) {
-          const checkedCount = this.editChecklistItems.filter(i => i.checked).length;
-          const total = this.editChecklistItems.length;
-          updates.checked = checkedCount === total;
-          updates.partiallyChecked = checkedCount > 0 && checkedCount < total;
-        }
-      } else {
+      } else if (!this.editItemIsChecklist) {
         updates.quantity = this.editItemQuantity || 1;
         updates.unit = this.editItemUnit || 'unidad';
+      } else {
+        updates.quantity = null;
+        updates.unit = null;
+      }
+
+      // Datos de sublista (para cualquier tipo de lista)
+      updates.isChecklist = this.editItemIsChecklist;
+      updates.checklist = this.editItemIsChecklist ? this.editChecklistItems : null;
+      // Recalcular estado checked si es sublista
+      if (this.editItemIsChecklist && this.editChecklistItems.length > 0) {
+        const checkedCount = this.editChecklistItems.filter(i => i.checked).length;
+        const total = this.editChecklistItems.length;
+        updates.checked = checkedCount === total;
+        updates.partiallyChecked = checkedCount > 0 && checkedCount < total;
       }
 
       await updateDoc(itemRef, updates);
@@ -2628,6 +2838,9 @@ export class HcShoppingList extends LitElement {
     this.newItemIsChecklist = e.target.checked;
     if (!e.target.checked) {
       this.newChecklistItems = [];
+      this.newChecklistItemText = '';
+      this.newChecklistItemQuantity = 1;
+      this.newChecklistItemUnit = 'unidad';
     }
   }
 
@@ -2639,11 +2852,20 @@ export class HcShoppingList extends LitElement {
     e?.preventDefault();
     if (!this.newChecklistItemText.trim()) return;
 
-    this.newChecklistItems = [
-      ...this.newChecklistItems,
-      { text: this.newChecklistItemText.trim(), checked: false }
-    ];
+    const checklistItem = {
+      text: this.newChecklistItemText.trim(),
+      checked: false
+    };
+
+    if (this.listType === 'shopping') {
+      checklistItem.quantity = this.newChecklistItemQuantity || 1;
+      checklistItem.unit = this.newChecklistItemUnit || 'unidad';
+    }
+
+    this.newChecklistItems = [...this.newChecklistItems, checklistItem];
     this.newChecklistItemText = '';
+    this.newChecklistItemQuantity = 1;
+    this.newChecklistItemUnit = 'unidad';
   }
 
   _handleRemoveChecklistBuilderItem(index) {
@@ -2662,6 +2884,9 @@ export class HcShoppingList extends LitElement {
     this.editItemIsChecklist = e.target.checked;
     if (!this.editItemIsChecklist) {
       this.editChecklistItems = [];
+      this.editChecklistItemText = '';
+      this.editChecklistItemQuantity = 1;
+      this.editChecklistItemUnit = 'unidad';
     }
   }
 
@@ -2673,11 +2898,20 @@ export class HcShoppingList extends LitElement {
     e?.preventDefault();
     if (!this.editChecklistItemText.trim()) return;
 
-    this.editChecklistItems = [
-      ...this.editChecklistItems,
-      { text: this.editChecklistItemText.trim(), checked: false }
-    ];
+    const checklistItem = {
+      text: this.editChecklistItemText.trim(),
+      checked: false
+    };
+
+    if (this.listType === 'shopping') {
+      checklistItem.quantity = this.editChecklistItemQuantity || 1;
+      checklistItem.unit = this.editChecklistItemUnit || 'unidad';
+    }
+
+    this.editChecklistItems = [...this.editChecklistItems, checklistItem];
     this.editChecklistItemText = '';
+    this.editChecklistItemQuantity = 1;
+    this.editChecklistItemUnit = 'unidad';
   }
 
   _handleRemoveEditChecklistItem(index) {
@@ -2689,6 +2923,25 @@ export class HcShoppingList extends LitElement {
       e.preventDefault();
       this._handleAddEditChecklistItem();
     }
+  }
+
+  _handleEditChecklistItemTextUpdate(index, value) {
+    this.editChecklistItems = this.editChecklistItems.map((item, i) =>
+      i === index ? { ...item, text: value } : item
+    );
+  }
+
+  _handleEditChecklistItemQuantityUpdate(index, value) {
+    const quantity = parseInt(value, 10) || 1;
+    this.editChecklistItems = this.editChecklistItems.map((item, i) =>
+      i === index ? { ...item, quantity } : item
+    );
+  }
+
+  _handleEditChecklistItemUnitUpdate(index, value) {
+    this.editChecklistItems = this.editChecklistItems.map((item, i) =>
+      i === index ? { ...item, unit: value } : item
+    );
   }
 
   async _handleInputChange(e) {
@@ -2953,7 +3206,16 @@ export class HcShoppingList extends LitElement {
       const item = this.items.find(i => i.id === itemId);
       if (!item) return;
 
-      if (action === 'edit') {
+      if (action === 'toggle-sublist') {
+        const isExpanded = !!this._expandedItems[itemId];
+        if (isExpanded) {
+          const updated = { ...this._expandedItems };
+          delete updated[itemId];
+          this._expandedItems = updated;
+        } else {
+          this._expandedItems = { ...this._expandedItems, [itemId]: true };
+        }
+      } else if (action === 'edit') {
         this._handleEditItem({ detail: { item } });
       } else if (action === 'delete') {
         this._handleRemoveItem({ detail: { itemId } });
@@ -3034,19 +3296,25 @@ export class HcShoppingList extends LitElement {
                     </td>
                   </tr>
                 ` : ''}
-                ${!isCollapsed ? items.map(item => this._renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, false)) : ''}
+                ${!isCollapsed ? items.map(item => this._renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, false, colCount)) : ''}
               `;
             })}
           ` : html`
-            ${sortedItems.map(item => this._renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, true))}
+            ${sortedItems.map(item => this._renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, true, colCount))}
           `}
         </tbody>
       </table>
     `;
   }
 
-  _renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, showCategory) {
+  _renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, showCategory, colCount) {
     const cat = this._getCategoryById(item.category);
+    const isChecklist = item.isChecklist && item.checklist && item.checklist.length > 0;
+    const isExpanded = !!this._expandedItems[item.id];
+    const progress = isChecklist
+      ? `${item.checklist.filter(i => i.checked).length}/${item.checklist.length}`
+      : '';
+    const imageUrl = this._getProductImageUrl(item);
     return html`
       <tr
         class="${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''}"
@@ -3059,8 +3327,27 @@ export class HcShoppingList extends LitElement {
             </div>
           </td>
         ` : ''}
-        <td>${item.name}</td>
-        ${!isAgnostic ? html`<td class="table-quantity hide-mobile">${item.quantity} ${item.unit}</td>` : ''}
+        <td>
+          ${isChecklist ? html`
+            <button
+              class="sublist-toggle"
+              data-action="toggle-sublist"
+              data-item-id="${item.id}"
+              aria-expanded="${isExpanded}"
+              title="Mostrar sublista"
+            >
+              ${isExpanded ? '▾' : '▸'}
+            </button>
+          ` : ''}
+          ${imageUrl ? html`<img class="product-image-inline" src="${imageUrl}" alt="">` : ''}
+          ${item.name}
+          ${isChecklist ? html`<span class="sublist-item-qty">(${progress})</span>` : ''}
+        </td>
+        ${!isAgnostic ? html`
+          <td class="table-quantity hide-mobile">
+            ${item.isChecklist ? '—' : `${item.quantity} ${item.unit}`}
+          </td>
+        ` : ''}
         ${showCategory ? html`
           <td class="hide-mobile">
             ${cat ? html`<span>${cat.icon || ''} ${cat.name}</span>` : '—'}
@@ -3073,6 +3360,35 @@ export class HcShoppingList extends LitElement {
           </td>
         ` : ''}
       </tr>
+      ${isChecklist && isExpanded ? html`
+        <tr class="sublist-row">
+          <td colspan="${colCount}">
+            <div class="sublist-items">
+              ${item.checklist.map((checkItem, index) => html`
+                <div class="sublist-item">
+                  <button
+                    class="sublist-check ${checkItem.checked ? 'checked' : ''}"
+                    @click=${() => this._handleChecklistToggle({
+                      detail: {
+                        itemId: item.id,
+                        checklistIndex: index,
+                        checked: !checkItem.checked
+                      }
+                    })}
+                    title="Marcar subelemento"
+                  >
+                    ${checkItem.checked ? '✓' : ''}
+                  </button>
+                  <span>${checkItem.text}</span>
+                  ${this.listType === 'shopping' ? html`
+                    <span class="sublist-item-qty">${checkItem.quantity ?? 1} ${checkItem.unit || 'unidad'}</span>
+                  ` : ''}
+                </div>
+              `)}
+            </div>
+          </td>
+        </tr>
+      ` : ''}
     `;
   }
 
@@ -3200,12 +3516,6 @@ export class HcShoppingList extends LitElement {
             title="Vista lista"
           >▤</button>
         </div>
-        <button
-          class="control-btn ${this.groupByCategory ? 'active' : ''}"
-          @click=${() => this.groupByCategory = !this.groupByCategory}
-        >
-          📁 Agrupar
-        </button>
         ${this.groupByCategory ? html`
           <button
             class="control-btn control-btn-small"
@@ -3213,6 +3523,12 @@ export class HcShoppingList extends LitElement {
             title="${this._allCategoriesCollapsed ? 'Expandir todas' : 'Colapsar todas'}"
           >${this._allCategoriesCollapsed ? '⊞' : '⊟'}</button>
         ` : ''}
+        <button
+          class="control-btn ${this.groupByCategory ? 'active' : ''}"
+          @click=${() => this.groupByCategory = !this.groupByCategory}
+        >
+          📁 Agrupar
+        </button>
         ${this.mode === 'shopping' ? html`
           <button
             class="control-btn ${this.showCompleted ? 'active' : ''}"
@@ -3316,49 +3632,51 @@ export class HcShoppingList extends LitElement {
                 `)}
               </select>
             </div>
-            <div class="checklist-option">
-              <input
-                type="checkbox"
-                id="is-checklist"
-                .checked=${this.newItemIsChecklist}
-                @change=${this._handleIsChecklistChange}
-              />
-              <label for="is-checklist">Es sublista</label>
-            </div>
           ` : html`
             <!-- Campos para listas de compra -->
-            <div class="quantity-input">
-              <label>Cant.</label>
-              <input
-                type="number"
-                min="1"
-                .value=${this.newItemQuantity}
-                @input=${this._handleQuantityChange}
-              />
-            </div>
-            <div class="unit-select">
-              <label>Unidad</label>
-              <select .value=${this.newItemUnit} @change=${this._handleUnitChange}>
-                ${UNITS.map(unit => html`
-                  <option value="${unit.id}" ?selected=${unit.id === this.newItemUnit}>
-                    ${unit.name}
-                  </option>
-                `)}
-              </select>
-            </div>
+            ${this.newItemIsChecklist ? '' : html`
+              <div class="quantity-input">
+                <label>Cant.</label>
+                <input
+                  type="number"
+                  min="1"
+                  .value=${this.newItemQuantity}
+                  @input=${this._handleQuantityChange}
+                />
+              </div>
+              <div class="unit-select">
+                <label>Unidad</label>
+                <select .value=${this.newItemUnit} @change=${this._handleUnitChange}>
+                  ${UNITS.map(unit => html`
+                    <option value="${unit.id}" ?selected=${unit.id === this.newItemUnit}>
+                      ${unit.name}
+                    </option>
+                  `)}
+                </select>
+              </div>
+            `}
           `}
+          <div class="checklist-option">
+            <input
+              type="checkbox"
+              id="is-checklist"
+              .checked=${this.newItemIsChecklist}
+              @change=${this._handleIsChecklistChange}
+            />
+            <label for="is-checklist">Es sublista</label>
+          </div>
           <button type="submit" class="add-btn" ?disabled=${!this.newItemName.trim() || (this.newItemIsChecklist && this.newChecklistItems.length === 0)}>
             + Añadir
           </button>
         </form>
-        ${isAgnostic && this.newItemIsChecklist ? html`
+        ${this.newItemIsChecklist ? html`
           <div class="checklist-builder">
             <div class="checklist-builder-title">Subelementos de "${this.newItemName || 'sublista'}"</div>
             ${this.newChecklistItems.length > 0 ? html`
               <div class="checklist-builder-items">
                 ${this.newChecklistItems.map((item, index) => html`
                   <div class="checklist-builder-item">
-                    <span>☐ ${item.text}</span>
+                    <span>☐ ${item.text}${this.listType === 'shopping' ? ` · ${item.quantity ?? 1} ${item.unit || 'unidad'}` : ''}</span>
                     <button type="button" @click=${() => this._handleRemoveChecklistBuilderItem(index)} title="Eliminar">✕</button>
                   </div>
                 `)}
@@ -3367,11 +3685,30 @@ export class HcShoppingList extends LitElement {
             <div class="checklist-builder-add">
               <input
                 type="text"
+                class="checklist-builder-text"
                 placeholder="Añadir subelemento..."
                 .value=${this.newChecklistItemText}
                 @input=${this._handleNewChecklistItemTextChange}
                 @keydown=${this._handleChecklistBuilderKeydown}
               />
+              ${this.listType === 'shopping' ? html`
+                <input
+                  type="number"
+                  min="1"
+                  class="checklist-builder-qty"
+                  .value=${this.newChecklistItemQuantity}
+                  @input=${(e) => this.newChecklistItemQuantity = parseInt(e.target.value) || 1}
+                />
+                <select
+                  class="checklist-builder-unit"
+                  .value=${this.newChecklistItemUnit}
+                  @change=${(e) => this.newChecklistItemUnit = e.target.value}
+                >
+                  ${UNITS.map(unit => html`
+                    <option value="${unit.id}">${unit.name}</option>
+                  `)}
+                </select>
+              ` : ''}
               <button type="button" @click=${this._handleAddChecklistBuilderItem}>+ Añadir</button>
             </div>
           </div>
@@ -3474,7 +3811,7 @@ export class HcShoppingList extends LitElement {
             <div class="items-list">
               ${items.map(item => html`
                 <hc-list-item
-                  .item=${item}
+                  .item=${this._withProductImage(item)}
                   .members=${this.members}
                   .mode=${this.mode}
                   .listType=${this.listType}
@@ -3486,6 +3823,7 @@ export class HcShoppingList extends LitElement {
                   @checklist-toggle=${this._handleChecklistToggle}
                   @checklist-add=${this._handleChecklistAdd}
                   @checklist-remove=${this._handleChecklistRemove}
+                  @checklist-update=${this._handleChecklistUpdate}
                 ></hc-list-item>
               `)}
             </div>
@@ -3495,7 +3833,7 @@ export class HcShoppingList extends LitElement {
             <div class="items-list">
               ${items.map(item => html`
                 <hc-list-item
-                  .item=${item}
+                  .item=${this._withProductImage(item)}
                   .members=${this.members}
                   .mode=${this.mode}
                   .listType=${this.listType}
@@ -3507,6 +3845,7 @@ export class HcShoppingList extends LitElement {
                   @checklist-toggle=${this._handleChecklistToggle}
                   @checklist-add=${this._handleChecklistAdd}
                   @checklist-remove=${this._handleChecklistRemove}
+                  @checklist-update=${this._handleChecklistUpdate}
                 ></hc-list-item>
               `)}
             </div>
@@ -3566,62 +3905,107 @@ export class HcShoppingList extends LitElement {
                     `)}
                   </select>
                 </div>
-                <div class="checklist-option">
-                  <input
-                    type="checkbox"
-                    id="edit-is-checklist"
-                    .checked=${this.editItemIsChecklist}
-                    @change=${this._handleEditIsChecklistChange}
-                  />
-                  <label for="edit-is-checklist">Es sublista</label>
-                </div>
-                ${this.editItemIsChecklist ? html`
-                  <div class="checklist-builder">
-                    <div class="checklist-builder-title">Subelementos de "${this.editItemName || 'sublista'}"</div>
-                    ${this.editChecklistItems.length > 0 ? html`
-                      <div class="checklist-builder-items">
-                        ${this.editChecklistItems.map((item, index) => html`
-                          <div class="checklist-builder-item">
-                            <span>${item.checked ? '☑' : '☐'} ${item.text}</span>
-                            <button type="button" @click=${() => this._handleRemoveEditChecklistItem(index)} title="Eliminar">✕</button>
-                          </div>
-                        `)}
-                      </div>
-                    ` : ''}
-                    <div class="checklist-builder-add">
-                      <input
-                        type="text"
-                        placeholder="Añadir subelemento..."
-                        .value=${this.editChecklistItemText}
-                        @input=${this._handleEditChecklistItemTextChange}
-                        @keydown=${this._handleEditChecklistBuilderKeydown}
-                      />
-                      <button type="button" @click=${this._handleAddEditChecklistItem}>+ Añadir</button>
-                    </div>
-                  </div>
-                ` : ''}
               ` : html`
-                <div class="form-group">
-                  <label>Cantidad</label>
-                  <input
-                    type="number"
-                    min="1"
-                    .value=${this.editItemQuantity}
-                    @input=${(e) => this.editItemQuantity = parseInt(e.target.value) || 1}
-                  />
-                </div>
-                <div class="form-group">
-                  <label>Unidad</label>
-                  <select
-                    .value=${this.editItemUnit}
-                    @change=${(e) => this.editItemUnit = e.target.value}
-                  >
-                    ${UNITS.map(unit => html`
-                      <option value="${unit.id}">${unit.name}</option>
-                    `)}
-                  </select>
-                </div>
+                ${this.editItemIsChecklist ? '' : html`
+                  <div class="form-group">
+                    <label>Cantidad</label>
+                    <input
+                      type="number"
+                      min="1"
+                      .value=${this.editItemQuantity}
+                      @input=${(e) => this.editItemQuantity = parseInt(e.target.value) || 1}
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>Unidad</label>
+                    <select
+                      .value=${this.editItemUnit}
+                      @change=${(e) => this.editItemUnit = e.target.value}
+                    >
+                      ${UNITS.map(unit => html`
+                        <option value="${unit.id}">${unit.name}</option>
+                      `)}
+                    </select>
+                  </div>
+                `}
               `}
+              <div class="checklist-option">
+                <input
+                  type="checkbox"
+                  id="edit-is-checklist"
+                  .checked=${this.editItemIsChecklist}
+                  @change=${this._handleEditIsChecklistChange}
+                />
+                <label for="edit-is-checklist">Es sublista</label>
+              </div>
+              ${this.editItemIsChecklist ? html`
+                <div class="checklist-builder">
+                  <div class="checklist-builder-title">Subelementos de "${this.editItemName || 'sublista'}"</div>
+                  ${this.editChecklistItems.length > 0 ? html`
+                    <div class="checklist-builder-items">
+                      ${this.editChecklistItems.map((item, index) => html`
+                        <div class="checklist-builder-item">
+                          <span>${item.checked ? '☑' : '☐'}</span>
+                          <input
+                            type="text"
+                            class="checklist-builder-text"
+                            .value=${item.text}
+                            @input=${(e) => this._handleEditChecklistItemTextUpdate(index, e.target.value)}
+                          />
+                          ${this.listType === 'shopping' ? html`
+                            <input
+                              type="number"
+                              min="1"
+                              class="checklist-builder-qty"
+                              .value=${item.quantity ?? 1}
+                              @input=${(e) => this._handleEditChecklistItemQuantityUpdate(index, e.target.value)}
+                            />
+                            <select
+                              class="checklist-builder-unit"
+                              .value=${item.unit || 'unidad'}
+                              @change=${(e) => this._handleEditChecklistItemUnitUpdate(index, e.target.value)}
+                            >
+                              ${UNITS.map(unit => html`
+                                <option value="${unit.id}">${unit.name}</option>
+                              `)}
+                            </select>
+                          ` : ''}
+                          <button type="button" @click=${() => this._handleRemoveEditChecklistItem(index)} title="Eliminar">✕</button>
+                        </div>
+                      `)}
+                    </div>
+                  ` : ''}
+                  <div class="checklist-builder-add">
+                    <input
+                      type="text"
+                      class="checklist-builder-text"
+                      placeholder="Añadir subelemento..."
+                      .value=${this.editChecklistItemText}
+                      @input=${this._handleEditChecklistItemTextChange}
+                      @keydown=${this._handleEditChecklistBuilderKeydown}
+                    />
+                    ${this.listType === 'shopping' ? html`
+                      <input
+                        type="number"
+                        min="1"
+                        class="checklist-builder-qty"
+                        .value=${this.editChecklistItemQuantity}
+                        @input=${(e) => this.editChecklistItemQuantity = parseInt(e.target.value) || 1}
+                      />
+                      <select
+                        class="checklist-builder-unit"
+                        .value=${this.editChecklistItemUnit}
+                        @change=${(e) => this.editChecklistItemUnit = e.target.value}
+                      >
+                        ${UNITS.map(unit => html`
+                          <option value="${unit.id}">${unit.name}</option>
+                        `)}
+                      </select>
+                    ` : ''}
+                    <button type="button" @click=${this._handleAddEditChecklistItem}>+ Añadir</button>
+                  </div>
+                </div>
+              ` : ''}
               ${this._showNewCategoryForm ? html`
                 <div class="new-category-form" style="margin-top: 1rem;">
                   <div class="new-category-form-title">Nueva categoría</div>
@@ -3682,4 +4066,6 @@ export class HcShoppingList extends LitElement {
   }
 }
 
-customElements.define('hc-shopping-list', HcShoppingList);
+if (!customElements.get('hc-shopping-list')) {
+  customElements.define('hc-shopping-list', HcShoppingList);
+}

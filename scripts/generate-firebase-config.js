@@ -75,10 +75,11 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Usar base de datos específica si se indica (para tests)
+// experimentalAutoDetectLongPolling mejora estabilidad en redes problemáticas
 const DATABASE_ID = '${databaseId}';
-export const db = DATABASE_ID === '(default)'
-  ? getFirestore(app)
-  : initializeFirestore(app, {}, DATABASE_ID);
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true
+}${databaseId !== '(default)' ? `, '${databaseId}'` : ''});
 
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'europe-west1');

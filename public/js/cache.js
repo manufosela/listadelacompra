@@ -96,8 +96,8 @@ export function setInCache(namespace, data, id = '', options = {}) {
     const storage = strategy === 'persistent' ? localStorage : sessionStorage;
     try {
       storage.setItem(key, JSON.stringify(cached));
-    } catch (e) {
-      console.warn('Cache write error:', e);
+    } catch (error) {
+      console.warn('Cache write error:', error);
     }
   }
 }
@@ -112,7 +112,7 @@ export function invalidateCache(namespace, id = '') {
   try {
     sessionStorage.removeItem(key);
     localStorage.removeItem(key);
-  } catch (e) {
+  } catch {
     // Ignorar errores de storage
   }
 }
@@ -139,7 +139,7 @@ export function invalidateNamespace(namespace) {
           storage.removeItem(key);
         }
       }
-    } catch (e) {
+    } catch {
       // Ignorar
     }
   });
@@ -159,7 +159,7 @@ export function clearAllCache() {
           storage.removeItem(key);
         }
       }
-    } catch (e) {
+    } catch {
       // Ignorar
     }
   });

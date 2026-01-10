@@ -213,4 +213,6 @@ export class HcUserMenu extends LitElement {
   }
 }
 
-customElements.define('hc-user-menu', HcUserMenu);
+if (!customElements.get('hc-user-menu')) {
+  customElements.define('hc-user-menu', HcUserMenu);
+}
