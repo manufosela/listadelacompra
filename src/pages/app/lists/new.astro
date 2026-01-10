@@ -565,8 +565,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                     <label class="product-checkbox">
                       <input type="checkbox" ${isChecked ? 'checked' : ''} />
                       ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="">` : '<span class="product-thumb-placeholder">—</span>'}
-                      <span class="product-name">${product.name}</span>
-                      ${product.storeTag ? `<span class="product-store-tag">${product.storeTag}</span>` : ''}
+                      <div class="product-info">
+                        <div class="product-name">${product.name}</div>
+                        ${product.storeTag ? `<div class="product-store-tag">${product.storeTag}</div>` : ''}
+                      </div>
                     </label>
                     <div class="product-quantity" ${isChecked ? '' : 'hidden'}>
                       <input type="number" min="0.1" step="0.1" value="${quantity}" class="qty-input" />
@@ -1416,6 +1418,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     flex: 1;
     min-width: 0;
     color: var(--color-text);
+  }
+
+  #products-modal .product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
   }
 
   #products-modal .product-name {
