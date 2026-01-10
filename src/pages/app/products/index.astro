@@ -30,7 +30,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       <div class="form-group">
         <label for="product-name">Nombre *</label>
         <input type="text" id="product-name" placeholder="ej: leche, pan, tomates..." required />
-        <small class="form-hint">Se guardará en minúsculas</small>
+        <small class="form-hint">Se mantiene el uso de mayúsculas/minúsculas</small>
       </div>
 
       <div class="form-group">
@@ -85,7 +85,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
   import { modal as confirmModal } from '/js/modal.js';
   import { toast } from '/js/toast.js';
-  import { getAllProducts, createProduct, updateProduct, deleteProduct } from '/js/db.js';
+  import { getAllProducts, createProduct, updateProduct, deleteProduct, normalizeProductName } from '/js/db.js';
   import { getCurrentGroupId } from '/js/group.js';
   import { getCategoriesForList } from '/js/categories.js';
   import { uploadProductImage, deleteProductImage } from '/js/storage.js';
@@ -368,23 +368,28 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
   }
 
-  async function updateListItemsCategory(productId, category) {
+  async function updateListItemsCategory(productId, category, productName) {
     const user = getCurrentUser();
     if (!user || !productId) return;
 
     try {
       const { db } = await import('/js/firebase-config.js');
-      const { collection, getDocs, query, where, updateDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
+      const { collection, getDocs, updateDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
 
       const listsRef = collection(db, 'users', user.uid, 'lists');
       const listsSnap = await getDocs(listsRef);
+      const normalizedName = normalizeProductName(productName || '');
 
       const updates = [];
       for (const listDoc of listsSnap.docs) {
         const itemsRef = collection(db, 'users', user.uid, 'lists', listDoc.id, 'items');
-        const itemsQuery = query(itemsRef, where('productId', '==', productId));
-        const itemsSnap = await getDocs(itemsQuery);
+        const itemsSnap = await getDocs(itemsRef);
         itemsSnap.forEach(itemDoc => {
+          const item = itemDoc.data();
+          const matchesProduct = item.productId === productId;
+          const matchesName = !item.productId && normalizedName &&
+            normalizeProductName(item.name || '') === normalizedName;
+          if (!matchesProduct && !matchesName) return;
           updates.push(updateDoc(doc(db, 'users', user.uid, 'lists', listDoc.id, 'items', itemDoc.id), {
             category
           }));
@@ -456,7 +461,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     // Normalizar nombre a lowercase
     const rawName = document.getElementById('product-name')?.value || '';
-    const name = rawName.toLowerCase().trim();
+    const name = rawName.trim();
 
     const data = {
       name,
@@ -474,7 +479,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       if (id) {
         await updateProduct(groupId, id, data);
         if ((previousCategory || 'otros') !== nextCategory) {
-          await updateListItemsCategory(id, nextCategory);
+          await updateListItemsCategory(id, nextCategory, name);
         }
       } else {
         productId = await createProduct(groupId, data);
