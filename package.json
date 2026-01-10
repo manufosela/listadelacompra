@@ -1,7 +1,7 @@
 {
   "name": "myhomecart",
   "type": "module",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "private": true,
   "scripts": {
     "generate:config": "node scripts/generate-firebase-config.js",

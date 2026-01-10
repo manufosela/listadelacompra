@@ -1430,6 +1430,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     gap: var(--space-sm);
     cursor: pointer;
     flex: 1;
+    width: 100%;
     min-width: 0;
     color: var(--color-text);
   }
@@ -1438,6 +1439,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     display: flex;
     flex-direction: column;
     gap: 2px;
+    flex: 1;
     min-width: 0;
   }
 
@@ -1446,6 +1448,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--color-text);
+  }
+
+  #products-modal [hidden],
+  #products-modal .product-quantity[hidden] {
+    display: none !important;
   }
 
   #products-modal .product-thumb {
