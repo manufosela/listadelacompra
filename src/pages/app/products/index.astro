@@ -108,6 +108,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   let removeImage = false;
   let previewUrl = null;
 
+  function updateCategorySelectSize() {
+    if (!productCategory) return;
+    productCategory.size = window.matchMedia('(max-width: 640px)').matches ? 8 : 1;
+  }
+
   function resetImageState() {
     selectedImageFile = null;
     removeImage = false;
@@ -117,6 +122,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       previewUrl = null;
     }
   }
+
+  updateCategorySelectSize();
+  window.addEventListener('resize', updateCategorySelectSize);
 
   function setImagePreview(url) {
     if (!productImagePreview) return;
