@@ -60,6 +60,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { db } from '/js/firebase-config.js';
   import { collection, query, onSnapshot, orderBy, doc, updateDoc, serverTimestamp, where } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
   import { toast } from '/js/toast.js';
+  import { getCurrentGroupId } from '/js/group.js';
   import '/components/hc-ticket-scanner.js';
 
   // Helper para formatear fechas
