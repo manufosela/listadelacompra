@@ -554,57 +554,54 @@ import AppLayout from '../../../layouts/AppLayout.astro';
               <span class="category-count">${products.length}</span>
             </div>
             <div class="product-items">
-              ${products.map(product => {
-                const selected = selectedProducts[product.id];
-                const isChecked = !!selected;
-                const quantity = selected?.quantity || product.defaultQuantity || 1;
-                const unit = selected?.unit || product.defaultUnit || 'unidad';
+              <table class="products-table">
+                <tbody>
+                  ${products.map(product => {
+                    const selected = selectedProducts[product.id];
+                    const isChecked = !!selected;
+                    const quantity = selected?.quantity || product.defaultQuantity || 1;
+                    const unit = selected?.unit || product.defaultUnit || 'unidad';
 
-                return `
-                  <div class="product-item ${isChecked ? 'selected' : ''}" data-id="${product.id}">
-                    <label class="product-checkbox">
-                      <input type="checkbox" ${isChecked ? 'checked' : ''} />
-                      ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="">` : '<span class="product-thumb-placeholder">—</span>'}
-                      <div class="product-info">
-                        <div class="product-name">${product.name}</div>
-                        ${product.storeTag ? `<div class="product-store-tag">${product.storeTag}</div>` : ''}
-                      </div>
-                    </label>
-                    <div class="product-quantity ${isChecked ? '' : 'disabled'}">
-                      <input type="number" min="0.1" step="0.1" value="${quantity}" class="qty-input" ${isChecked ? '' : 'disabled'} />
-                      <select class="unit-select" ${isChecked ? '' : 'disabled'}>
-                        ${UNITS.map(u =>
-                          `<option value="${u.id}" ${unit === u.id ? 'selected' : ''}>${u.name}</option>`
-                        ).join('')}
-                      </select>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
+                    return `
+                      <tr class="product-row ${isChecked ? 'selected' : ''}" data-id="${product.id}">
+                        <td class="product-check">
+                          <input type="checkbox" ${isChecked ? 'checked' : ''} />
+                        </td>
+                        <td class="product-media">
+                          ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="">` : '<span class="product-thumb-placeholder">—</span>'}
+                        </td>
+                        <td class="product-info-cell">
+                          <div class="product-name">${product.name}</div>
+                          ${product.storeTag ? `<div class="product-store-tag">${product.storeTag}</div>` : ''}
+                        </td>
+                        <td class="product-quantity-cell">
+                          <div class="product-quantity ${isChecked ? '' : 'disabled'}">
+                            <input type="number" min="0.1" step="0.1" value="${quantity}" class="qty-input" ${isChecked ? '' : 'disabled'} />
+                            <select class="unit-select" ${isChecked ? '' : 'disabled'}>
+                              ${UNITS.map(u =>
+                                `<option value="${u.id}" ${unit === u.id ? 'selected' : ''}>${u.name}</option>`
+                              ).join('')}
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
             </div>
           </div>
         `;
       }).join('');
 
     // Añadir event listeners
-    productsList.querySelectorAll('.product-item').forEach(item => {
+    productsList.querySelectorAll('.product-row').forEach(item => {
       const productId = item.dataset.id;
       const product = catalogProducts.find(p => p.id === productId);
       const checkbox = item.querySelector('input[type="checkbox"]');
       const quantityDiv = item.querySelector('.product-quantity');
       const qtyInput = item.querySelector('.qty-input');
       const unitSelect = item.querySelector('.unit-select');
-
-      item.addEventListener('click', (event) => {
-        if (event.target.closest('.product-quantity')) return;
-        const wasChecked = checkbox.checked;
-        setTimeout(() => {
-          if (checkbox.checked === wasChecked) {
-            checkbox.checked = !wasChecked;
-            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        });
-      });
 
       checkbox.addEventListener('change', () => {
         if (checkbox.checked) {
@@ -1414,36 +1411,60 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     background: rgba(37, 99, 235, 0.08);
   }
 
-  #products-modal .product-checkbox {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    cursor: pointer;
-    flex: 1;
+  #products-modal .products-table {
     width: 100%;
-    min-width: 0;
-    color: var(--color-text);
-    font-size: var(--font-size-base);
+    border-collapse: separate;
+    border-spacing: 0 6px;
   }
 
-  #products-modal .product-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1;
+  #products-modal .products-table td {
+    padding: 6px 8px;
+    color: var(--color-text);
+    vertical-align: middle;
+  }
+
+  #products-modal .product-row {
+    background: var(--color-bg-secondary);
+  }
+
+  #products-modal .product-row.selected {
+    background: rgba(37, 99, 235, 0.08);
+  }
+
+  #products-modal .product-check {
+    width: 32px;
+    text-align: center;
+  }
+
+  #products-modal .product-media {
+    width: 40px;
+  }
+
+  #products-modal .product-info-cell {
+    width: 100%;
     min-width: 0;
-    visibility: visible;
-    opacity: 1;
   }
 
   #products-modal .product-name {
-    display: block;
+    font-size: var(--font-size-base);
+    line-height: 1.2;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--color-text);
-    font-size: var(--font-size-base);
-    line-height: 1.2;
+  }
+
+  #products-modal .product-store-tag {
+    font-size: var(--font-size-xs);
+    color: #0f766e;
+    background: rgba(13, 148, 136, 0.12);
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    display: inline-block;
+    margin-top: 2px;
+  }
+
+  #products-modal .product-quantity-cell {
+    white-space: nowrap;
   }
 
   #products-modal [hidden],
@@ -1458,6 +1479,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     object-fit: cover;
     border: 1px solid var(--color-border);
     background: #fff;
+    display: block;
   }
 
   #products-modal .product-thumb-placeholder {
@@ -1470,16 +1492,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     justify-content: center;
     color: var(--color-text-secondary);
     font-size: 0.75rem;
-  }
-
-  #products-modal .product-store-tag {
-    font-size: var(--font-size-xs);
-    color: #0f766e;
-    background: rgba(13, 148, 136, 0.12);
-    padding: 2px 6px;
-    border-radius: var(--radius-full);
-    margin-left: var(--space-xs);
-    white-space: nowrap;
   }
 
   #products-modal .product-quantity {
