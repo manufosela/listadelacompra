@@ -204,6 +204,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
       // Añadir listeners nuevos
       refs.forEach((ref) => {
+        if (ref.ownerId === currentUser.uid) return;
         const key = `${ref.ownerId}:${ref.listId}`;
         if (sharedListUnsubs.has(key)) return;
 
@@ -314,11 +315,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   function isSharedList(list) {
     if (!list) return false;
-    if (list.shared) return true;
-    if (list.ownerId === currentUser?.uid && Array.isArray(list.members)) {
-      return list.members.length > 1;
-    }
-    return false;
+    return list.ownerId !== currentUser?.uid;
   }
 
   // Helper para generar los botones de acción
