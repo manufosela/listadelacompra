@@ -285,6 +285,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
               </td>
               <td class="product-name">
                 ${p.name}
+                ${p.storeTag ? `<span class="product-store-inline">${p.storeTag}</span>` : ''}
                 <button class="btn btn-sm btn-ghost edit-btn edit-inline" aria-label="Editar producto" title="Editar">
                   ✏️
                 </button>
@@ -637,6 +638,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     white-space: nowrap;
   }
 
+  .product-store-inline {
+    display: none;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    margin-left: var(--space-xs);
+  }
+
   .product-image-cell {
     width: 56px;
   }
@@ -689,6 +697,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     .products-table td.product-store,
     .products-table th[data-sort="storeTag"] {
       display: none;
+    }
+
+    .product-store-inline {
+      display: inline-block;
     }
 
     .edit-inline {
