@@ -640,6 +640,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         const qtyInput = item.querySelector('.qty-input');
         const unitSelect = item.querySelector('.unit-select');
 
+        item.addEventListener('click', (event) => {
+          if (event.target.closest('.product-quantity')) return;
+          const wasChecked = checkbox.checked;
+          setTimeout(() => {
+            if (checkbox.checked === wasChecked) {
+              checkbox.checked = !wasChecked;
+              checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+        });
+
         checkbox.addEventListener('change', () => {
           if (checkbox.checked) {
             selectedProducts[productId] = {
@@ -1272,10 +1283,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
+    z-index: 0;
   }
 
   .modal-content {
     position: relative;
+    z-index: 1;
     width: 100%;
     max-width: 500px;
     max-height: 80vh;
@@ -1395,6 +1408,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     padding: var(--space-sm);
     border-radius: var(--radius-sm);
     transition: background var(--transition-fast);
+    color: var(--color-text);
+    cursor: pointer;
   }
 
   .product-item:hover {
@@ -1412,12 +1427,14 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     cursor: pointer;
     flex: 1;
     min-width: 0;
+    color: var(--color-text);
   }
 
   .product-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: var(--color-text);
   }
 
   .product-thumb {
