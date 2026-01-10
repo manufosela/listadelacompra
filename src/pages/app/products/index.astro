@@ -35,7 +35,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
       <div class="form-group">
         <label for="product-category">Categoría</label>
-        <select id="product-category"></select>
+        <select id="product-category" class="category-select"></select>
       </div>
 
       <div class="form-group">
@@ -586,6 +586,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .product-image-actions input[type="file"] {
     font-size: 0.875rem;
+  }
+
+  .category-select {
+    max-height: 50vh;
+    overflow-y: auto;
   }
 
   .product-defaults-row {
