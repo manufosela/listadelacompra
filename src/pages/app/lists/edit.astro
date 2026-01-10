@@ -205,6 +205,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   let catalogProducts = [];
   let selectedProducts = {};
   let productCategories = [];
+  let existingProducts = {};
 
   // Elementos DOM
   const loadingState = document.getElementById('loading-state');
@@ -544,6 +545,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
         catalogProducts = products;
         productCategories = categories;
+        await loadExistingListItems();
 
         if (catalogProducts.length === 0) {
           productsList.innerHTML = `
@@ -559,6 +561,32 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       } catch (error) {
         console.error('Error loading products:', error);
         productsList.innerHTML = `<p class="error-text">Error al cargar productos: ${error.message}</p>`;
+      }
+    }
+
+    async function loadExistingListItems() {
+      existingProducts = {};
+
+      if (!currentUser?.uid || !currentList?.id) {
+        return;
+      }
+
+      try {
+        const { db } = await import('/js/firebase-config.js');
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js');
+        const itemsRef = collection(db, 'users', currentUser.uid, 'lists', currentList.id, 'items');
+        const itemsSnap = await getDocs(itemsRef);
+
+        itemsSnap.forEach(docSnap => {
+          const item = docSnap.data();
+          if (!item.productId) return;
+          existingProducts[item.productId] = {
+            quantity: item.quantity || 1,
+            unit: item.unit || 'unidad'
+          };
+        });
+      } catch (error) {
+        console.warn('No se pudieron cargar los items existentes:', error);
       }
     }
 
@@ -604,37 +632,45 @@ import AppLayout from '../../../layouts/AppLayout.astro';
               <div class="product-items">
                 <table class="products-table">
                   <tbody>
-                    ${products.map(product => {
-                      const selected = selectedProducts[product.id];
-                      const isChecked = !!selected;
-                      const quantity = selected?.quantity || product.defaultQuantity || 1;
-                      const unit = selected?.unit || product.defaultUnit || 'unidad';
+                  ${products.map(product => {
+                    const selected = selectedProducts[product.id];
+                    const existing = existingProducts[product.id];
+                    const isSelected = !!selected;
+                    const isExisting = !!existing;
+                    const isChecked = isSelected || isExisting;
+                    const quantity = isExisting
+                      ? (existing.quantity || 1)
+                      : (selected?.quantity || product.defaultQuantity || 1);
+                    const unit = isExisting
+                      ? (existing.unit || product.defaultUnit || 'unidad')
+                      : (selected?.unit || product.defaultUnit || 'unidad');
 
-                      return `
-                        <tr class="product-row ${isChecked ? 'selected' : ''}" data-id="${product.id}">
-                          <td class="product-check">
-                            <input type="checkbox" ${isChecked ? 'checked' : ''} />
-                          </td>
-                          <td class="product-media">
-                            ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="">` : '<span class="product-thumb-placeholder" aria-hidden="true"></span>'}
-                          </td>
-                          <td class="product-info-cell">
-                            <div class="product-name">${product.name}</div>
-                            ${product.storeTag ? `<div class="product-store-tag">${product.storeTag}</div>` : ''}
-                          </td>
-                          <td class="product-quantity-cell">
-                            <div class="product-quantity ${isChecked ? '' : 'disabled'}">
-                              <input type="number" min="0.1" step="0.1" value="${quantity}" class="qty-input" ${isChecked ? '' : 'disabled'} />
-                              <select class="unit-select" ${isChecked ? '' : 'disabled'}>
-                                ${UNITS.map(u =>
-                                  `<option value="${u.id}" ${unit === u.id ? 'selected' : ''}>${u.name}</option>`
-                                ).join('')}
-                              </select>
-                            </div>
-                          </td>
-                        </tr>
-                      `;
-                    }).join('')}
+                    return `
+                      <tr class="product-row ${isChecked ? 'selected' : ''} ${isExisting ? 'existing' : ''}" data-id="${product.id}">
+                        <td class="product-check">
+                          <input type="checkbox" ${isChecked ? 'checked' : ''} ${isExisting ? 'disabled' : ''} />
+                        </td>
+                        <td class="product-media">
+                          ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="">` : '<span class="product-thumb-placeholder" aria-hidden="true"></span>'}
+                        </td>
+                        <td class="product-info-cell">
+                          <div class="product-name">${product.name}</div>
+                          ${isExisting ? '<div class="product-existing-badge">En lista</div>' : ''}
+                          ${product.storeTag ? `<div class="product-store-tag">${product.storeTag}</div>` : ''}
+                        </td>
+                        <td class="product-quantity-cell">
+                          <div class="product-quantity ${isSelected ? '' : 'disabled'}">
+                            <input type="number" min="0.1" step="0.1" value="${quantity}" class="qty-input" ${isSelected ? '' : 'disabled'} />
+                            <select class="unit-select" ${isSelected ? '' : 'disabled'}>
+                              ${UNITS.map(u =>
+                                `<option value="${u.id}" ${unit === u.id ? 'selected' : ''}>${u.name}</option>`
+                              ).join('')}
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
                   </tbody>
                 </table>
               </div>
@@ -651,6 +687,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         const unitSelect = item.querySelector('.unit-select');
 
         checkbox.addEventListener('change', () => {
+          if (checkbox.disabled) return;
           if (checkbox.checked) {
             selectedProducts[productId] = {
               product,
@@ -1444,6 +1481,20 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   #products-modal .product-row.selected {
     background: rgba(37, 99, 235, 0.08);
+  }
+
+  #products-modal .product-row.existing {
+    background: rgba(22, 163, 74, 0.12);
+  }
+
+  #products-modal .product-existing-badge {
+    font-size: var(--font-size-xs);
+    color: #166534;
+    background: rgba(22, 163, 74, 0.16);
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    display: inline-block;
+    margin-top: 2px;
   }
 
   #products-modal .product-check {
