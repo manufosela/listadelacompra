@@ -166,6 +166,7 @@ export async function createProduct(groupId, productData) {
     name: productData.name.trim(),
     normalizedName,
     brand: productData.brand?.trim() || null,
+    storeTag: productData.storeTag?.trim() || null,
     category: productData.category || 'otros',
     defaultUnit: productData.defaultUnit || 'unidad',
     defaultQuantity: productData.defaultQuantity || 1,

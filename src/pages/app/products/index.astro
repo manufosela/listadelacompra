@@ -39,6 +39,26 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       </div>
 
       <div class="form-group">
+        <label for="product-store-tag">Supermercado</label>
+        <input
+          type="text"
+          id="product-store-tag"
+          placeholder="ej: Carrefour, Mercadona..."
+          list="store-tag-list"
+        />
+        <datalist id="store-tag-list"></datalist>
+      </div>
+
+      <div class="form-group">
+        <label>Unidades por defecto</label>
+        <div class="product-defaults-row">
+          <input type="number" id="product-default-quantity" min="0.1" step="0.1" />
+          <select id="product-default-unit"></select>
+        </div>
+        <small class="form-hint">Puedes cambiarlo al añadir el producto a una lista</small>
+      </div>
+
+      <div class="form-group">
         <label for="product-image">Foto</label>
         <div class="product-image-row">
           <div class="product-image-preview" id="product-image-preview">
@@ -69,6 +89,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { getCurrentGroupId } from '/js/group.js';
   import { getCategoriesForList } from '/js/categories.js';
   import { uploadProductImage, deleteProductImage } from '/js/storage.js';
+  import { UNITS } from '/js/db.js';
 
   let allProducts = [];
   let allCategories = []; // Incluye default + custom
@@ -76,6 +97,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   let sortDirection = localStorage.getItem('productsSortDirection') || 'asc';
   const productModal = document.getElementById('product-modal');
   const productCategory = document.getElementById('product-category');
+  const productStoreTag = document.getElementById('product-store-tag');
+  const storeTagList = document.getElementById('store-tag-list');
+  const productDefaultQuantity = document.getElementById('product-default-quantity');
+  const productDefaultUnit = document.getElementById('product-default-unit');
   const productImageInput = document.getElementById('product-image');
   const productImagePreview = document.getElementById('product-image-preview');
   const removeProductImageBtn = document.getElementById('remove-product-image');
@@ -121,6 +146,22 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     } catch (error) {
       console.warn('Error loading categories:', error);
     }
+  }
+
+  function loadUnitOptions() {
+    if (!productDefaultUnit) return;
+    productDefaultUnit.innerHTML = '';
+    UNITS.forEach(unit => {
+      productDefaultUnit.innerHTML += `<option value="${unit.id}">${unit.name}</option>`;
+    });
+  }
+
+  function updateStoreTagSuggestions(products) {
+    if (!storeTagList) return;
+    const tags = Array.from(new Set(
+      products.map(p => p.storeTag).filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b));
+    storeTagList.innerHTML = tags.map(tag => `<option value="${tag}"></option>`).join('');
   }
 
   function getCategoryDisplay(categoryId) {
@@ -185,6 +226,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       await loadCategories(groupId);
 
       allProducts = await getAllProducts(groupId);
+      updateStoreTagSuggestions(allProducts);
       renderProducts(allProducts);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -280,6 +322,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       if (productId) productId.value = product.id;
       if (productName) productName.value = product.name;
       if (prodCategory) prodCategory.value = product.category || '';
+      if (productStoreTag) productStoreTag.value = product.storeTag || '';
+      if (productDefaultQuantity) productDefaultQuantity.value = product.defaultQuantity || 1;
+      if (productDefaultUnit) productDefaultUnit.value = product.defaultUnit || 'unidad';
       if (deleteBtn) deleteBtn.hidden = false;
       resetImageState();
       setImagePreview(product.imageUrl || '');
@@ -291,6 +336,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       if (productId) productId.value = '';
       form?.reset();
       if (deleteBtn) deleteBtn.hidden = true;
+      if (productDefaultQuantity) productDefaultQuantity.value = 1;
+      if (productDefaultUnit) productDefaultUnit.value = 'unidad';
+      if (productStoreTag) productStoreTag.value = '';
       resetImageState();
       setImagePreview('');
       if (removeProductImageBtn) removeProductImageBtn.hidden = true;
@@ -329,6 +377,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   // Modal handlers
   document.getElementById('add-product-btn')?.addEventListener('click', () => openModal());
   document.getElementById('cancel-modal')?.addEventListener('click', () => productModal?.close());
+  loadUnitOptions();
 
   productImageInput?.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
@@ -359,7 +408,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     const data = {
       name,
-      category: document.getElementById('product-category')?.value || null
+      category: document.getElementById('product-category')?.value || null,
+      storeTag: productStoreTag?.value?.trim() || null,
+      defaultQuantity: parseFloat(productDefaultQuantity?.value) || 1,
+      defaultUnit: productDefaultUnit?.value || 'unidad'
     };
 
     try {
@@ -526,6 +578,28 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .product-image-actions input[type="file"] {
     font-size: 0.875rem;
+  }
+
+  .product-defaults-row {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+  }
+
+  .product-defaults-row input,
+  .product-defaults-row select {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+  }
+
+  .product-defaults-row input {
+    width: 80px;
+  }
+
+  .product-defaults-row select {
+    min-width: 140px;
   }
 
   .sort-icon {
