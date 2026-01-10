@@ -616,7 +616,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                             <input type="checkbox" ${isChecked ? 'checked' : ''} />
                           </td>
                           <td class="product-media">
-                            ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="">` : '<span class="product-thumb-placeholder">—</span>'}
+                            ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="">` : '<span class="product-thumb-placeholder" aria-hidden="true"></span>'}
                           </td>
                           <td class="product-info-cell">
                             <div class="product-name">${product.name}</div>
@@ -1354,7 +1354,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   #products-modal .modal-body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--space-md) var(--space-lg);
+    padding: 0;
   }
 
   #products-modal .modal-footer {
@@ -1427,6 +1427,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   #products-modal .products-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: separate;
     border-spacing: 0 6px;
   }
@@ -1446,12 +1447,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   #products-modal .product-check {
-    width: 32px;
+    width: 28px;
     text-align: center;
   }
 
   #products-modal .product-media {
-    width: 40px;
+    width: 36px;
   }
 
   #products-modal .product-info-cell {
@@ -1462,7 +1463,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   #products-modal .product-name {
     font-size: var(--font-size-base);
     line-height: 1.2;
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -1478,6 +1479,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   #products-modal .product-quantity-cell {
+    width: 140px;
     white-space: nowrap;
   }
 
@@ -1487,8 +1489,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   #products-modal .product-thumb {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 6px;
     object-fit: cover;
     border: 1px solid var(--color-border);
@@ -1498,14 +1500,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   #products-modal .product-thumb-placeholder {
     display: inline-flex;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 6px;
     border: 1px dashed var(--color-border);
     align-items: center;
     justify-content: center;
-    color: var(--color-text-secondary);
-    font-size: 0.75rem;
+    background: var(--color-bg-tertiary);
   }
 
   #products-modal .product-quantity {
@@ -1520,12 +1521,14 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   #products-modal .qty-input {
-    width: 60px;
+    width: 40px;
     padding: 4px 8px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     font-size: var(--font-size-sm);
     text-align: center;
+    color: var(--color-text);
+    background: var(--color-bg);
   }
 
   #products-modal .unit-select {
