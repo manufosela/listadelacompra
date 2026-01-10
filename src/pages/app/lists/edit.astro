@@ -618,9 +618,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                           ${product.storeTag ? `<div class="product-store-tag">${product.storeTag}</div>` : ''}
                         </div>
                       </label>
-                      <div class="product-quantity" ${isChecked ? '' : 'hidden'}>
-                        <input type="number" min="0.1" step="0.1" value="${quantity}" class="qty-input" />
-                        <select class="unit-select">
+                      <div class="product-quantity ${isChecked ? '' : 'disabled'}">
+                        <input type="number" min="0.1" step="0.1" value="${quantity}" class="qty-input" ${isChecked ? '' : 'disabled'} />
+                        <select class="unit-select" ${isChecked ? '' : 'disabled'}>
                           ${UNITS.map(u =>
                             `<option value="${u.id}" ${unit === u.id ? 'selected' : ''}>${u.name}</option>`
                           ).join('')}
@@ -661,11 +661,15 @@ import AppLayout from '../../../layouts/AppLayout.astro';
               unit: unitSelect.value
             };
             item.classList.add('selected');
-            quantityDiv.hidden = false;
+            quantityDiv.classList.remove('disabled');
+            qtyInput.disabled = false;
+            unitSelect.disabled = false;
           } else {
             delete selectedProducts[productId];
             item.classList.remove('selected');
-            quantityDiv.hidden = true;
+            quantityDiv.classList.add('disabled');
+            qtyInput.disabled = true;
+            unitSelect.disabled = true;
           }
           updateSelectedCount();
         });
@@ -1497,6 +1501,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     align-items: center;
     gap: var(--space-xs);
     flex-shrink: 0;
+  }
+
+  #products-modal .product-quantity.disabled {
+    opacity: 0.6;
   }
 
   #products-modal .qty-input {
