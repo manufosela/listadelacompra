@@ -45,6 +45,7 @@ export class HcShoppingList extends LitElement {
     _draggedCategory: { type: String, state: true }, // Categoría siendo arrastrada
     _expandedItems: { type: Object, state: true }, // Sublistas expandidas {itemId: true}
     _productImageMap: { type: Object, state: true }, // productId -> imageUrl|null
+    _productCategoryMap: { type: Object, state: true }, // productId -> categoryId|null
     loading: { type: Boolean, state: true },
     loadError: { type: String, state: true },
     newItemName: { type: String, state: true },
@@ -1667,6 +1668,7 @@ export class HcShoppingList extends LitElement {
     this._draggedCategory = null; // Categoría siendo arrastrada
     this._expandedItems = {};
     this._productImageMap = {};
+    this._productCategoryMap = {};
     this.loading = true;
     this.loadError = null;
     this.newItemName = '';
@@ -2129,21 +2131,21 @@ export class HcShoppingList extends LitElement {
       items.map(item => item.productId).filter(Boolean)
     ));
 
-    const missingIds = productIds.filter((id) => !(id in this._productImageMap));
-    if (missingIds.length === 0) return;
-
     try {
       const products = await Promise.all(
-        missingIds.map((id) => getProduct(groupId, id).catch(() => null))
+        productIds.map((id) => getProduct(groupId, id).catch(() => null))
       );
 
       const nextMap = { ...this._productImageMap };
+      const nextCategoryMap = { ...this._productCategoryMap };
       products.forEach((product, index) => {
-        const productId = missingIds[index];
+        const productId = productIds[index];
         nextMap[productId] = product?.imageUrl || null;
+        nextCategoryMap[productId] = product?.category || null;
       });
 
       this._productImageMap = nextMap;
+      this._productCategoryMap = nextCategoryMap;
     } catch (error) {
       console.warn('Error loading product images:', error);
     }
@@ -2152,6 +2154,13 @@ export class HcShoppingList extends LitElement {
   _getProductImageUrl(item) {
     if (!item?.productId) return null;
     return this._productImageMap[item.productId] || null;
+  }
+
+  _getItemCategory(item) {
+    if (item?.productId && this._productCategoryMap[item.productId]) {
+      return this._productCategoryMap[item.productId];
+    }
+    return item?.category || 'otros';
   }
 
   _withProductImage(item) {
@@ -2195,7 +2204,7 @@ export class HcShoppingList extends LitElement {
 
     const groups = {};
     this._filteredItems.forEach(item => {
-      const category = item.category || 'otros';
+      const category = this._getItemCategory(item);
       if (!groups[category]) {
         groups[category] = [];
       }
@@ -2621,7 +2630,7 @@ export class HcShoppingList extends LitElement {
     this.editItemUnit = item.unit || 'unidad';
     this.editItemNotes = item.notes || '';
     this.editItemPriority = item.priority || '';
-    this.editItemCategory = item.category || '';
+    this.editItemCategory = this._getItemCategory(item) || '';
     // Cargar datos de sublista
     this.editItemIsChecklist = item.isChecklist || false;
     if (item.checklist && this.listType === 'shopping') {
@@ -3308,7 +3317,7 @@ export class HcShoppingList extends LitElement {
   }
 
   _renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, showCategory, colCount) {
-    const cat = this._getCategoryById(item.category);
+    const cat = this._getCategoryById(this._getItemCategory(item));
     const isChecklist = item.isChecklist && item.checklist && item.checklist.length > 0;
     const isExpanded = !!this._expandedItems[item.id];
     const progress = isChecklist
@@ -3402,10 +3411,12 @@ export class HcShoppingList extends LitElement {
         valA = (a.name || '').toLowerCase();
         valB = (b.name || '').toLowerCase();
       } else if (this._sortColumn === 'category') {
-        const catA = this._getCategoryById(a.category);
-        const catB = this._getCategoryById(b.category);
-        valA = (catA?.name || a.category || 'zzz').toLowerCase();
-        valB = (catB?.name || b.category || 'zzz').toLowerCase();
+        const catAId = this._getItemCategory(a);
+        const catBId = this._getItemCategory(b);
+        const catA = this._getCategoryById(catAId);
+        const catB = this._getCategoryById(catBId);
+        valA = (catA?.name || catAId || 'zzz').toLowerCase();
+        valB = (catB?.name || catBId || 'zzz').toLowerCase();
       }
 
       if (valA < valB) return this._sortDirection === 'asc' ? -1 : 1;
