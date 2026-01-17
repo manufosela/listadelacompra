@@ -88,7 +88,9 @@ export class HcShoppingList extends LitElement {
     _duplicateWarnings: { type: Array, state: true },
     // Ordenación en tabla
     _sortColumn: { type: String, state: true },
-    _sortDirection: { type: String, state: true }
+    _sortDirection: { type: String, state: true },
+    // Lightbox para imágenes
+    _lightboxImageUrl: { type: String, state: true }
   };
 
   static styles = css`
@@ -232,6 +234,36 @@ export class HcShoppingList extends LitElement {
       object-fit: cover;
       margin-right: 0.5rem;
       border: 1px solid #e2e8f0;
+      cursor: zoom-in;
+      transition: transform 0.15s ease;
+    }
+
+    .product-image-inline:hover {
+      transform: scale(1.15);
+    }
+
+    .image-lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      cursor: zoom-out;
+      animation: lightbox-fade-in 0.2s ease;
+    }
+
+    .image-lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    @keyframes lightbox-fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     .filter-select {
@@ -3235,6 +3267,15 @@ export class HcShoppingList extends LitElement {
       return;
     }
 
+    // Si se hizo clic en la imagen del producto, mostrar lightbox
+    const productImage = e.target.closest('.product-image-inline');
+    if (productImage) {
+      e.preventDefault();
+      e.stopPropagation();
+      this._showImageLightbox(productImage.src);
+      return;
+    }
+
     // Buscar la fila clickeada
     const row = e.target.closest('tr[data-item-id]');
     if (!row) return;
@@ -3247,6 +3288,14 @@ export class HcShoppingList extends LitElement {
     if (this.mode === 'shopping') {
       this._handleToggleItem({ detail: { itemId: item.id, checked: !item.checked } });
     }
+  }
+
+  _showImageLightbox(imageUrl) {
+    this._lightboxImageUrl = imageUrl;
+  }
+
+  _hideImageLightbox() {
+    this._lightboxImageUrl = null;
   }
 
   _renderTableView() {
@@ -4074,6 +4123,13 @@ export class HcShoppingList extends LitElement {
               </div>
             </form>
           </div>
+        </div>
+      ` : ''}
+
+      <!-- Lightbox para imágenes de productos -->
+      ${this._lightboxImageUrl ? html`
+        <div class="image-lightbox" @click=${this._hideImageLightbox}>
+          <img src="${this._lightboxImageUrl}" alt="Imagen del producto" @click=${(e) => e.stopPropagation()}>
         </div>
       ` : ''}
     `;
