@@ -873,18 +873,24 @@ export class HcListItem extends LitElement {
   }
 
   _handleItemClick(e) {
-    // No hacer toggle si se clickea en checkbox, botones de acción, menú de asignación o imagen
-    if (e.target.closest('.checkbox') ||
-        e.target.closest('.checkbox-square') ||
-        e.target.closest('.item-actions') ||
-        e.target.closest('.assign-menu') ||
-        e.target.closest('.item-image')) {
+    // Usar composedPath para Shadow DOM - buscar en toda la ruta del evento
+    const path = e.composedPath();
+    const clickedOnInteractive = path.some(el =>
+      el.classList?.contains('checkbox') ||
+      el.classList?.contains('checkbox-square') ||
+      el.classList?.contains('item-actions') ||
+      el.classList?.contains('assign-menu') ||
+      el.classList?.contains('item-image') ||
+      el.classList?.contains('action-btn')
+    );
+    if (clickedOnInteractive) {
       return;
     }
     this._handleToggle();
   }
 
   _showImageModal(url, e) {
+    e.preventDefault();
     e.stopPropagation();
     this.imageModalUrl = url;
   }
@@ -1207,9 +1213,8 @@ export class HcListItem extends LitElement {
     if (isAgnosticList) {
       return html`
         <div
-          class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass} ${isShoppingMode ? 'clickable' : ''} ${this.card ? 'card' : ''}"
+          class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass} ${this.card ? 'card' : ''}"
           style="${this.card ? 'position: relative;' : ''}"
-          @click=${isShoppingMode ? this._handleItemClick : null}
         >
           <!-- Checkbox solo en modo usar, no en modo edición -->
           ${isShoppingMode ? html`
@@ -1302,9 +1307,8 @@ export class HcListItem extends LitElement {
     const productImageUrl = item.productImageUrl || item.imageUrl || null;
     return html`
       <div
-        class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''} ${this.card ? 'card' : ''}"
+        class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${this.card ? 'card' : ''}"
         style="${this.card ? 'position: relative;' : ''}"
-        @click=${isShoppingMode ? this._handleItemClick : null}
       >
         <!-- Checkbox only in shopping mode -->
         ${isShoppingMode ? html`
