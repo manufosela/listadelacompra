@@ -3029,6 +3029,9 @@ export class HcShoppingList extends LitElement {
     if (product.defaultQuantity) {
       this.newItemQuantity = product.defaultQuantity;
     }
+    if (product.category) {
+      this.newItemCategory = product.category;
+    }
 
     this.showSuggestions = false;
     this.selectedSuggestionIndex = -1;

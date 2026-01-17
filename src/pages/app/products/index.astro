@@ -59,14 +59,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       </div>
 
       <div class="form-group">
-        <label for="product-image">Foto</label>
+        <label>Foto</label>
         <div class="product-image-row">
           <div class="product-image-preview" id="product-image-preview">
             <span>Sin foto</span>
           </div>
           <div class="product-image-actions">
-            <input type="file" id="product-image" accept="image/*" />
-            <button type="button" class="btn btn-ghost" id="remove-product-image" hidden>Quitar foto</button>
+            <input type="file" id="product-image-camera" accept="image/*" capture="environment" hidden />
+            <input type="file" id="product-image-gallery" accept="image/*" hidden />
+            <button type="button" class="btn btn-outline" id="btn-camera" title="Hacer foto">📷 Cámara</button>
+            <button type="button" class="btn btn-outline" id="btn-gallery" title="Seleccionar imagen">🖼️ Galería</button>
+            <button type="button" class="btn btn-ghost" id="remove-product-image" hidden>Quitar</button>
           </div>
         </div>
         <small class="form-hint">JPG/PNG/WebP, máximo 2MB</small>
@@ -95,22 +98,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   let allCategories = []; // Incluye default + custom
   let sortColumn = localStorage.getItem('productsSortColumn') || 'name';
   let sortDirection = localStorage.getItem('productsSortDirection') || 'asc';
-  const productModal = document.getElementById('product-modal');
-  const productCategory = document.getElementById('product-category');
-  const productStoreTag = document.getElementById('product-store-tag');
-  const storeTagList = document.getElementById('store-tag-list');
-  const productDefaultQuantity = document.getElementById('product-default-quantity');
-  const productDefaultUnit = document.getElementById('product-default-unit');
-  const productImageInput = document.getElementById('product-image');
-  const productImagePreview = document.getElementById('product-image-preview');
-  const removeProductImageBtn = document.getElementById('remove-product-image');
   let selectedImageFile = null;
   let removeImage = false;
   let previewUrl = null;
   let editingProduct = null;
   let isSaving = false;
 
+  // Helper para obtener elementos dinámicamente (necesario para View Transitions)
+  const getEl = (id) => document.getElementById(id);
+
   function updateCategorySelectSize() {
+    const productCategory = getEl('product-category');
     if (!productCategory) return;
     productCategory.size = window.matchMedia('(max-width: 640px)').matches ? 8 : 1;
   }
@@ -118,7 +116,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   function resetImageState() {
     selectedImageFile = null;
     removeImage = false;
-    if (productImageInput) productImageInput.value = '';
+    if (productImageCamera) productImageCamera.value = '';
+    if (productImageGallery) productImageGallery.value = '';
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       previewUrl = null;
@@ -129,16 +128,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   window.addEventListener('resize', updateCategorySelectSize);
 
   function setImagePreview(url) {
-    if (!productImagePreview) return;
+    const preview = getEl('product-image-preview');
+    if (!preview) return;
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       previewUrl = null;
     }
 
     if (url) {
-      productImagePreview.innerHTML = `<img src="${url}" alt="Foto del producto" />`;
+      preview.innerHTML = `<img src="${url}" alt="Foto del producto" />`;
     } else {
-      productImagePreview.innerHTML = '<span>Sin foto</span>';
+      preview.innerHTML = '<span>Sin foto</span>';
     }
   }
 
@@ -147,10 +147,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       allCategories = await getCategoriesForList(groupId, 'shopping');
 
       // Poblar select de categorías
-      if (productCategory) {
-        productCategory.innerHTML = '<option value="">Sin categoría</option>';
+      const categorySelect = getEl('product-category');
+      if (categorySelect) {
+        categorySelect.innerHTML = '<option value="">Sin categoría</option>';
         allCategories.forEach(cat => {
-          productCategory.innerHTML += `<option value="${cat.id}">${cat.icon || '📦'} ${cat.name}</option>`;
+          categorySelect.innerHTML += `<option value="${cat.id}">${cat.icon || '📦'} ${cat.name}</option>`;
         });
       }
     } catch (error) {
@@ -159,19 +160,21 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   function loadUnitOptions() {
-    if (!productDefaultUnit) return;
-    productDefaultUnit.innerHTML = '';
+    const unitSelect = getEl('product-default-unit');
+    if (!unitSelect) return;
+    unitSelect.innerHTML = '';
     UNITS.forEach(unit => {
-      productDefaultUnit.innerHTML += `<option value="${unit.id}">${unit.name}</option>`;
+      unitSelect.innerHTML += `<option value="${unit.id}">${unit.name}</option>`;
     });
   }
 
   function updateStoreTagSuggestions(products) {
-    if (!storeTagList) return;
+    const tagList = getEl('store-tag-list');
+    if (!tagList) return;
     const tags = Array.from(new Set(
       products.map(p => p.storeTag).filter(Boolean)
     )).sort((a, b) => a.localeCompare(b));
-    storeTagList.innerHTML = tags.map(tag => `<option value="${tag}"></option>`).join('');
+    tagList.innerHTML = tags.map(tag => `<option value="${tag}"></option>`).join('');
   }
 
   function getCategoryDisplay(categoryId) {
@@ -328,12 +331,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   function openModal(product = null) {
-    const modalTitle = document.getElementById('modal-title');
-    const productId = document.getElementById('product-id');
-    const productName = document.getElementById('product-name');
-    const prodCategory = document.getElementById('product-category');
-    const deleteBtn = document.getElementById('delete-product');
-    const form = document.getElementById('product-form');
+    const modal = getEl('product-modal');
+    const modalTitle = getEl('modal-title');
+    const productId = getEl('product-id');
+    const productName = getEl('product-name');
+    const prodCategory = getEl('product-category');
+    const storeTag = getEl('product-store-tag');
+    const defaultQty = getEl('product-default-quantity');
+    const defaultUnit = getEl('product-default-unit');
+    const deleteBtn = getEl('delete-product');
+    const removeImgBtn = getEl('remove-product-image');
+    const form = getEl('product-form');
 
     if (product) {
       editingProduct = product;
@@ -341,14 +349,14 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       if (productId) productId.value = product.id;
       if (productName) productName.value = product.name;
       if (prodCategory) prodCategory.value = product.category || '';
-      if (productStoreTag) productStoreTag.value = product.storeTag || '';
-      if (productDefaultQuantity) productDefaultQuantity.value = product.defaultQuantity || 1;
-      if (productDefaultUnit) productDefaultUnit.value = product.defaultUnit || 'unidad';
+      if (storeTag) storeTag.value = product.storeTag || '';
+      if (defaultQty) defaultQty.value = product.defaultQuantity || 1;
+      if (defaultUnit) defaultUnit.value = product.defaultUnit || 'unidad';
       if (deleteBtn) deleteBtn.hidden = false;
       resetImageState();
       setImagePreview(product.imageUrl || '');
-      if (removeProductImageBtn) {
-        removeProductImageBtn.hidden = !product.imageUrl;
+      if (removeImgBtn) {
+        removeImgBtn.hidden = !product.imageUrl;
       }
     } else {
       editingProduct = null;
@@ -356,16 +364,16 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       if (productId) productId.value = '';
       form?.reset();
       if (deleteBtn) deleteBtn.hidden = true;
-      if (productDefaultQuantity) productDefaultQuantity.value = 1;
-      if (productDefaultUnit) productDefaultUnit.value = 'unidad';
-      if (productStoreTag) productStoreTag.value = '';
+      if (defaultQty) defaultQty.value = 1;
+      if (defaultUnit) defaultUnit.value = 'unidad';
+      if (storeTag) storeTag.value = '';
       resetImageState();
       setImagePreview('');
-      if (removeProductImageBtn) removeProductImageBtn.hidden = true;
+      if (removeImgBtn) removeImgBtn.hidden = true;
     }
 
-    if (productModal?.isConnected) {
-      productModal.showModal();
+    if (modal?.isConnected) {
+      modal.showModal();
     }
   }
 
@@ -424,49 +432,83 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   // Re-ejecutar en navegaciones con View Transitions
   document.addEventListener('astro:page-load', tryInit);
 
-  // Filtro de búsqueda
-  const searchInput = document.getElementById('search-input');
-  searchInput?.addEventListener('input', e => {
+  // Filtro de búsqueda (event delegation para soportar View Transitions)
+  document.addEventListener('input', e => {
+    if (e.target.id !== 'search-input') return;
     const query = e.target.value.toLowerCase();
     const filtered = allProducts.filter(p => p.name.toLowerCase().includes(query));
     renderProducts(filtered);
   });
 
-  // Modal handlers
-  document.getElementById('add-product-btn')?.addEventListener('click', () => openModal());
-  document.getElementById('cancel-modal')?.addEventListener('click', () => productModal?.close());
+  // Modal handlers (event delegation para soportar View Transitions)
   loadUnitOptions();
 
-  productImageInput?.addEventListener('change', (e) => {
+  function handleImageSelect(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     selectedImageFile = file;
     removeImage = false;
     previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
-    if (removeProductImageBtn) removeProductImageBtn.hidden = false;
+    const removeBtn = document.getElementById('remove-product-image');
+    if (removeBtn) removeBtn.hidden = false;
+  }
+
+  // Event delegation para clicks
+  document.addEventListener('click', e => {
+    const target = e.target.closest('[id]');
+    if (!target) return;
+
+    switch (target.id) {
+      case 'add-product-btn':
+        openModal();
+        break;
+      case 'cancel-modal':
+        document.getElementById('product-modal')?.close();
+        break;
+      case 'btn-camera':
+        document.getElementById('product-image-camera')?.click();
+        break;
+      case 'btn-gallery':
+        document.getElementById('product-image-gallery')?.click();
+        break;
+      case 'remove-product-image':
+        selectedImageFile = null;
+        removeImage = true;
+        const cameraInput = document.getElementById('product-image-camera');
+        const galleryInput = document.getElementById('product-image-gallery');
+        if (cameraInput) cameraInput.value = '';
+        if (galleryInput) galleryInput.value = '';
+        setImagePreview('');
+        target.hidden = true;
+        break;
+      case 'delete-product':
+        handleDeleteProduct();
+        break;
+    }
   });
 
-  removeProductImageBtn?.addEventListener('click', () => {
-    selectedImageFile = null;
-    removeImage = true;
-    if (productImageInput) productImageInput.value = '';
-    setImagePreview('');
-    if (removeProductImageBtn) removeProductImageBtn.hidden = true;
+  // Event delegation para cambios en inputs de imagen
+  document.addEventListener('change', e => {
+    if (e.target.id === 'product-image-camera' || e.target.id === 'product-image-gallery') {
+      handleImageSelect(e);
+    }
   });
 
-  document.getElementById('product-form')?.addEventListener('submit', async e => {
+  // Event delegation para submit del formulario
+  document.addEventListener('submit', async e => {
+    if (e.target.id !== 'product-form') return;
     e.preventDefault();
 
     // Evitar múltiples envíos
     if (isSaving) return;
 
     const groupId = getCurrentGroupId();
-    const id = document.getElementById('product-id')?.value;
+    const id = getEl('product-id')?.value;
     const submitBtn = e.target.querySelector('button[type="submit"]');
 
     // Normalizar nombre a lowercase
-    const rawName = document.getElementById('product-name')?.value || '';
+    const rawName = getEl('product-name')?.value || '';
     const name = rawName.trim();
 
     if (!name) {
@@ -476,10 +518,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     const data = {
       name,
-      category: document.getElementById('product-category')?.value || null,
-      storeTag: productStoreTag?.value?.trim() || null,
-      defaultQuantity: parseFloat(productDefaultQuantity?.value) || 1,
-      defaultUnit: productDefaultUnit?.value || 'unidad'
+      category: getEl('product-category')?.value || null,
+      storeTag: getEl('product-store-tag')?.value?.trim() || null,
+      defaultQuantity: parseFloat(getEl('product-default-quantity')?.value) || 1,
+      defaultUnit: getEl('product-default-unit')?.value || 'unidad'
     };
 
     // Validar duplicados (mismo nombre normalizado y categoría)
@@ -544,7 +586,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         toast.success('Producto añadido');
       }
 
-      productModal?.close();
+      getEl('product-modal')?.close();
       loadProducts();
     } catch (error) {
       toast.error(error.message);
@@ -557,7 +599,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
   });
 
-  document.getElementById('delete-product')?.addEventListener('click', async () => {
+  // Event delegation para el click de delete-product (dentro del handler de clicks general)
+  async function handleDeleteProduct() {
     const confirmed = await confirmModal.confirm({
       title: 'Eliminar producto',
       message: '¿Estás seguro de que quieres eliminar este producto?',
@@ -568,17 +611,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     if (!confirmed) return;
 
     const groupId = getCurrentGroupId();
-    const id = document.getElementById('product-id')?.value;
+    const id = getEl('product-id')?.value;
 
     try {
       await deleteProduct(groupId, id);
-      productModal?.close();
+      getEl('product-modal')?.close();
       toast.success('Producto eliminado');
       loadProducts();
     } catch (error) {
       toast.error('Error: ' + error.message);
     }
-  });
+  }
 </script>
 
 <style is:global>
@@ -683,12 +726,24 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .product-image-actions {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
     gap: var(--space-xs);
+    align-items: center;
   }
 
-  .product-image-actions input[type="file"] {
-    font-size: 0.875rem;
+  .btn-outline {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-sm);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-outline:hover {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-primary);
   }
 
   .category-select {
