@@ -52,7 +52,14 @@ pnpm format               # Formatea con Prettier
 # Firebase
 pnpm firebase:emulators   # Inicia emuladores Firebase
 pnpm deploy               # Build y deploy a Firebase Hosting
+
+# Firebase CLI (usar siempre con --account)
+firebase deploy --only storage --account mjfosela@gmail.com
+firebase deploy --only firestore:rules --account mjfosela@gmail.com
+firebase deploy --only hosting --account mjfosela@gmail.com
 ```
+
+**IMPORTANTE**: Siempre usar `--account mjfosela@gmail.com` en comandos de Firebase CLI.
 
 ## Arquitectura
 

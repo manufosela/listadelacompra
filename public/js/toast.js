@@ -18,7 +18,11 @@ function getContainer() {
     container.id = 'toast-container';
     container.setAttribute('aria-live', 'polite');
     container.setAttribute('aria-atomic', 'true');
+    // Usar popover para renderizar en top layer (sobre dialogs nativos)
+    container.setAttribute('popover', 'manual');
     document.body.appendChild(container);
+    // Mostrar el popover para activar el top layer
+    container.showPopover();
   }
   return container;
 }
@@ -40,6 +44,12 @@ function injectStyles() {
       gap: 0.5rem;
       pointer-events: none;
       max-width: calc(100vw - 3rem);
+      /* Reset estilos por defecto de popover */
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: transparent;
+      overflow: visible;
     }
 
     @media (max-width: 480px) {

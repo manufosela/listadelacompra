@@ -27,58 +27,57 @@ function injectStyles() {
   const styles = document.createElement('style');
   styles.id = 'modal-styles';
   styles.textContent = `
-    .modal-overlay {
+    .confirm-dialog {
       position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100001;
-      padding: 1rem;
-      animation: modal-fade-in 0.2s ease;
-    }
-
-    .modal-overlay.closing {
-      animation: modal-fade-out 0.15s ease forwards;
-    }
-
-    .modal-dialog {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       background: white;
+      border: none;
       border-radius: 0.75rem;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
       max-width: 400px;
-      width: 100%;
+      width: calc(100% - 2rem);
+      padding: 0;
       animation: modal-slide-in 0.2s ease;
     }
 
-    .modal-overlay.closing .modal-dialog {
+    .confirm-dialog::backdrop {
+      background: rgba(0, 0, 0, 0.5);
+      animation: modal-fade-in 0.2s ease;
+    }
+
+    .confirm-dialog.closing {
       animation: modal-slide-out 0.15s ease forwards;
     }
 
-    .modal-header {
+    .confirm-dialog.closing::backdrop {
+      animation: modal-fade-out 0.15s ease forwards;
+    }
+
+    .confirm-dialog .modal-header {
       padding: 1.25rem 1.5rem 0;
     }
 
-    .modal-title {
+    .confirm-dialog .modal-title {
       font-size: 1.125rem;
       font-weight: 600;
       color: #111827;
       margin: 0;
     }
 
-    .modal-body {
+    .confirm-dialog .modal-body {
       padding: 0.75rem 1.5rem 1.5rem;
     }
 
-    .modal-message {
+    .confirm-dialog .modal-message {
       color: #4b5563;
       font-size: 0.9375rem;
       line-height: 1.5;
       margin: 0;
     }
 
-    .modal-footer {
+    .confirm-dialog .modal-footer {
       display: flex;
       gap: 0.75rem;
       padding: 0 1.5rem 1.5rem;
@@ -144,22 +143,22 @@ function injectStyles() {
     @keyframes modal-slide-in {
       from {
         opacity: 0;
-        transform: scale(0.95) translateY(-10px);
+        transform: translate(-50%, -50%) scale(0.95);
       }
       to {
         opacity: 1;
-        transform: scale(1) translateY(0);
+        transform: translate(-50%, -50%) scale(1);
       }
     }
 
     @keyframes modal-slide-out {
       from {
         opacity: 1;
-        transform: scale(1) translateY(0);
+        transform: translate(-50%, -50%) scale(1);
       }
       to {
         opacity: 0;
-        transform: scale(0.95) translateY(-10px);
+        transform: translate(-50%, -50%) scale(0.95);
       }
     }
   `;
@@ -188,61 +187,58 @@ function confirm(options) {
   } = config;
 
   return new Promise((resolve) => {
-    // Crear overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div class="modal-header">
-          <h2 class="modal-title" id="modal-title">${escapeHtml(title)}</h2>
-        </div>
-        <div class="modal-body">
-          <p class="modal-message">${escapeHtml(message)}</p>
-        </div>
-        <div class="modal-footer">
-          <button class="modal-btn modal-btn-cancel" data-action="cancel">
-            ${escapeHtml(cancelText)}
-          </button>
-          <button class="modal-btn modal-btn-confirm ${danger ? 'danger' : ''}" data-action="confirm">
-            ${escapeHtml(confirmText)}
-          </button>
-        </div>
+    // Crear dialog nativo (se renderiza en top layer)
+    const dialog = document.createElement('dialog');
+    dialog.className = 'confirm-dialog';
+    dialog.innerHTML = `
+      <div class="modal-header">
+        <h2 class="modal-title">${escapeHtml(title)}</h2>
+      </div>
+      <div class="modal-body">
+        <p class="modal-message">${escapeHtml(message)}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn modal-btn-cancel" data-action="cancel">
+          ${escapeHtml(cancelText)}
+        </button>
+        <button class="modal-btn modal-btn-confirm ${danger ? 'danger' : ''}" data-action="confirm">
+          ${escapeHtml(confirmText)}
+        </button>
       </div>
     `;
 
     // Manejar acciones
     const close = (result) => {
-      overlay.classList.add('closing');
+      dialog.classList.add('closing');
       setTimeout(() => {
-        overlay.remove();
+        dialog.close();
+        dialog.remove();
         resolve(result);
       }, 150);
     };
 
     // Click en botones
-    overlay.addEventListener('click', (e) => {
+    dialog.addEventListener('click', (e) => {
       const action = e.target.dataset.action;
       if (action === 'confirm') close(true);
       if (action === 'cancel') close(false);
     });
 
-    // Click fuera del modal = cancelar
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close(false);
+    // Click en backdrop (fuera del dialog) = cancelar
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) close(false);
     });
 
-    // Escape = cancelar
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        document.removeEventListener('keydown', handleEscape);
-        close(false);
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
+    // Cancelar con Escape (evento nativo del dialog)
+    dialog.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      close(false);
+    });
 
-    // Añadir al DOM y enfocar botón confirmar
-    document.body.appendChild(overlay);
-    overlay.querySelector('.modal-btn-confirm').focus();
+    // Añadir al DOM, mostrar y enfocar botón confirmar
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    dialog.querySelector('.modal-btn-confirm').focus();
   });
 }
 

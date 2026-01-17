@@ -51,6 +51,16 @@ service firebase.storage {
       allow write: if isAuthenticated();
     }
 
+    // ==================== PRODUCT IMAGES ====================
+
+    match /product-images/{groupId}/{fileName} {
+      // Lectura pública (las imágenes se cargan sin token)
+      allow read: if true;
+
+      // Usuarios autenticados pueden subir/actualizar imágenes de productos
+      allow write: if isAuthenticated() && isValidImage();
+    }
+
     // ==================== GROUP TICKETS ====================
 
     match /groups/{groupId}/tickets/{ticketId} {

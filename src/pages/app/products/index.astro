@@ -108,6 +108,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   let removeImage = false;
   let previewUrl = null;
   let editingProduct = null;
+  let isSaving = false;
 
   function updateCategorySelectSize() {
     if (!productCategory) return;
@@ -456,12 +457,22 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   document.getElementById('product-form')?.addEventListener('submit', async e => {
     e.preventDefault();
+
+    // Evitar múltiples envíos
+    if (isSaving) return;
+
     const groupId = getCurrentGroupId();
     const id = document.getElementById('product-id')?.value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
 
     // Normalizar nombre a lowercase
     const rawName = document.getElementById('product-name')?.value || '';
     const name = rawName.trim();
+
+    if (!name) {
+      toast.error('El nombre del producto es obligatorio');
+      return;
+    }
 
     const data = {
       name,
@@ -470,6 +481,29 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       defaultQuantity: parseFloat(productDefaultQuantity?.value) || 1,
       defaultUnit: productDefaultUnit?.value || 'unidad'
     };
+
+    // Validar duplicados (mismo nombre normalizado y categoría)
+    const normalizedName = normalizeProductName(name);
+    const categoryToCheck = data.category || 'otros';
+    const isDuplicate = allProducts.some(p => {
+      if (id && p.id === id) return false; // Excluir el producto actual si estamos editando
+      const pNormalized = p.normalizedName || normalizeProductName(p.name);
+      const pCategory = p.category || 'otros';
+      return pNormalized === normalizedName && pCategory === categoryToCheck;
+    });
+
+    if (isDuplicate) {
+      toast.error('Ya existe un producto con ese nombre en la misma categoría');
+      return;
+    }
+
+    isSaving = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Guardando...';
+    }
+
+    let createdProductId = null;
 
     try {
       let productId = id;
@@ -483,6 +517,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         }
       } else {
         productId = await createProduct(groupId, data);
+        createdProductId = productId; // Guardar para posible rollback
       }
 
       if (removeImage && productId) {
@@ -491,8 +526,16 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       }
 
       if (selectedImageFile && productId) {
-        const imageUrl = await uploadProductImage(selectedImageFile, groupId, productId);
-        await updateProduct(groupId, productId, { imageUrl });
+        try {
+          const imageUrl = await uploadProductImage(selectedImageFile, groupId, productId);
+          await updateProduct(groupId, productId, { imageUrl });
+        } catch (imageError) {
+          // Si falla la imagen en un producto nuevo, eliminar el producto
+          if (createdProductId) {
+            await deleteProduct(groupId, createdProductId);
+          }
+          throw new Error('Error al subir la imagen: ' + imageError.message);
+        }
       }
 
       if (id) {
@@ -504,7 +547,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       productModal?.close();
       loadProducts();
     } catch (error) {
-      toast.error('Error: ' + error.message);
+      toast.error(error.message);
+    } finally {
+      isSaving = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Guardar';
+      }
     }
   });
 

@@ -55,8 +55,10 @@ export async function resizeImage(file, maxWidth = 200, maxHeight = 200) {
     const img = new Image();
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
+    const objectUrl = URL.createObjectURL(file);
 
     img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
       let { width, height } = img;
 
       // Calcular nuevas dimensiones manteniendo proporción
@@ -83,8 +85,11 @@ export async function resizeImage(file, maxWidth = 200, maxHeight = 200) {
       );
     };
 
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Error al cargar la imagen'));
+    };
+    img.src = objectUrl;
   });
 }
 
@@ -99,8 +104,10 @@ export async function cropSquareImage(file, size = 200) {
     const img = new Image();
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
+    const objectUrl = URL.createObjectURL(file);
 
     img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
       const { width, height } = img;
 
       // Calcular el recorte cuadrado centrado
@@ -128,8 +135,11 @@ export async function cropSquareImage(file, size = 200) {
       );
     };
 
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Error al cargar la imagen'));
+    };
+    img.src = objectUrl;
   });
 }
 
