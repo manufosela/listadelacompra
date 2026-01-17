@@ -13,7 +13,8 @@ export class HcListItem extends LitElement {
     showChecklist: { type: Boolean, state: true },
     newChecklistItem: { type: String, state: true },
     newChecklistItemQuantity: { type: Number, state: true },
-    newChecklistItemUnit: { type: String, state: true }
+    newChecklistItemUnit: { type: String, state: true },
+    imageModalUrl: { type: String, state: true }
   };
 
   static styles = css`
@@ -83,11 +84,41 @@ export class HcListItem extends LitElement {
       border-radius: 6px;
       object-fit: cover;
       border: 1px solid #e2e8f0;
+      cursor: zoom-in;
+      transition: transform 0.15s ease;
+    }
+
+    .item-image:hover {
+      transform: scale(1.1);
     }
 
     .item-image.card {
       width: 36px;
       height: 36px;
+    }
+
+    .image-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+      cursor: zoom-out;
+      animation: fade-in 0.2s ease;
+    }
+
+    .image-modal-content {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     .item.card .item-quantity {
@@ -810,6 +841,7 @@ export class HcListItem extends LitElement {
     this.members = [];
     this.mode = 'shopping';
     this.listType = 'shopping';
+    this.imageModalUrl = null;
     this._boundCloseMenu = this._closeMenuOnClickOutside.bind(this);
   }
 
@@ -841,14 +873,24 @@ export class HcListItem extends LitElement {
   }
 
   _handleItemClick(e) {
-    // No hacer toggle si se clickea en checkbox, botones de acción o menú de asignación
+    // No hacer toggle si se clickea en checkbox, botones de acción, menú de asignación o imagen
     if (e.target.closest('.checkbox') ||
         e.target.closest('.checkbox-square') ||
         e.target.closest('.item-actions') ||
-        e.target.closest('.assign-menu')) {
+        e.target.closest('.assign-menu') ||
+        e.target.closest('.item-image')) {
       return;
     }
     this._handleToggle();
+  }
+
+  _showImageModal(url, e) {
+    e.stopPropagation();
+    this.imageModalUrl = url;
+  }
+
+  _hideImageModal() {
+    this.imageModalUrl = null;
   }
 
   _handleRemove() {
@@ -1281,7 +1323,16 @@ export class HcListItem extends LitElement {
         <div class="item-content">
           <div class="item-main">
             ${productImageUrl ? html`
-              <img class="item-image ${this.card ? 'card' : ''}" src="${productImageUrl}" alt="">
+              <img
+                class="item-image ${this.card ? 'card' : ''}"
+                src="${productImageUrl}"
+                alt=""
+                @click=${(e) => this._showImageModal(productImageUrl, e)}
+                role="button"
+                tabindex="0"
+                aria-label="Ver imagen ampliada"
+                @keydown=${(e) => e.key === 'Enter' && this._showImageModal(productImageUrl, e)}
+              >
             ` : ''}
             <span class="item-name">${item.name || item.productName}</span>
             <span class="item-quantity">
@@ -1361,6 +1412,22 @@ export class HcListItem extends LitElement {
           ` : ''}
         </div>
       </div>
+
+      ${this.imageModalUrl ? html`
+        <div
+          class="image-modal-backdrop"
+          @click=${this._hideImageModal}
+          role="dialog"
+          aria-label="Imagen ampliada"
+        >
+          <img
+            class="image-modal-content"
+            src="${this.imageModalUrl}"
+            alt="Imagen del producto ampliada"
+            @click=${(e) => e.stopPropagation()}
+          >
+        </div>
+      ` : ''}
     `;
   }
 }
