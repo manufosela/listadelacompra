@@ -116,8 +116,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   function resetImageState() {
     selectedImageFile = null;
     removeImage = false;
-    if (productImageCamera) productImageCamera.value = '';
-    if (productImageGallery) productImageGallery.value = '';
+    const cameraInput = getEl('product-image-camera');
+    const galleryInput = getEl('product-image-gallery');
+    if (cameraInput) cameraInput.value = '';
+    if (galleryInput) galleryInput.value = '';
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       previewUrl = null;
