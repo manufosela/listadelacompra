@@ -224,11 +224,8 @@ export async function uploadProductImage(file, groupId, productId) {
     throw new Error('Tipo de archivo no válido. Usa JPG, PNG, GIF o WebP.');
   }
 
-  // Validar tamaño (máximo 2MB)
-  const maxSize = 2 * 1024 * 1024;
-  if (file.size > maxSize) {
-    throw new Error('La imagen es demasiado grande. Máximo 2MB.');
-  }
+  // No validamos tamaño porque la imagen se redimensiona a 400x400 WebP
+  // Una foto de móvil de 20MB quedará en ~50-100KB tras el redimensionado
 
   const resized = await cropSquareImage(file, 400);
   const fileName = `product-images/${groupId}/${productId}.webp`;
