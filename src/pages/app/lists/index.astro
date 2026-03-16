@@ -602,17 +602,24 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     const hasShared = orderedCombinedLists.some(list => list.ownerId && list.ownerId !== currentUser.uid);
 
     if (lists.length === 0) {
-      let emptyMessage = 'No tienes listas todavía';
       if (isArchivedTab) {
-        emptyMessage = 'No tienes listas archivadas';
+        container.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-icon">📦</span>
+            <p>Sin listas archivadas</p>
+            <p class="empty-hint">Cuando archives una lista, aparecerá aquí.</p>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-icon">🛒</span>
+            <h3>Tu despensa está vacía</h3>
+            <p class="empty-hint">Crea tu primera lista y empieza a organizar la compra con tu familia.</p>
+            <a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>
+          </div>
+        `;
       }
-
-      container.innerHTML = `
-        <div class="empty-state">
-          <p>${emptyMessage}</p>
-          ${!isArchivedTab ? '<a href="/app/lists/new" class="btn btn-primary">Crear mi primera lista</a>' : ''}
-        </div>
-      `;
       return;
     }
 
@@ -956,8 +963,27 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     color: var(--color-text-secondary);
   }
 
+  .empty-icon {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: var(--space-md);
+  }
+
+  .empty-state h3 {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: var(--space-sm);
+  }
+
+  .empty-hint {
+    max-width: 280px;
+    margin: 0 auto var(--space-lg);
+    line-height: 1.5;
+  }
+
   .empty-state p {
-    margin-bottom: var(--space-lg);
+    margin-bottom: var(--space-md);
   }
 
   @media (max-width: 480px) {
