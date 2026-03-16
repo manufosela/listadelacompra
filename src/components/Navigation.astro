@@ -150,16 +150,19 @@ const currentPath = Astro.url.pathname;
 
     .nav-link {
       flex-direction: column;
-      gap: var(--space-xs);
-      padding: var(--space-xs) var(--space-sm);
+      gap: 2px;
+      padding: var(--space-sm) var(--space-sm);
+      min-width: 44px;
+      min-height: 44px;
+      justify-content: center;
     }
 
     .nav-icon {
-      font-size: 1.5rem;
+      font-size: 1.25rem;
     }
 
     .nav-label {
-      font-size: var(--font-size-xs);
+      font-size: 0.625rem;
     }
   }
 </style>
