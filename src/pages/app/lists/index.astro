@@ -247,7 +247,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
       updateSharedLists();
     }, (error) => {
-      console.error('Error loading shared list refs:', error);
+      // Si el grupo no es accesible, limpiar localStorage para no reintentar
+      if (error?.code === 'permission-denied') {
+        localStorage.removeItem('hc_current_group');
+      }
       sharedLists = [];
       renderLists();
     });

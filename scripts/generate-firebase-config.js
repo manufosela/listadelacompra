@@ -62,7 +62,7 @@ const fileContent = `// =====================================================
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
 import { getAuth, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
-import { getFirestore, connectFirestoreEmulator, initializeFirestore } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+import { getFirestore, connectFirestoreEmulator, initializeFirestore, setLogLevel } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 import { getStorage, connectStorageEmulator } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js';
 import { getFunctions, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js';
 
@@ -83,6 +83,10 @@ export const db = initializeFirestore(app, {
 
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'europe-west1');
+
+// Suprimir logs internos del SDK de Firestore (permission-denied en snapshot listeners)
+// Los errores se gestionan en el código con try/catch y error handlers
+${isDev ? '' : "setLogLevel('warn');"}
 
 // Info de entorno
 export const ENV = {
