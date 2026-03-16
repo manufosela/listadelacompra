@@ -453,6 +453,58 @@ export class HcTicketScanner extends LitElement {
       color: var(--color-text-secondary, #6b7280);
     }
 
+    /* Items de la lista sin match */
+    .unmatched-warning {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: var(--color-warning-bg, rgba(232, 172, 78, 0.12));
+      border-radius: 0.75rem;
+      border: 1px solid var(--color-warning, #e8ac4e);
+    }
+
+    .unmatched-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .unmatched-icon {
+      font-size: 1.25rem;
+    }
+
+    .unmatched-header h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin: 0;
+      color: var(--color-text, #3a302c);
+    }
+
+    .unmatched-hint {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary, #7a6e6a);
+      margin: 0.25rem 0 0.75rem;
+      line-height: 1.4;
+    }
+
+    .unmatched-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.375rem;
+    }
+
+    .unmatched-list li {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.625rem;
+      background: var(--color-bg, #fffbf8);
+      border-radius: 9999px;
+      color: var(--color-text, #3a302c);
+      border: 1px solid var(--color-border, #ede4dd);
+    }
+
     @media (prefers-color-scheme: dark) {
       .modal { background: #1e293b; }
       .modal-header { border-color: #334155; }
@@ -722,9 +774,35 @@ export class HcTicketScanner extends LitElement {
     this._ticketData = { ...this._ticketData, [field]: value };
   }
 
+  _getAvailableListItems() {
+    if (!this.listItems) return [];
+    const matchedIds = new Set(
+      (this._ticketData?.items || [])
+        .filter(i => i.status === 'matched' && i.matchedListItemId)
+        .map(i => i.matchedListItemId)
+    );
+    return this.listItems.filter(item =>
+      !matchedIds.has(item.id) && !item.ticketId && !item.checked
+    );
+  }
+
+  _getUnmatchedListItems() {
+    if (!this.listItems || !this._ticketData) return [];
+    const matchedIds = new Set(
+      this._ticketData.items
+        .filter(i => i.status === 'matched' && i.matchedListItemId)
+        .map(i => i.matchedListItemId)
+    );
+    // Mostrar items de la lista que no tienen match con este ticket ni con tickets previos
+    return this.listItems.filter(item =>
+      !matchedIds.has(item.id) && !item.ticketId && !item.checked
+    );
+  }
+
   _renderReviewStep() {
     const data = this._ticketData;
     const activeItems = data.items.filter(i => i.status !== 'ignored');
+    const unmatchedListItems = this._getUnmatchedListItems();
 
     return html`
       <div class="modal-body">
@@ -772,6 +850,21 @@ export class HcTicketScanner extends LitElement {
         <div class="ticket-items">
           ${data.items.map((item, index) => this._renderTicketItem(item, index))}
         </div>
+
+        ${unmatchedListItems.length > 0 ? html`
+          <div class="unmatched-warning">
+            <div class="unmatched-header">
+              <span class="unmatched-icon">⚠️</span>
+              <h3>${unmatchedListItems.length} items de tu lista sin precio</h3>
+            </div>
+            <p class="unmatched-hint">Estos items no se han encontrado en el ticket. Puedes subir otro ticket de otra tienda o asignarlos manualmente arriba.</p>
+            <ul class="unmatched-list">
+              ${unmatchedListItems.map(item => html`
+                <li>${item.name}${item.quantity > 1 ? ` (×${item.quantity})` : ''}</li>
+              `)}
+            </ul>
+          </div>
+        ` : ''}
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" @click=${() => { this._step = 'upload'; }}>Volver</button>
@@ -794,8 +887,8 @@ export class HcTicketScanner extends LitElement {
           ${item.status === 'unmatched' && this.listItems.length > 0 ? html`
             <div class="match-selector">
               <select @change=${(e) => this._handleMatchChange(index, e.target.value)}>
-                <option value="">Añadir como nuevo</option>
-                ${this.listItems.map(li => html`<option value="${li.id}">${li.name}</option>`)}
+                <option value="">Ignorar (compra personal)</option>
+                ${this._getAvailableListItems().map(li => html`<option value="${li.id}">${li.name}</option>`)}
               </select>
             </div>
           ` : ''}
