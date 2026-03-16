@@ -599,7 +599,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
 
     const isArchivedTab = currentTab === 'archived';
-    const hasShared = orderedCombinedLists.some(list => list.ownerId && list.ownerId !== currentUser.uid);
 
     if (lists.length === 0) {
       if (isArchivedTab) {
@@ -624,55 +623,41 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
 
     if (viewMode === 'list') {
-      // Vista lista/tabla
-      container.innerHTML = `
-        <div class="lists-table-wrapper">
-          <table class="lists-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>Nombre</th>
-                <th>Elementos</th>
-                ${isArchivedTab ? '<th>Creada</th><th>Archivada</th>' : ''}
-                ${hasShared ? '<th>Propietario</th>' : ''}
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${lists.map(list => {
-                const isOwner = list.ownerId === currentUser.uid;
-                const listUrl = isOwner
-                  ? `/app/list?id=${list.id}`
-                  : `/app/list?id=${list.id}&owner=${list.ownerId}`;
-                const sharedBadge = isSharedList(list)
-                  ? `<span class="shared-badge">Compartida</span>`
-                  : '';
+      // Vista lista - rows compactas (responsive) + tabla en desktop
+      const rowsHtml = lists.map(list => {
+        const isOwner = list.ownerId === currentUser.uid;
+        const listUrl = isOwner
+          ? `/app/list?id=${list.id}`
+          : `/app/list?id=${list.id}&owner=${list.ownerId}`;
+        const sharedBadge = isSharedList(list)
+          ? `<span class="shared-badge">Compartida</span>`
+          : '';
+        const membersBadge = list.members?.length > 1
+          ? `<span class="members-badge">👥 ${list.members.length}</span>`
+          : '';
+        const ownerBadge = !isOwner
+          ? `<span class="owner-badge">De ${list.ownerName || 'otra persona'}</span>`
+          : '';
 
-                return `
-                  <tr>
-                    <td class="icon-cell"><a href="${listUrl}">${renderIcon(list)}</a></td>
-                    <td class="name-cell">
-                      <a href="${listUrl}">
-                        ${list.name}
-                        ${list.members?.length > 1 ? `<span class="members-badge">👥 ${list.members.length}</span>` : ''}
-                        ${!isOwner ? `<span class="owner-badge">De ${list.ownerName || 'otra persona'}</span>` : ''}
-                        ${sharedBadge}
-                      </a>
-                    </td>
-                    <td class="count-cell"><a href="${listUrl}">${list.itemCount || 0}</a></td>
-                    ${isArchivedTab ? `
-                      <td class="date-cell"><a href="${listUrl}">${formatDate(list.createdAt)}</a></td>
-                      <td class="date-cell"><a href="${listUrl}">${formatDate(list.archivedAt)}</a></td>
-                    ` : ''}
-                    ${hasShared ? `<td class="owner-cell"><a href="${listUrl}">${list.ownerName || ''}</a></td>` : ''}
-                    <td class="actions-cell">${renderActionButtons(list, isOwner)}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
+        return `
+          <div class="list-row">
+            <a href="${listUrl}" class="list-row-link">
+              <span class="list-row-icon">${renderIcon(list)}</span>
+              <span class="list-row-info">
+                <span class="list-row-name">${list.name}</span>
+                <span class="list-row-meta">
+                  ${membersBadge}${ownerBadge}${sharedBadge}
+                  ${isArchivedTab ? `<span class="list-row-date">${formatDate(list.archivedAt)}</span>` : ''}
+                </span>
+              </span>
+              <span class="list-row-count">${list.itemCount || 0}</span>
+            </a>
+            ${renderActionButtons(list, isOwner)}
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `<div class="lists-rows">${rowsHtml}</div>`;
     } else {
       // Vista grid (iconos)
       container.innerHTML = `
@@ -985,62 +970,94 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     }
   }
 
-  /* Table view styles */
-  .lists-table-wrapper {
-    overflow-x: auto;
+  /* List rows - vista compacta responsive */
+  .lists-rows {
+    display: flex;
+    flex-direction: column;
   }
 
-  .lists-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .lists-table th,
-  .lists-table td {
-    padding: var(--space-sm) var(--space-md);
-    text-align: left;
+  .list-row {
+    display: flex;
+    align-items: center;
     border-bottom: 1px solid var(--color-border);
+    transition: background var(--transition-fast);
   }
 
-  .lists-table th {
-    font-weight: 500;
-    font-size: var(--font-size-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-secondary);
+  .list-row:last-child {
+    border-bottom: none;
+  }
+
+  .list-row:hover {
     background: var(--color-bg-secondary);
   }
 
-  .lists-table tbody tr {
-    transition: background 0.15s ease;
-  }
-
-  .lists-table tbody tr:hover {
-    background: var(--color-bg-secondary);
-  }
-
-  .lists-table .icon-cell a,
-  .lists-table .name-cell a,
-  .lists-table .count-cell a,
-  .lists-table .owner-cell a {
+  .list-row-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-md);
     color: inherit;
     text-decoration: none;
-    display: block;
-    width: 100%;
-    height: 100%;
   }
 
-  .lists-table .icon-cell,
-  .lists-table .name-cell,
-  .lists-table .count-cell,
-  .lists-table .owner-cell {
-    cursor: pointer;
-  }
-
-  .lists-table .icon-cell {
-    width: 50px;
+  .list-row-icon {
     font-size: 1.5rem;
+    flex-shrink: 0;
+    width: 36px;
     text-align: center;
+  }
+
+  .list-row-icon .list-icon-img {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+  }
+
+  .list-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .list-row-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .list-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  .list-row-date {
+    color: var(--color-text-tertiary);
+  }
+
+  .list-row-count {
+    flex-shrink: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    min-width: 24px;
+    text-align: center;
+  }
+
+  .list-row .list-actions-group {
+    display: flex;
+    gap: 4px;
+    padding-right: var(--space-sm);
+    flex-shrink: 0;
   }
 
   .list-icon-img {
@@ -1053,36 +1070,6 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   .list-card-icon .list-icon-img {
     width: 48px;
     height: 48px;
-  }
-
-  .lists-table .name-cell {
-    font-weight: 500;
-  }
-
-  .lists-table .name-cell .members-badge {
-    margin-left: var(--space-sm);
-    font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
-  }
-
-  .lists-table .count-cell {
-    color: var(--color-text-secondary);
-    white-space: nowrap;
-  }
-
-  .lists-table .owner-cell {
-    color: var(--color-text-secondary);
-  }
-
-  .lists-table .date-cell {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-xs);
-    white-space: nowrap;
-  }
-
-  .lists-table .date-cell a {
-    color: inherit;
-    text-decoration: none;
   }
 
   /* Fechas en cards */
@@ -1099,17 +1086,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     display: block;
   }
 
-  .lists-table .actions-cell {
-    width: 150px;
-    text-align: right;
-  }
-
-  .lists-table .actions-cell .list-actions-group {
-    display: inline-flex;
-    gap: 4px;
-    justify-content: flex-end;
-  }
-
+  /* Ocultar acciones en mobile, mostrar con swipe o long-press en el futuro */
   @media (max-width: 480px) {
     .tabs-row {
       flex-wrap: wrap;
@@ -1123,8 +1100,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       margin-bottom: var(--space-sm);
     }
 
-    .lists-table .actions-cell {
-      width: auto;
+    .list-row .list-actions-group {
+      gap: 2px;
     }
 
     .list-action-btn {
@@ -1135,6 +1112,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     .list-action-btn svg {
       width: 14px;
       height: 14px;
+    }
+
+    .list-row-link {
+      padding: var(--space-sm) var(--space-md);
+      gap: var(--space-sm);
     }
   }
 
