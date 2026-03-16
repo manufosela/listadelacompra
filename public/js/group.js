@@ -87,12 +87,14 @@ export async function getUserGroups(forceRefresh = false) {
   }
 
   return getCachedOrFetch('userGroups', user.uid, async () => {
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-    if (!userDoc.exists()) return [];
+    const userRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userRef);
+    if (!userDocSnap.exists()) return [];
 
-    const groupIds = userDoc.data().groupIds || [];
+    const groupIds = userDocSnap.data().groupIds || [];
     if (groupIds.length === 0) return [];
 
+    const staleIds = [];
     const groups = await Promise.all(
       groupIds.map(async (id) => {
         try {
@@ -100,13 +102,24 @@ export async function getUserGroups(forceRefresh = false) {
           if (groupDoc.exists()) {
             return { id: groupDoc.id, ...groupDoc.data() };
           }
+          staleIds.push(id);
           return null;
         } catch {
-          // El usuario ya no es miembro del grupo o el grupo fue eliminado
+          // Sin permisos = ya no es miembro del grupo
+          staleIds.push(id);
           return null;
         }
       })
     );
+
+    // Limpiar referencias a grupos obsoletos del perfil del usuario
+    if (staleIds.length > 0) {
+      try {
+        await updateDoc(userRef, { groupIds: arrayRemove(...staleIds) });
+      } catch {
+        // Si falla la limpieza, no es crítico
+      }
+    }
 
     return groups.filter(Boolean);
   });
