@@ -66,19 +66,26 @@ export async function compressImage(file, maxWidth = 1200, quality = 0.8) {
  * @param {string} params.userId - ID del usuario propietario de la lista
  * @returns {Promise<Object>} Datos del ticket procesado
  */
-export async function processTicket({ imageFile, groupId, listId, userId }) {
+export async function processTicket({ imageFile, groupId, listId, userId, assignedTo }) {
   // Comprimir imagen
   const compressed = await compressImage(imageFile);
   const base64 = await imageToBase64(compressed);
 
   // Llamar a Cloud Function
   const processTicketFn = httpsCallable(functions, 'processTicket');
-  const result = await processTicketFn({
+  const params = {
     imageBase64: base64,
     groupId,
     listId,
     userId
-  });
+  };
+
+  // Si se pasa assignedTo, solo matchear contra items asignados al usuario
+  if (assignedTo) {
+    params.assignedTo = assignedTo;
+  }
+
+  const result = await processTicketFn(params);
 
   return result.data;
 }
@@ -92,7 +99,7 @@ export async function processTicket({ imageFile, groupId, listId, userId }) {
  * @param {Array} params.listItems - Items actuales de la lista
  * @param {Object} params.ticketMeta - Metadata del ticket (store, date, total)
  */
-export async function applyTicketToList({ userId, listId, ticketItems, listItems: _listItems, ticketMeta }) {
+export async function applyTicketToList({ userId, listId, ticketItems, listItems: _listItems, ticketMeta, ticketId }) {
   const itemsRef = collection(db, 'users', userId, 'lists', listId, 'items');
   const listRef = doc(db, 'users', userId, 'lists', listId);
 
@@ -109,20 +116,27 @@ export async function applyTicketToList({ userId, listId, ticketItems, listItems
     }
 
     if (ticketItem.status === 'matched' && ticketItem.matchedListItemId) {
-      // Actualizar item existente
+      // Actualizar item existente con precio del ticket
       const itemRef = doc(db, 'users', userId, 'lists', listId, 'items', ticketItem.matchedListItemId);
-      await updateDoc(itemRef, {
+      const updateData = {
         checked: true,
         price: ticketItem.totalPrice || ticketItem.unitPrice,
         unitPrice: ticketItem.unitPrice,
         checkedAt: serverTimestamp(),
         ticketStore: ticketMeta?.store || null,
         ticketDate: ticketMeta?.date || null
-      });
+      };
+
+      // Guardar ticketId para tracking de multi-ticket
+      if (ticketId) {
+        updateData.ticketId = ticketId;
+      }
+
+      await updateDoc(itemRef, updateData);
       results.updated++;
     } else if (ticketItem.status === 'new' || ticketItem.status === 'unmatched') {
       // Crear nuevo item
-      await addDoc(itemsRef, {
+      const newItemData = {
         name: ticketItem.name,
         quantity: ticketItem.quantity || 1,
         unit: ticketItem.unit || 'unidad',
@@ -134,7 +148,13 @@ export async function applyTicketToList({ userId, listId, ticketItems, listItems
         createdAt: serverTimestamp(),
         ticketStore: ticketMeta?.store || null,
         ticketDate: ticketMeta?.date || null
-      });
+      };
+
+      if (ticketId) {
+        newItemData.ticketId = ticketId;
+      }
+
+      await addDoc(itemsRef, newItemData);
       results.created++;
     }
   }

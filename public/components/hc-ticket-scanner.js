@@ -23,6 +23,7 @@ export class HcTicketScanner extends LitElement {
     listId: { type: String, attribute: 'list-id' },
     userId: { type: String, attribute: 'user-id' },
     listItems: { type: Array },
+    assignedTo: { type: String, attribute: 'assigned-to' },
     buttonHidden: { type: Boolean, attribute: 'button-hidden' },
 
     // Estado interno
@@ -36,6 +37,7 @@ export class HcTicketScanner extends LitElement {
   constructor() {
     super();
     this.listItems = [];
+    this.assignedTo = null;
     this.buttonHidden = false;
     this._isOpen = false;
     this._step = 'upload';
@@ -568,7 +570,8 @@ export class HcTicketScanner extends LitElement {
         imageFile: file,
         groupId,
         listId: this.listId,
-        userId: this.userId
+        userId: this.userId,
+        assignedTo: this.assignedTo
       });
 
       if (!result.success) {
@@ -632,6 +635,9 @@ export class HcTicketScanner extends LitElement {
     this._step = 'applying';
 
     try {
+      // Generar ticketId único para tracking multi-ticket
+      const ticketId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
       const results = await applyTicketToList({
         userId: this.userId,
         listId: this.listId,
@@ -641,7 +647,8 @@ export class HcTicketScanner extends LitElement {
           store: this._ticketData.store,
           date: this._ticketData.date,
           total: this._ticketData.total
-        }
+        },
+        ticketId
       });
 
       // Subir imagen a Storage
@@ -649,7 +656,6 @@ export class HcTicketScanner extends LitElement {
       if (this._imageFile) {
         try {
           const groupId = getCurrentGroupId();
-          const ticketId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const storageRef = ref(storage, `groups/${groupId}/tickets/${ticketId}.jpg`);
 
           // Comprimir imagen antes de subir
