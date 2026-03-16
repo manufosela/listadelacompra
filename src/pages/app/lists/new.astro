@@ -704,6 +704,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     try {
       let iconUrl = null;
 
+      // Si es tipo "dividir", auto-seleccionar todos los miembros del grupo
+      let finalMembers = selectedMembers;
+      if (expenseType === 'shared' && groupMembers.length > 0 && finalMembers.length === 0) {
+        finalMembers = groupMembers.map(m => m.uid);
+      }
+
       // Crear lista primero (necesitamos el ID para subir la imagen)
       const newList = await createList({
         name,
@@ -716,7 +722,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
         scheduledDate: date || null,
         isRecurring,
         recurringPattern: isRecurring ? { frequency } : null
-      }, selectedMembers);
+      }, finalMembers);
 
       // Si hay imagen seleccionada, subirla y actualizar la lista
       if (selectedImageFile) {
