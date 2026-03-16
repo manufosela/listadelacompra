@@ -87,47 +87,20 @@ export async function getUserGroups(forceRefresh = false) {
   }
 
   return getCachedOrFetch('userGroups', user.uid, async () => {
-    const userRef = doc(db, 'users', user.uid);
-    const userDocSnap = await getDoc(userRef);
-    if (!userDocSnap.exists()) return [];
+    // Usar Cloud Function para evitar errores permission-denied en consola
+    const getMyGroupsFn = httpsCallable(functions, 'getMyGroups');
+    const result = await getMyGroupsFn();
+    const { groups, cleaned } = result.data;
 
-    const groupIds = userDocSnap.data().groupIds || [];
-    if (groupIds.length === 0) return [];
-
-    const staleIds = [];
-    const groups = await Promise.all(
-      groupIds.map(async (id) => {
-        try {
-          const groupDoc = await getDoc(doc(db, 'groups', id));
-          if (groupDoc.exists()) {
-            return { id: groupDoc.id, ...groupDoc.data() };
-          }
-          staleIds.push(id);
-          return null;
-        } catch {
-          // Sin permisos = ya no es miembro del grupo
-          staleIds.push(id);
-          return null;
-        }
-      })
-    );
-
-    // Limpiar referencias a grupos obsoletos del perfil del usuario
-    if (staleIds.length > 0) {
-      try {
-        await updateDoc(userRef, { groupIds: arrayRemove(...staleIds) });
-      } catch {
-        // Si falla la limpieza, no es crítico
-      }
-
-      // Si el grupo seleccionado en localStorage es obsoleto, limpiarlo
+    // Si se limpiaron grupos obsoletos, limpiar localStorage también
+    if (cleaned > 0) {
       const currentGroup = getCurrentGroupId();
-      if (currentGroup && staleIds.includes(currentGroup)) {
+      if (currentGroup && !groups.some(g => g.id === currentGroup)) {
         localStorage.removeItem('hc_current_group');
       }
     }
 
-    return groups.filter(Boolean);
+    return groups || [];
   });
 }
 

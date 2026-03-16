@@ -523,3 +523,60 @@ export const acceptInvitation = onCall(
     }
   }
 );
+
+/**
+ * Get user's groups with admin privileges
+ * Avoids client-side permission-denied errors for stale groupIds
+ */
+export const getMyGroups = onCall(
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    timeoutSeconds: 15,
+    cors: true,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const userId = request.auth.uid;
+
+    // Leer el documento del usuario
+    const userRef = db.collection('users').doc(userId);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      return { groups: [] };
+    }
+
+    const groupIds = userSnap.data().groupIds || [];
+    if (groupIds.length === 0) {
+      return { groups: [] };
+    }
+
+    const validGroups = [];
+    const staleIds = [];
+
+    for (const groupId of groupIds) {
+      const groupSnap = await db.collection('groups').doc(groupId).get();
+      if (groupSnap.exists) {
+        const data = groupSnap.data();
+        // Verificar que el usuario sigue siendo miembro
+        if (data.members && data.members[userId]) {
+          validGroups.push({ id: groupSnap.id, ...data });
+        } else {
+          staleIds.push(groupId);
+        }
+      } else {
+        staleIds.push(groupId);
+      }
+    }
+
+    // Limpiar groupIds obsoletos
+    if (staleIds.length > 0) {
+      await userRef.update({ groupIds: FieldValue.arrayRemove(...staleIds) });
+    }
+
+    return { groups: validGroups, cleaned: staleIds.length };
+  }
+);
