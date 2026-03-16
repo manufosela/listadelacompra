@@ -3551,6 +3551,7 @@ export class HcShoppingList extends LitElement {
           list-id="${this.listId}"
           user-id="${this.userId}"
           .listItems=${this.items}
+          .assignedTo=${this.filterByAssignee || null}
           button-hidden
           @ticket-applied=${this._handleTicketApplied}
         ></hc-ticket-scanner>

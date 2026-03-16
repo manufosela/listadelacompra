@@ -159,6 +159,7 @@ export const processTicket = onCall(
       const analysis = await analyzeTicketWithOpenAI(imageContent);
 
       // If listId provided, load list items for matching suggestions
+      const assignedTo = data.assignedTo || null;
       let listItems = [];
       if (listId && userId) {
         const itemsSnap = await db
@@ -176,7 +177,16 @@ export const processTicket = onCall(
           checked: doc.data().checked || false,
           quantity: doc.data().quantity,
           unit: doc.data().unit,
+          assignedTo: doc.data().assignedTo || null,
+          ticketId: doc.data().ticketId || null,
         }));
+
+        // Filtrar por assignedTo si se proporciona (solo matchear contra mis items)
+        if (assignedTo) {
+          listItems = listItems.filter(item =>
+            item.assignedTo === assignedTo && !item.ticketId
+          );
+        }
       }
 
       // Try to match ticket items with list items
