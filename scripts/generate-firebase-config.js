@@ -86,7 +86,7 @@ export const functions = getFunctions(app, 'europe-west1');
 
 // Suprimir logs internos del SDK de Firestore (permission-denied en snapshot listeners)
 // Los errores se gestionan en el código con try/catch y error handlers
-${isDev ? '' : "setLogLevel('warn');"}
+${isDev ? '' : "setLogLevel('silent');"}
 
 // Info de entorno
 export const ENV = {
