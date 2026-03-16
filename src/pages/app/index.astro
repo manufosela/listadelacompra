@@ -8,22 +8,41 @@ import AppLayout from '../../layouts/AppLayout.astro';
       <h1 id="greeting" class="home-greeting">Hola</h1>
       <p class="welcome">¿Qué necesitas hoy?</p>
 
+      <!-- Banner de invitaciones pendientes -->
+      <div id="invitations-banner" class="invitations-banner" hidden></div>
+
       <div class="quick-actions">
         <a href="/app/lists" class="quick-action">
           <span class="quick-icon">🛒</span>
-          <span class="quick-label">Mis listas</span>
+          <span class="quick-label">Listas</span>
         </a>
         <a href="/app/lists/new" class="quick-action accent">
           <span class="quick-icon">✨</span>
           <span class="quick-label">Nueva lista</span>
         </a>
+        <a href="/app/tickets" class="quick-action secondary">
+          <span class="quick-icon">🧾</span>
+          <span class="quick-label">Tickets</span>
+        </a>
+        <a href="/app/balances" class="quick-action secondary">
+          <span class="quick-icon">💰</span>
+          <span class="quick-label">Balances</span>
+        </a>
         <a href="/app/products" class="quick-action secondary">
           <span class="quick-icon">📦</span>
           <span class="quick-label">Productos</span>
         </a>
-        <a href="/app/tickets" class="quick-action secondary">
-          <span class="quick-icon">🧾</span>
-          <span class="quick-label">Tickets</span>
+        <a href="/app/groups" class="quick-action secondary">
+          <span class="quick-icon">👥</span>
+          <span class="quick-label">Grupos</span>
+        </a>
+        <a href="/app/categories" class="quick-action secondary">
+          <span class="quick-icon">🏷️</span>
+          <span class="quick-label">Categorías</span>
+        </a>
+        <a href="/app/settings" class="quick-action secondary">
+          <span class="quick-icon">⚙️</span>
+          <span class="quick-label">Ajustes</span>
         </a>
       </div>
     </div>
@@ -33,10 +52,60 @@ import AppLayout from '../../layouts/AppLayout.astro';
 <script type="module">
   import { isAuthResolved, getCurrentUser } from '/js/auth.js';
 
-  function initPage(user) {
+  async function initPage(user) {
     const greeting = document.getElementById('greeting');
     const displayName = user.displayName?.split(' ')[0] || 'Usuario';
     if (greeting) greeting.textContent = `Hola, ${displayName}`;
+
+    // Comprobar invitaciones pendientes
+    try {
+      const { getPendingInvitations, acceptInvitation } = await import('/js/group.js');
+      const invitations = await getPendingInvitations();
+      const banner = document.getElementById('invitations-banner');
+      if (invitations.length > 0 && banner) {
+        banner.hidden = false;
+        banner.innerHTML = invitations.map(inv => `
+          <div class="invitation-card">
+            <div class="invitation-info">
+              <strong>${inv.groupName}</strong>
+              <span>Invitado por ${inv.invitedByName}</span>
+            </div>
+            <div class="invitation-actions">
+              <button class="inv-accept" data-id="${inv.id}">Aceptar</button>
+              <button class="inv-reject" data-id="${inv.id}">Rechazar</button>
+            </div>
+          </div>
+        `).join('');
+
+        banner.querySelectorAll('.inv-accept').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            btn.textContent = 'Aceptando...';
+            try {
+              await acceptInvitation(btn.dataset.id);
+              btn.closest('.invitation-card').remove();
+              if (banner.children.length === 0) banner.hidden = true;
+              const { toast } = await import('/js/toast.js');
+              toast.success('Te has unido al grupo');
+            } catch {
+              btn.disabled = false;
+              btn.textContent = 'Aceptar';
+            }
+          });
+        });
+
+        banner.querySelectorAll('.inv-reject').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const { rejectInvitation } = await import('/js/group.js');
+            await rejectInvitation(btn.dataset.id);
+            btn.closest('.invitation-card').remove();
+            if (banner.children.length === 0) banner.hidden = true;
+          });
+        });
+      }
+    } catch {
+      // Sin invitaciones o error de red, no es crítico
+    }
   }
 
   function tryInit() {
@@ -81,11 +150,75 @@ import AppLayout from '../../layouts/AppLayout.astro';
     font-weight: 500;
   }
 
+  /* Banner invitaciones */
+  .invitations-banner {
+    margin-bottom: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .invitation-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background: var(--color-success-bg);
+    border: 1px solid var(--color-success);
+    border-radius: var(--radius-lg);
+  }
+
+  .invitation-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+  }
+
+  .invitation-info strong {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+  }
+
+  .invitation-info span {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  .invitation-actions {
+    display: flex;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
+
+  .inv-accept {
+    padding: var(--space-xs) var(--space-md);
+    background: var(--color-success);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .inv-reject {
+    padding: var(--space-xs) var(--space-md);
+    background: none;
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+  }
+
+  /* Quick actions */
   .quick-actions {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-md);
-    max-width: 360px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-sm);
+    max-width: 480px;
     margin: 0 auto;
   }
 
@@ -93,11 +226,11 @@ import AppLayout from '../../layouts/AppLayout.astro';
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-lg) var(--space-md);
+    gap: var(--space-xs);
+    padding: var(--space-md) var(--space-sm);
     background: var(--color-bg);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
     text-decoration: none;
     color: var(--color-text);
     transition: transform var(--transition-fast), box-shadow var(--transition-fast);
@@ -105,7 +238,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   .quick-action:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow: var(--shadow-md);
   }
 
@@ -124,11 +257,30 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   .quick-icon {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
 
   .quick-label {
-    font-size: var(--font-size-sm);
+    font-size: 0.6875rem;
     font-weight: 600;
+  }
+
+  @media (max-width: 480px) {
+    .quick-actions {
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-xs);
+    }
+
+    .quick-action {
+      padding: var(--space-sm) var(--space-xs);
+    }
+
+    .quick-icon {
+      font-size: 1.25rem;
+    }
+
+    .quick-label {
+      font-size: 0.5625rem;
+    }
   }
 </style>

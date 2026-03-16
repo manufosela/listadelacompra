@@ -4,7 +4,6 @@ import {
   getGroupMembers,
   removeMember,
   updateMemberRole,
-  generateGroupInvite,
   isAdmin,
   getCurrentGroupId
 } from '/js/group.js';
@@ -15,7 +14,6 @@ export class HcMemberManager extends LitElement {
     groupId: { type: String, attribute: 'group-id' },
     members: { type: Array, state: true },
     isCurrentUserAdmin: { type: Boolean, state: true },
-    inviteCode: { type: String, state: true },
     loading: { type: Boolean, state: true },
     error: { type: String, state: true }
   };
@@ -137,32 +135,6 @@ export class HcMemberManager extends LitElement {
       font-size: 1rem;
     }
 
-    .invite-code {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .code-display {
-      font-family: monospace;
-      font-size: 1.5rem;
-      letter-spacing: 0.25rem;
-      padding: 0.75rem 1.5rem;
-      background: var(--color-bg, #fffbf8);
-      border: 2px dashed var(--color-border-dark, #ddd1c9);
-      border-radius: 0.5rem;
-    }
-
-    .copy-btn {
-      padding: 0.5rem 1rem;
-      background: var(--color-primary, #e07b5c);
-      color: white;
-      border: none;
-      border-radius: 0.375rem;
-      cursor: pointer;
-      font-size: 0.875rem;
-    }
 
     .copy-btn:hover {
       background: var(--color-primary-dark, #c9624a);
@@ -201,7 +173,6 @@ export class HcMemberManager extends LitElement {
     this._componentId = `member-manager-${Math.random().toString(36).substr(2, 9)}`;
     this.members = [];
     this.isCurrentUserAdmin = false;
-    this.inviteCode = '';
     this.loading = true;
     this.error = '';
 
@@ -253,22 +224,6 @@ export class HcMemberManager extends LitElement {
     this.loading = false;
   }
 
-  async _generateInvite() {
-    const hId = this.groupId || getCurrentGroupId();
-    try {
-      this.inviteCode = await generateGroupInvite(hId);
-    } catch (error) {
-      this.error = error.message;
-    }
-  }
-
-  async _copyInviteCode() {
-    try {
-      await navigator.clipboard.writeText(this.inviteCode);
-    } catch (error) {
-      console.error('Error copying to clipboard:', error);
-    }
-  }
 
   async _removeMember(userId) {
     if (!confirm('¿Estás seguro de que quieres eliminar a este miembro?')) return;
@@ -367,27 +322,6 @@ export class HcMemberManager extends LitElement {
         `)}
       </div>
 
-      ${this.isCurrentUserAdmin ? html`
-        <div class="invite-section">
-          <h3>Invitar miembros</h3>
-
-          ${this.inviteCode ? html`
-            <div class="invite-code">
-              <span class="code-display">${this.inviteCode}</span>
-              <button class="copy-btn" @click=${this._copyInviteCode}>
-                📋 Copiar
-              </button>
-            </div>
-            <p style="font-size: 0.875rem; color: var(--color-text-secondary, #7a6e6a);">
-              Este código expira en 48 horas.
-            </p>
-          ` : html`
-            <button class="generate-btn" @click=${this._generateInvite}>
-              🔗 Generar código de invitación
-            </button>
-          `}
-        </div>
-      ` : ''}
     `;
   }
 }
