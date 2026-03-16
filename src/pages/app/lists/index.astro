@@ -186,6 +186,21 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       return;
     }
 
+    // Verificar que el grupo es accesible antes de suscribirse
+    try {
+      const { getUserGroups } = await import('/js/group.js');
+      const validGroups = await getUserGroups();
+      if (!validGroups.some(g => g.id === groupId)) {
+        sharedLists = [];
+        renderLists();
+        return;
+      }
+    } catch {
+      sharedLists = [];
+      renderLists();
+      return;
+    }
+
     const refsRef = collection(db, 'groups', groupId, 'sharedListRefs');
     const refsQuery = query(refsRef, where('members', 'array-contains', currentUser.uid));
 

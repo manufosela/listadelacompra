@@ -119,6 +119,12 @@ export async function getUserGroups(forceRefresh = false) {
       } catch {
         // Si falla la limpieza, no es crítico
       }
+
+      // Si el grupo seleccionado en localStorage es obsoleto, limpiarlo
+      const currentGroup = getCurrentGroupId();
+      if (currentGroup && staleIds.includes(currentGroup)) {
+        localStorage.removeItem('hc_current_group');
+      }
     }
 
     return groups.filter(Boolean);
