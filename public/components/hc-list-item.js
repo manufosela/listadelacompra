@@ -27,14 +27,14 @@ export class HcListItem extends LitElement {
       align-items: center;
       gap: 0.75rem;
       padding: 0.75rem 1rem;
-      background: white;
-      border: 1px solid #e2e8f0;
+      background: var(--color-bg, #fffbf8);
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       transition: all 0.15s ease;
     }
 
     .item:hover {
-      border-color: #cbd5e1;
+      border-color: var(--color-border-dark, #ddd1c9);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
@@ -83,7 +83,7 @@ export class HcListItem extends LitElement {
       height: 28px;
       border-radius: 6px;
       object-fit: cover;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       cursor: zoom-in;
       transition: transform 0.15s ease;
     }
@@ -123,7 +123,7 @@ export class HcListItem extends LitElement {
 
     .item.card .item-quantity {
       font-size: 0.8125rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .item.card .item-actions {
@@ -139,13 +139,13 @@ export class HcListItem extends LitElement {
 
     .item.card.checked {
       opacity: 0.7;
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .checkbox {
       width: 22px;
       height: 22px;
-      border: 2px solid #cbd5e1;
+      border: 2px solid var(--color-border-dark, #ddd1c9);
       border-radius: 50%;
       cursor: pointer;
       display: flex;
@@ -156,12 +156,12 @@ export class HcListItem extends LitElement {
     }
 
     .checkbox:hover {
-      border-color: #22c55e;
+      border-color: var(--color-success, #6bbe86);
     }
 
     .checkbox.checked {
-      background: #22c55e;
-      border-color: #22c55e;
+      background: var(--color-success, #6bbe86);
+      border-color: var(--color-success, #6bbe86);
       color: white;
     }
 
@@ -185,23 +185,23 @@ export class HcListItem extends LitElement {
 
     .item-quantity {
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       white-space: nowrap;
     }
 
     .item-meta {
       font-size: 0.75rem;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
       margin-top: 0.25rem;
     }
 
     .item-notes {
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       font-style: italic;
       margin-top: 0.25rem;
       padding-top: 0.25rem;
-      border-top: 1px dashed #e2e8f0;
+      border-top: 1px dashed var(--color-border, #ede4dd);
     }
 
     .item-actions {
@@ -230,11 +230,11 @@ export class HcListItem extends LitElement {
     }
 
     .action-btn:hover {
-      background: #f1f5f9;
+      background: var(--color-bg-tertiary, #ffede3);
     }
 
     .action-btn.danger:hover {
-      background: #fef2f2;
+      background: var(--color-danger-bg, rgba(217, 107, 107, 0.12));
     }
 
     .assignee {
@@ -242,17 +242,17 @@ export class HcListItem extends LitElement {
       align-items: center;
       gap: 0.25rem;
       padding: 0.125rem 0.5rem;
-      background: #eff6ff;
+      background: var(--color-primary-bg, rgba(224, 123, 92, 0.1));
       border-radius: 9999px;
       font-size: 0.75rem;
-      color: #2563eb;
+      color: var(--color-primary, #e07b5c);
     }
 
     .assignee-avatar {
       width: 18px;
       height: 18px;
       border-radius: 50%;
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       color: white;
       display: flex;
       align-items: center;
@@ -276,8 +276,8 @@ export class HcListItem extends LitElement {
       position: absolute;
       top: 100%;
       right: 0;
-      background: white;
-      border: 1px solid #e2e8f0;
+      background: var(--color-bg, #fffbf8);
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       min-width: 180px;
@@ -289,9 +289,9 @@ export class HcListItem extends LitElement {
       padding: 0.5rem 0.75rem;
       font-size: 0.75rem;
       font-weight: 500;
-      color: #64748b;
-      background: #f8fafc;
-      border-bottom: 1px solid #e2e8f0;
+      color: var(--color-text-secondary, #7a6e6a);
+      background: var(--color-bg-secondary, #fff5ee);
+      border-bottom: 1px solid var(--color-border, #ede4dd);
     }
 
     .assign-option {
@@ -309,18 +309,18 @@ export class HcListItem extends LitElement {
     }
 
     .assign-option:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .assign-option.selected {
-      background: #eff6ff;
+      background: var(--color-primary-bg, rgba(224, 123, 92, 0.1));
     }
 
     .assign-option .avatar {
       width: 24px;
       height: 24px;
       border-radius: 50%;
-      background: #64748b;
+      background: var(--color-text-secondary, #7a6e6a);
       color: white;
       display: flex;
       align-items: center;
@@ -337,27 +337,27 @@ export class HcListItem extends LitElement {
     }
 
     .assign-option.unassign {
-      color: #dc2626;
-      border-top: 1px solid #e2e8f0;
+      color: var(--color-danger, #d96b6b);
+      border-top: 1px solid var(--color-border, #ede4dd);
     }
 
     /* Estilos para listas agnósticas */
     .item.priority-high {
-      border-left: 3px solid #dc2626;
+      border-left: 3px solid var(--color-danger, #d96b6b);
     }
 
     .item.priority-medium {
-      border-left: 3px solid #f59e0b;
+      border-left: 3px solid var(--color-warning, #e8ac4e);
     }
 
     .item.priority-low {
-      border-left: 3px solid #10b981;
+      border-left: 3px solid var(--color-success, #6bbe86);
     }
 
     .checkbox-square {
       width: 20px;
       height: 20px;
-      border: 2px solid #cbd5e1;
+      border: 2px solid var(--color-border-dark, #ddd1c9);
       border-radius: 4px;
       cursor: pointer;
       display: flex;
@@ -369,12 +369,12 @@ export class HcListItem extends LitElement {
     }
 
     .checkbox-square:hover {
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .checkbox-square.checked {
-      background: #2563eb;
-      border-color: #2563eb;
+      background: var(--color-primary, #e07b5c);
+      border-color: var(--color-primary, #e07b5c);
       color: white;
     }
 
@@ -390,36 +390,36 @@ export class HcListItem extends LitElement {
     }
 
     .priority-badge.high {
-      background: #fef2f2;
-      color: #dc2626;
+      background: var(--color-danger-bg, rgba(217, 107, 107, 0.12));
+      color: var(--color-danger, #d96b6b);
     }
 
     .priority-badge.medium {
-      background: #fffbeb;
-      color: #d97706;
+      background: var(--color-warning-bg, rgba(232, 172, 78, 0.12));
+      color: var(--color-warning, #e8ac4e);
     }
 
     .priority-badge.low {
-      background: #ecfdf5;
-      color: #059669;
+      background: var(--color-success-bg, rgba(107, 190, 134, 0.12));
+      color: var(--color-success, #6bbe86);
     }
 
     .item-notes-inline {
       font-size: 0.75rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       margin-top: 0.25rem;
     }
 
     /* Estilos para sublistas con details/summary */
     .item-checklist {
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
-      background: white;
+      background: var(--color-bg, #fffbf8);
       transition: all 0.15s ease;
     }
 
     .item-checklist:hover {
-      border-color: #cbd5e1;
+      border-color: var(--color-border-dark, #ddd1c9);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
@@ -435,7 +435,7 @@ export class HcListItem extends LitElement {
       cursor: pointer;
       list-style: none;
       user-select: none;
-      color: #1e293b;
+      color: var(--color-text, #3a302c);
     }
 
     .item-checklist summary::-webkit-details-marker {
@@ -445,7 +445,7 @@ export class HcListItem extends LitElement {
     .item-checklist summary::before {
       content: '▶';
       font-size: 0.625rem;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
       transition: transform 0.15s ease;
     }
 
@@ -462,13 +462,13 @@ export class HcListItem extends LitElement {
 
     .summary-name {
       font-weight: 500;
-      color: #1e293b;
+      color: var(--color-text, #3a302c);
     }
 
     .summary-progress {
       font-size: 0.75rem;
-      color: #64748b;
-      background: #f1f5f9;
+      color: var(--color-text-secondary, #7a6e6a);
+      background: var(--color-bg-tertiary, #ffede3);
       padding: 0.125rem 0.5rem;
       border-radius: 9999px;
     }
@@ -513,16 +513,16 @@ export class HcListItem extends LitElement {
       transition: all 0.15s ease;
       flex-shrink: 0;
       font-size: 0.625rem;
-      background: white;
+      background: var(--color-bg, #fffbf8);
     }
 
     .checklist-item-checkbox:hover {
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .checklist-item-checkbox.checked {
-      background: #22c55e;
-      border-color: #22c55e;
+      background: var(--color-success, #6bbe86);
+      border-color: var(--color-success, #6bbe86);
       color: white;
     }
 
@@ -533,12 +533,12 @@ export class HcListItem extends LitElement {
 
     .checklist-item-text.checked {
       text-decoration: line-through;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     .checklist-item-qty {
       font-size: 0.8125rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       margin-left: 0.5rem;
       white-space: nowrap;
     }
@@ -554,7 +554,7 @@ export class HcListItem extends LitElement {
       align-items: center;
       justify-content: center;
       font-size: 0.75rem;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
       opacity: 0;
       transition: all 0.15s ease;
     }
@@ -564,8 +564,8 @@ export class HcListItem extends LitElement {
     }
 
     .checklist-item-remove:hover {
-      background: #fef2f2;
-      color: #dc2626;
+      background: var(--color-danger-bg, rgba(217, 107, 107, 0.12));
+      color: var(--color-danger, #d96b6b);
     }
 
     .checklist-add {
@@ -578,21 +578,21 @@ export class HcListItem extends LitElement {
     .checklist-add-input {
       flex: 1;
       padding: 0.375rem 0.5rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.25rem;
       font-size: 0.875rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
     }
 
     .checklist-add-qty,
     .checklist-add-unit {
       padding: 0.375rem 0.5rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.25rem;
       font-size: 0.875rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
     }
 
     .checklist-add-qty {
@@ -604,17 +604,17 @@ export class HcListItem extends LitElement {
     }
 
     .checklist-add-input::placeholder {
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     .checklist-add-input:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .checklist-add-btn {
       padding: 0.375rem 0.5rem;
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       color: white;
       border: none;
       border-radius: 0.25rem;
@@ -624,7 +624,7 @@ export class HcListItem extends LitElement {
     }
 
     .checklist-add-btn:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .checklist-add-btn:disabled {
@@ -666,20 +666,20 @@ export class HcListItem extends LitElement {
       }
 
       .item-quantity {
-        color: #94a3b8;
+        color: var(--color-text-tertiary, #a89e9a);
       }
 
       .item-meta {
-        color: #64748b;
+        color: var(--color-text-secondary, #7a6e6a);
       }
 
       .item-notes {
-        color: #94a3b8;
+        color: var(--color-text-tertiary, #a89e9a);
         border-color: #334155;
       }
 
       .item-notes-inline {
-        color: #94a3b8;
+        color: var(--color-text-tertiary, #a89e9a);
       }
 
       .checkbox {
@@ -687,7 +687,7 @@ export class HcListItem extends LitElement {
       }
 
       .checkbox:hover {
-        border-color: #22c55e;
+        border-color: var(--color-success, #6bbe86);
       }
 
       .checkbox-square {
@@ -696,11 +696,11 @@ export class HcListItem extends LitElement {
       }
 
       .checkbox-square:hover {
-        border-color: #3b82f6;
+        border-color: var(--color-primary, #e07b5c);
       }
 
       .action-btn {
-        color: #94a3b8;
+        color: var(--color-text-tertiary, #a89e9a);
       }
 
       .action-btn:hover {
@@ -730,7 +730,7 @@ export class HcListItem extends LitElement {
       }
 
       .assign-menu-header {
-        color: #94a3b8;
+        color: var(--color-text-tertiary, #a89e9a);
         background: #0f172a;
         border-color: #334155;
       }
@@ -782,7 +782,7 @@ export class HcListItem extends LitElement {
       }
 
       .item-checklist summary::before {
-        color: #64748b;
+        color: var(--color-text-secondary, #7a6e6a);
       }
 
       .summary-name {
@@ -791,7 +791,7 @@ export class HcListItem extends LitElement {
 
       .summary-progress {
         background: #334155;
-        color: #94a3b8;
+        color: var(--color-text-tertiary, #a89e9a);
       }
 
       .checklist-item-checkbox {
@@ -804,11 +804,11 @@ export class HcListItem extends LitElement {
       }
 
       .checklist-item-text.checked {
-        color: #64748b;
+        color: var(--color-text-secondary, #7a6e6a);
       }
 
       .checklist-item-remove {
-        color: #64748b;
+        color: var(--color-text-secondary, #7a6e6a);
       }
 
       .checklist-add-input {
@@ -818,7 +818,7 @@ export class HcListItem extends LitElement {
       }
 
       .checklist-add-input::placeholder {
-        color: #64748b;
+        color: var(--color-text-secondary, #7a6e6a);
       }
 
       .checklist-add-qty,

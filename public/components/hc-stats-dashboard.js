@@ -23,27 +23,27 @@ export class HcStatsDashboard extends LitElement {
     }
 
     .stat-card {
-      background: white;
+      background: var(--color-bg, #fffbf8);
       border-radius: 0.75rem;
       padding: 1.5rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
     }
 
     .stat-card h3 {
       margin-bottom: 1rem;
       font-size: 1rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .stat-value {
       font-size: 2.5rem;
       font-weight: 700;
-      color: #2563eb;
+      color: var(--color-primary, #e07b5c);
       margin-bottom: 0.5rem;
     }
 
     .stat-label {
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
       font-size: 0.875rem;
     }
 
@@ -51,7 +51,7 @@ export class HcStatsDashboard extends LitElement {
       display: flex;
       justify-content: space-between;
       padding: 0.75rem 0;
-      border-bottom: 1px solid #f1f5f9;
+      border-bottom: 1px solid var(--color-bg-tertiary, #ffede3);
     }
 
     .store-item:last-child {
@@ -63,25 +63,25 @@ export class HcStatsDashboard extends LitElement {
     }
 
     .store-amount {
-      color: #2563eb;
+      color: var(--color-primary, #e07b5c);
       font-weight: 500;
     }
 
     .store-count {
       font-size: 0.75rem;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     .loading {
       text-align: center;
       padding: 3rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .empty-state {
       text-align: center;
       padding: 2rem;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
   `;
 

@@ -179,7 +179,7 @@ const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopp
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#3b82f6" />
+    <meta name="theme-color" content="#e07b5c" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="MyHomeCart" />
@@ -187,6 +187,10 @@ const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopp
     <!-- Preconnect para rendimiento -->
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Tipografía Nunito - rounded y friendly -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
     <!-- CSS (con cache busting usando hash de build) -->
     <link rel="stylesheet" href={`/css/reset.css?${CACHE_BUSTER}`} />
@@ -266,6 +270,22 @@ const keywords = 'cart, lists, shared cart, home cart, lista de la compra, shopp
 
       ::view-transition-new(main-content) {
         animation: 150ms ease-in slide-from-right;
+      }
+
+      /* Respetar preferencia de movimiento reducido */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+
+        ::view-transition-old(root),
+        ::view-transition-new(root),
+        ::view-transition-old(main-content),
+        ::view-transition-new(main-content) {
+          animation: none !important;
+        }
       }
     </style>
   </head>

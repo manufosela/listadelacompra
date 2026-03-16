@@ -527,11 +527,11 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   .stats-bar-fill.month {
-    background: #10b981;
+    background: var(--color-success);
   }
 
   .stats-bar-fill.member {
-    background: #8b5cf6;
+    background: var(--color-accent);
   }
 
   .balances-summary {
@@ -561,11 +561,11 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   .your-balance.positive .balance-amount {
-    color: #16a34a;
+    color: var(--color-success);
   }
 
   .your-balance.negative .balance-amount {
-    color: #dc2626;
+    color: var(--color-danger);
   }
 
   .your-balance .balance-label {
@@ -595,13 +595,13 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   .debt-card.you-owe {
-    background: #fef2f2;
-    border-color: #fecaca;
+    background: var(--color-danger-bg);
+    border-color: var(--color-danger);
   }
 
   .debt-card.owed-to-you {
-    background: #f0fdf4;
-    border-color: #bbf7d0;
+    background: var(--color-success-bg);
+    border-color: var(--color-success);
   }
 
   .debt-parties {
@@ -654,18 +654,18 @@ import AppLayout from '../../layouts/AppLayout.astro';
   }
 
   .member-amount.positive {
-    color: #16a34a;
+    color: var(--color-success);
   }
 
   .member-amount.negative {
-    color: #dc2626;
+    color: var(--color-danger);
   }
 
   .all-settled {
     text-align: center;
     padding: var(--space-xl);
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
+    background: var(--color-success-bg);
+    border: 1px solid var(--color-success);
     border-radius: var(--radius-lg);
   }
 

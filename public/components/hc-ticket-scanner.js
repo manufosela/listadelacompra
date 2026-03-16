@@ -317,7 +317,7 @@ export class HcTicketScanner extends LitElement {
 
     .status-matched { background: #dcfce7; color: #16a34a; }
     .status-unmatched { background: #fef3c7; color: #d97706; }
-    .status-new { background: #dbeafe; color: #2563eb; }
+    .status-new { background: var(--color-primary-bg, rgba(224, 123, 92, 0.1)); color: var(--color-primary, #e07b5c); }
     .status-ignored { background: #f3f4f6; color: #6b7280; }
 
     .item-info {
@@ -424,7 +424,7 @@ export class HcTicketScanner extends LitElement {
     .error {
       background: #fef2f2;
       border: 1px solid #fecaca;
-      color: #dc2626;
+      color: var(--color-danger, #d96b6b);
       padding: 1rem;
       border-radius: 0.5rem;
       margin-bottom: 1rem;

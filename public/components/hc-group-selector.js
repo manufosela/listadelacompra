@@ -28,7 +28,7 @@ export class HcGroupSelector extends LitElement {
       gap: 0.5rem;
       padding: 0.5rem 1rem;
       background: transparent;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       cursor: pointer;
       font-size: 0.875rem;
@@ -37,8 +37,8 @@ export class HcGroupSelector extends LitElement {
     }
 
     .selector-button:hover {
-      background: #f8fafc;
-      border-color: #cbd5e1;
+      background: var(--color-bg-secondary, #fff5ee);
+      border-color: var(--color-border-dark, #ddd1c9);
     }
 
     .group-icon {
@@ -88,7 +88,7 @@ export class HcGroupSelector extends LitElement {
       left: 0;
       margin-top: 0.5rem;
       min-width: 240px;
-      background: white;
+      background: var(--color-bg, #fffbf8);
       border-radius: 0.5rem;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       z-index: 100;
@@ -106,11 +106,11 @@ export class HcGroupSelector extends LitElement {
 
     .dropdown-header {
       padding: 0.75rem 1rem;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--color-border, #ede4dd);
       font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .group-list {
@@ -132,11 +132,11 @@ export class HcGroupSelector extends LitElement {
     }
 
     .group-item:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .group-item.active {
-      background: #eff6ff;
+      background: var(--color-primary-bg, rgba(224, 123, 92, 0.1));
     }
 
     .group-name {
@@ -146,19 +146,19 @@ export class HcGroupSelector extends LitElement {
 
     .group-role {
       font-size: 0.75rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       padding: 0.125rem 0.5rem;
-      background: #f1f5f9;
+      background: var(--color-bg-tertiary, #ffede3);
       border-radius: 9999px;
     }
 
     .check-icon {
-      color: #2563eb;
+      color: var(--color-primary, #e07b5c);
     }
 
     .dropdown-footer {
       padding: 0.5rem;
-      border-top: 1px solid #e2e8f0;
+      border-top: 1px solid var(--color-border, #ede4dd);
     }
 
     .create-button {
@@ -171,19 +171,19 @@ export class HcGroupSelector extends LitElement {
       border: none;
       border-radius: 0.375rem;
       font-size: 0.875rem;
-      color: #2563eb;
+      color: var(--color-primary, #e07b5c);
       cursor: pointer;
       transition: background 0.15s ease;
     }
 
     .create-button:hover {
-      background: #eff6ff;
+      background: var(--color-primary-bg, rgba(224, 123, 92, 0.1));
     }
 
     .empty-state {
       padding: 1.5rem;
       text-align: center;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .empty-state p {
@@ -192,7 +192,7 @@ export class HcGroupSelector extends LitElement {
 
     .loading {
       padding: 0.5rem 1rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     @media (prefers-color-scheme: dark) {

@@ -115,28 +115,28 @@ function injectStyles() {
 
     /* Tipos */
     .toast.success {
-      border-left-color: #10b981;
-      background: #f0fdf4;
+      border-left-color: var(--color-success, #6bbe86);
+      background: var(--color-success-bg, rgba(107, 190, 134, 0.12));
     }
-    .toast.success .toast-icon { color: #10b981; }
+    .toast.success .toast-icon { color: var(--color-success, #6bbe86); }
 
     .toast.error {
-      border-left-color: #ef4444;
-      background: #fef2f2;
+      border-left-color: var(--color-danger, #d96b6b);
+      background: var(--color-danger-bg, rgba(217, 107, 107, 0.12));
     }
-    .toast.error .toast-icon { color: #ef4444; }
+    .toast.error .toast-icon { color: var(--color-danger, #d96b6b); }
 
     .toast.warning {
-      border-left-color: #f59e0b;
-      background: #fffbeb;
+      border-left-color: var(--color-warning, #e8ac4e);
+      background: var(--color-warning-bg, rgba(232, 172, 78, 0.12));
     }
-    .toast.warning .toast-icon { color: #f59e0b; }
+    .toast.warning .toast-icon { color: var(--color-warning, #e8ac4e); }
 
     .toast.info {
-      border-left-color: #3b82f6;
-      background: #eff6ff;
+      border-left-color: var(--color-info, #5ea8d0);
+      background: var(--color-info-bg, rgba(94, 168, 208, 0.12));
     }
-    .toast.info .toast-icon { color: #3b82f6; }
+    .toast.info .toast-icon { color: var(--color-info, #5ea8d0); }
 
     @keyframes toast-in {
       from {

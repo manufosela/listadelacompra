@@ -577,7 +577,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     font-size: var(--font-size-xs);
     font-weight: 500;
     color: var(--color-primary);
-    background: rgba(37, 99, 235, 0.1);
+    background: var(--color-primary-bg);
     border-radius: var(--radius-full);
   }
 
@@ -623,8 +623,8 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   .member-chip.is-you {
-    background: rgba(37, 99, 235, 0.06);
-    border-color: rgba(37, 99, 235, 0.2);
+    background: var(--color-primary-bg);
+    border-color: var(--color-primary);
   }
 
   .member-avatar {
@@ -663,13 +663,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   .member-badge.owner {
-    color: #b45309;
-    background: rgba(245, 158, 11, 0.15);
+    color: var(--color-warning);
+    background: var(--color-warning-bg);
   }
 
   .member-badge.admin {
     color: var(--color-primary);
-    background: rgba(37, 99, 235, 0.1);
+    background: var(--color-primary-bg);
   }
 
   .toggle-admin-btn {
@@ -688,17 +688,17 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   .toggle-admin-btn:hover {
-    background: rgba(37, 99, 235, 0.1);
+    background: var(--color-primary-bg);
     color: var(--color-primary);
   }
 
   .toggle-admin-btn.is-admin {
     color: var(--color-primary);
-    background: rgba(37, 99, 235, 0.1);
+    background: var(--color-primary-bg);
   }
 
   .toggle-admin-btn.is-admin:hover {
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--color-danger-bg);
     color: var(--color-danger);
   }
 
@@ -774,7 +774,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     padding: 3px 6px 3px 8px;
     font-size: var(--font-size-xs);
     color: var(--color-warning);
-    background: rgba(245, 158, 11, 0.1);
+    background: var(--color-warning-bg);
     border-radius: var(--radius-sm);
   }
 
@@ -861,12 +861,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .history-status.status-accepted {
     color: var(--color-success);
-    background: rgba(34, 197, 94, 0.1);
+    background: var(--color-success-bg);
   }
 
   .history-status.status-rejected {
     color: var(--color-danger);
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--color-danger-bg);
   }
 
   .history-status.status-expired {
@@ -881,7 +881,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .danger-content {
     padding: var(--space-md);
-    background: rgba(239, 68, 68, 0.02);
+    background: var(--color-danger-bg);
   }
 
   .danger-row {
@@ -949,7 +949,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   }
 
   .btn-danger:hover {
-    background: #dc2626;
+    background: var(--color-danger-dark);
   }
 
   .btn-danger-outline {
@@ -989,7 +989,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
   .btn-icon-sm:hover {
     color: var(--color-danger);
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--color-danger-bg);
   }
 
   /* ========================================

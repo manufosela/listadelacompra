@@ -137,3 +137,27 @@ Para tests E2E, configurar `TEST_USER_EMAIL` y `TEST_USER_PASSWORD` en `.env.tes
 - Imports de Firestore usan CDN: `https://www.gstatic.com/firebasejs/10.7.0/firebase-*.js`
 - Solo Lit para componentes interactivos, sin frameworks adicionales
 - Los componentes son autosuficientes y desacoplados
+
+## Design Context
+
+### Users
+Usuarios mixtos: familias organizando la compra semanal, parejas y compañeros de piso compartiendo listas, e individuos gestionando sus propias compras. Usan la app en contextos cotidianos y domésticos, a menudo desde el móvil en el supermercado o en casa planificando.
+
+### Brand Personality
+**Divertida, colorida, expresiva** - La app debe transmitir alegría y hacer que la tarea mundana de la compra sea agradable. Que dé gusto usarla.
+
+### Aesthetic Direction
+- **Estilo**: Soft/Pastel — colores suaves, bordes generosamente redondeados, sensación amable y ligera
+- **Referencia**: AnyList/Mealime — apps de compra/cocina con toque cálido y práctico
+- **Anti-referencias**: No debe parecer una app corporativa fría, ni una herramienta técnica/developer
+- **Tema**: Light mode como principal con dark mode como complemento
+- **Tipografía**: Fuentes con personalidad (rounded/friendly), no fuentes del sistema genéricas
+- **Iconos**: Considerar iconos ilustrados o con estilo propio en lugar de emojis planos
+- **Color**: Paleta pastel vibrante con acentos alegres. Evitar azules corporativos fríos
+
+### Design Principles
+1. **Calidez ante todo**: Cada elemento debe sentirse acogedor y cercano, como una app hecha para el hogar
+2. **Color con propósito**: Usar color generosamente pero con intención — categorías, estados y acciones deben tener identidad cromática propia
+3. **Simplicidad juguetona**: Interfaces simples pero con detalles que sorprendan (micro-interacciones, transiciones suaves, estados vacíos con personalidad)
+4. **Mobile-first real**: La experiencia en móvil (en el supermercado, con una mano) es la principal — todo debe ser fácil de tocar y leer
+5. **Accesibilidad inclusiva**: WCAG AA mínimo, soporte para daltonismo, reduced-motion, navegación por teclado

@@ -49,6 +49,26 @@ a:hover {
   color: var(--color-text-secondary);
 }
 
+.empty-state .empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: var(--space-md);
+}
+
+.empty-state h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--space-sm);
+}
+
+.empty-state .empty-hint {
+  max-width: 300px;
+  margin: 0 auto var(--space-lg);
+  line-height: 1.5;
+  font-size: var(--font-size-sm);
+}
+
 /* Responsive tables */
 .table-responsive {
   width: 100%;
