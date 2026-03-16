@@ -117,7 +117,7 @@ export class HcCategoriesManager extends LitElement {
 
     .btn-icon.delete:hover {
       background: #fee2e2;
-      color: #dc2626;
+      color: var(--color-danger, #d96b6b);
     }
 
     .btn-icon:disabled {
@@ -143,9 +143,9 @@ export class HcCategoriesManager extends LitElement {
     }
 
     .add-category-btn:hover {
-      border-color: var(--color-primary, #2563eb);
-      color: var(--color-primary, #2563eb);
-      background: rgba(37, 99, 235, 0.05);
+      border-color: var(--color-primary, #e07b5c);
+      color: var(--color-primary, #e07b5c);
+      background: var(--color-primary-bg, rgba(224, 123, 92, 0.05));
     }
 
     /* Modal */
@@ -210,8 +210,8 @@ export class HcCategoriesManager extends LitElement {
 
     .form-group input:focus {
       outline: none;
-      border-color: var(--color-primary, #2563eb);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      border-color: var(--color-primary, #e07b5c);
+      box-shadow: 0 0 0 3px var(--color-primary-bg, rgba(224, 123, 92, 0.1));
     }
 
     .color-grid {
@@ -279,16 +279,16 @@ export class HcCategoriesManager extends LitElement {
     }
 
     .btn-primary {
-      background: var(--color-primary, #2563eb);
+      background: var(--color-primary, #e07b5c);
       color: white;
     }
 
     .btn-primary:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .btn-danger {
-      background: #dc2626;
+      background: var(--color-danger, #d96b6b);
       color: white;
     }
 
@@ -298,7 +298,7 @@ export class HcCategoriesManager extends LitElement {
 
     .error-message {
       background: #fee2e2;
-      color: #dc2626;
+      color: var(--color-danger, #d96b6b);
       padding: var(--space-sm, 8px) var(--space-md, 12px);
       border-radius: var(--radius-md, 8px);
       font-size: var(--font-size-sm, 14px);

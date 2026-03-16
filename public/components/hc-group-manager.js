@@ -307,7 +307,7 @@ export class HcMemberManager extends LitElement {
     const hId = this.groupId || getCurrentGroupId();
     if (!hId) {
       return html`
-        <div class="empty-state" style="text-align: center; padding: 2rem; color: #64748b;">
+        <div class="empty-state" style="text-align: center; padding: 2rem; color: var(--color-text-secondary, #7a6e6a);">
           <p>No tienes un grupo configurado.</p>
           <p style="margin-top: 0.5rem;">Crea o únete a un grupo para ver los miembros.</p>
         </div>
@@ -316,7 +316,7 @@ export class HcMemberManager extends LitElement {
 
     if (this.members.length === 0 && !this.error) {
       return html`
-        <div class="empty-state" style="text-align: center; padding: 2rem; color: #64748b;">
+        <div class="empty-state" style="text-align: center; padding: 2rem; color: var(--color-text-secondary, #7a6e6a);">
           <p>No hay miembros en este grupo.</p>
         </div>
       `;
@@ -378,7 +378,7 @@ export class HcMemberManager extends LitElement {
                 📋 Copiar
               </button>
             </div>
-            <p style="font-size: 0.875rem; color: #64748b;">
+            <p style="font-size: 0.875rem; color: var(--color-text-secondary, #7a6e6a);">
               Este código expira en 48 horas.
             </p>
           ` : html`

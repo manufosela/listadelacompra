@@ -115,7 +115,7 @@ export class HcShoppingList extends LitElement {
     .control-btn {
       padding: 0.375rem 0.75rem;
       background: transparent;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.375rem;
       font-size: 0.875rem;
       cursor: pointer;
@@ -123,13 +123,13 @@ export class HcShoppingList extends LitElement {
     }
 
     .control-btn:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .control-btn.active {
-      background: #eff6ff;
-      border-color: #2563eb;
-      color: #2563eb;
+      background: var(--color-primary-bg, rgba(224, 123, 92, 0.1));
+      border-color: var(--color-primary, #e07b5c);
+      color: var(--color-primary, #e07b5c);
     }
 
     .control-btn-small {
@@ -139,7 +139,7 @@ export class HcShoppingList extends LitElement {
 
     .mode-toggle {
       display: flex;
-      background: #f1f5f9;
+      background: var(--color-bg-tertiary, #ffede3);
       border-radius: 0.5rem;
       padding: 0.25rem;
       margin-bottom: 1rem;
@@ -155,7 +155,7 @@ export class HcShoppingList extends LitElement {
       font-weight: 500;
       cursor: pointer;
       transition: all 0.15s ease;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .mode-btn:hover {
@@ -163,8 +163,8 @@ export class HcShoppingList extends LitElement {
     }
 
     .mode-btn.active {
-      background: white;
-      color: #2563eb;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-primary, #e07b5c);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
@@ -174,16 +174,16 @@ export class HcShoppingList extends LitElement {
       border: none;
       cursor: pointer;
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .sublist-toggle[aria-expanded="true"] {
-      color: #1e293b;
+      color: var(--color-text, #3a302c);
     }
 
     .sublist-row td {
       padding: 0.5rem 1rem;
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .sublist-items {
@@ -198,31 +198,31 @@ export class HcShoppingList extends LitElement {
       align-items: center;
       gap: 0.5rem;
       font-size: 0.875rem;
-      color: #1e293b;
+      color: var(--color-text, #3a302c);
     }
 
     .sublist-check {
       width: 18px;
       height: 18px;
-      border: 1.5px solid #cbd5e1;
+      border: 1.5px solid var(--color-border-dark, #ddd1c9);
       border-radius: 3px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 0.625rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
     }
 
     .sublist-check.checked {
-      background: #22c55e;
-      border-color: #22c55e;
+      background: var(--color-success, #6bbe86);
+      border-color: var(--color-success, #6bbe86);
       color: white;
     }
 
     .sublist-item-qty {
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       font-size: 0.8125rem;
       white-space: nowrap;
     }
@@ -233,7 +233,7 @@ export class HcShoppingList extends LitElement {
       border-radius: 6px;
       object-fit: cover;
       margin-right: 0.5rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       cursor: zoom-in;
       transition: transform 0.15s ease;
     }
@@ -268,13 +268,13 @@ export class HcShoppingList extends LitElement {
 
     .filter-select {
       padding: 0.375rem 0.75rem;
-      background: white;
-      border: 1px solid #e2e8f0;
+      background: var(--color-bg, #fffbf8);
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.375rem;
       font-size: 0.875rem;
       cursor: pointer;
       transition: all 0.15s ease;
-      color: #1e293b;
+      color: var(--color-text, #3a302c);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -320,7 +320,7 @@ export class HcShoppingList extends LitElement {
 
     .filter-select:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .add-item-section {
@@ -343,30 +343,30 @@ export class HcShoppingList extends LitElement {
     .input-group label {
       display: block;
       font-size: 0.75rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       margin-bottom: 0.25rem;
     }
 
     .add-item-input {
       width: 100%;
       padding: 0.75rem 1rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 1rem;
       transition: border-color 0.15s ease;
       box-sizing: border-box;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
     }
 
     .add-item-input::placeholder {
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     .add-item-input:focus {
       outline: none;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      border-color: var(--color-primary, #e07b5c);
+      box-shadow: 0 0 0 3px var(--color-primary-bg, rgba(224, 123, 92, 0.1));
     }
 
     @media (prefers-color-scheme: dark) {
@@ -390,8 +390,8 @@ export class HcShoppingList extends LitElement {
       top: 100%;
       left: 0;
       right: 0;
-      background: white;
-      border: 1px solid #e2e8f0;
+      background: var(--color-bg, #fffbf8);
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
       z-index: 100;
@@ -407,12 +407,12 @@ export class HcShoppingList extends LitElement {
       align-items: center;
       gap: 0.5rem;
       transition: background 0.1s ease;
-      color: #1e293b;
+      color: var(--color-text, #3a302c);
     }
 
     .suggestion-item:hover,
     .suggestion-item.selected {
-      background: #f1f5f9;
+      background: var(--color-bg-tertiary, #ffede3);
     }
 
     .suggestion-icon {
@@ -425,7 +425,7 @@ export class HcShoppingList extends LitElement {
 
     .suggestion-category {
       font-size: 0.75rem;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -455,17 +455,17 @@ export class HcShoppingList extends LitElement {
     .quantity-input input {
       width: 100%;
       padding: 0.75rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 1rem;
       text-align: center;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
     }
 
     .quantity-input input:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .unit-select {
@@ -475,17 +475,17 @@ export class HcShoppingList extends LitElement {
     .unit-select select {
       width: 100%;
       padding: 0.75rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 1rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
       cursor: pointer;
     }
 
     .unit-select select:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -504,7 +504,7 @@ export class HcShoppingList extends LitElement {
 
     .add-btn {
       padding: 0.75rem 1.5rem;
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       color: white;
       border: none;
       border-radius: 0.5rem;
@@ -515,11 +515,11 @@ export class HcShoppingList extends LitElement {
     }
 
     .add-btn:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .add-btn:disabled {
-      background: #94a3b8;
+      background: var(--color-text-tertiary, #a89e9a);
       cursor: not-allowed;
     }
 
@@ -580,12 +580,12 @@ export class HcShoppingList extends LitElement {
     }
 
     .category-group.drag-over {
-      border-top: 2px solid #2563eb;
+      border-top: 2px solid var(--color-primary, #e07b5c);
       margin-top: -2px;
     }
 
     .category-group.drag-over-bottom {
-      border-bottom: 2px solid #2563eb;
+      border-bottom: 2px solid var(--color-primary, #e07b5c);
       margin-bottom: -2px;
     }
 
@@ -630,7 +630,7 @@ export class HcShoppingList extends LitElement {
       font-weight: 500;
       border-radius: 0.5rem;
       margin-bottom: 0.5rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       font-size: 0.875rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -696,7 +696,7 @@ export class HcShoppingList extends LitElement {
     /* View toggle buttons */
     .view-toggle {
       display: flex;
-      background: #f1f5f9;
+      background: var(--color-bg-tertiary, #ffede3);
       border-radius: 0.375rem;
       padding: 0.125rem;
     }
@@ -708,7 +708,7 @@ export class HcShoppingList extends LitElement {
       border-radius: 0.25rem;
       cursor: pointer;
       font-size: 1rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       transition: all 0.15s ease;
       line-height: 1;
     }
@@ -718,8 +718,8 @@ export class HcShoppingList extends LitElement {
     }
 
     .view-toggle-btn.active {
-      background: white;
-      color: #2563eb;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-primary, #e07b5c);
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
 
@@ -753,7 +753,7 @@ export class HcShoppingList extends LitElement {
     .items-table td {
       padding: 0.625rem 0.75rem;
       text-align: left;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--color-border, #ede4dd);
     }
 
     .items-table th {
@@ -761,8 +761,8 @@ export class HcShoppingList extends LitElement {
       font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: #64748b;
-      background: #f8fafc;
+      color: var(--color-text-secondary, #7a6e6a);
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .items-table tbody tr {
@@ -771,7 +771,7 @@ export class HcShoppingList extends LitElement {
     }
 
     .items-table tbody tr:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .items-table tbody tr.checked {
@@ -790,7 +790,7 @@ export class HcShoppingList extends LitElement {
     .table-checkbox {
       width: 20px;
       height: 20px;
-      border: 2px solid #cbd5e1;
+      border: 2px solid var(--color-border-dark, #ddd1c9);
       border-radius: 50%;
       display: inline-flex;
       align-items: center;
@@ -798,16 +798,16 @@ export class HcShoppingList extends LitElement {
       cursor: pointer;
       transition: all 0.15s ease;
       font-size: 0.75rem;
-      background: white;
+      background: var(--color-bg, #fffbf8);
     }
 
     .table-checkbox:hover {
-      border-color: #22c55e;
+      border-color: var(--color-success, #6bbe86);
     }
 
     .table-checkbox.checked {
-      background: #22c55e;
-      border-color: #22c55e;
+      background: var(--color-success, #6bbe86);
+      border-color: var(--color-success, #6bbe86);
       color: white;
     }
 
@@ -837,7 +837,7 @@ export class HcShoppingList extends LitElement {
     }
 
     .table-actions button:hover {
-      background: #f1f5f9;
+      background: var(--color-bg-tertiary, #ffede3);
     }
 
     .table-actions button.danger:hover {
@@ -851,11 +851,11 @@ export class HcShoppingList extends LitElement {
     }
 
     .items-table th.sortable:hover {
-      background: #e2e8f0;
+      background: var(--color-border, #ede4dd);
     }
 
     .items-table th.sorted {
-      color: #2563eb;
+      color: var(--color-primary, #e07b5c);
     }
 
     /* Filas de categoría en tabla */
@@ -885,11 +885,11 @@ export class HcShoppingList extends LitElement {
     }
 
     .items-table .category-row.drag-over td {
-      border-top: 2px solid #2563eb;
+      border-top: 2px solid var(--color-primary, #e07b5c);
     }
 
     .items-table .category-row.drag-over-bottom td {
-      border-bottom: 2px solid #2563eb;
+      border-bottom: 2px solid var(--color-primary, #e07b5c);
     }
 
     .category-chevron-table {
@@ -971,28 +971,28 @@ export class HcShoppingList extends LitElement {
     .quick-add-input {
       flex: 1;
       padding: 0.625rem 1rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 0.875rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
       transition: border-color 0.15s ease;
     }
 
     .quick-add-input::placeholder {
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     .quick-add-input:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .quick-add-btn {
       width: 40px;
       height: 40px;
       border: none;
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       color: white;
       border-radius: 0.5rem;
       font-size: 1.25rem;
@@ -1005,11 +1005,11 @@ export class HcShoppingList extends LitElement {
     }
 
     .quick-add-btn:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .quick-add-btn:disabled {
-      background: #94a3b8;
+      background: var(--color-text-tertiary, #a89e9a);
       cursor: not-allowed;
     }
 
@@ -1032,7 +1032,7 @@ export class HcShoppingList extends LitElement {
     /* Duplicate warning styles */
     .duplicate-warning {
       background: #fef3c7;
-      border: 1px solid #f59e0b;
+      border: 1px solid var(--color-warning, #e8ac4e);
       border-radius: 0.375rem;
       padding: 0.5rem 0.75rem;
       margin-top: 0.5rem;
@@ -1075,7 +1075,7 @@ export class HcShoppingList extends LitElement {
 
     .progress-bar {
       height: 4px;
-      background: #e2e8f0;
+      background: var(--color-border, #ede4dd);
       border-radius: 9999px;
       overflow: hidden;
       margin-bottom: 1rem;
@@ -1083,20 +1083,20 @@ export class HcShoppingList extends LitElement {
 
     .progress-fill {
       height: 100%;
-      background: #22c55e;
+      background: var(--color-success, #6bbe86);
       transition: width 0.3s ease;
     }
 
     .progress-text {
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       margin-bottom: 0.5rem;
     }
 
     .empty-state {
       text-align: center;
       padding: 3rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .empty-state-icon {
@@ -1107,19 +1107,19 @@ export class HcShoppingList extends LitElement {
     .loading {
       text-align: center;
       padding: 2rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .error {
       text-align: center;
       padding: 2rem;
-      color: #dc2626;
+      color: var(--color-danger, #d96b6b);
     }
 
     .load-error {
       text-align: center;
       padding: 2rem;
-      color: #dc2626;
+      color: var(--color-danger, #d96b6b);
       background: #fef2f2;
       border-radius: 0.5rem;
       border: 1px solid #fecaca;
@@ -1131,7 +1131,7 @@ export class HcShoppingList extends LitElement {
 
     .retry-btn {
       padding: 0.5rem 1rem;
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       color: white;
       border: none;
       border-radius: 0.375rem;
@@ -1140,7 +1140,7 @@ export class HcShoppingList extends LitElement {
     }
 
     .retry-btn:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -1160,23 +1160,23 @@ export class HcShoppingList extends LitElement {
     .notes-input textarea {
       width: 100%;
       padding: 0.5rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 0.875rem;
       resize: none;
       font-family: inherit;
       box-sizing: border-box;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
     }
 
     .notes-input textarea::placeholder {
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     .notes-input textarea:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .priority-select {
@@ -1186,17 +1186,17 @@ export class HcShoppingList extends LitElement {
     .priority-select select {
       width: 100%;
       padding: 0.75rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 1rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
       cursor: pointer;
     }
 
     .priority-select select:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     /* Selector de categoría */
@@ -1207,23 +1207,23 @@ export class HcShoppingList extends LitElement {
     .category-select select {
       width: 100%;
       padding: 0.75rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 1rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
       cursor: pointer;
     }
 
     .category-select select:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     /* Formulario de nueva categoría inline */
     .new-category-form {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
+      background: var(--color-bg-secondary, #fff5ee);
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       padding: 0.75rem;
       margin-top: 0.5rem;
@@ -1232,7 +1232,7 @@ export class HcShoppingList extends LitElement {
 
     .new-category-form-title {
       font-size: 0.75rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       margin-bottom: 0.5rem;
       font-weight: 500;
     }
@@ -1246,16 +1246,16 @@ export class HcShoppingList extends LitElement {
     .new-category-form-row input {
       flex: 1;
       padding: 0.375rem 0.5rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.25rem;
       font-size: 0.875rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
     }
 
     .new-category-form-row input:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .color-picker {
@@ -1278,7 +1278,7 @@ export class HcShoppingList extends LitElement {
     }
 
     .color-option.selected {
-      border-color: #1e293b;
+      border-color: var(--color-text, #3a302c);
       box-shadow: 0 0 0 2px white inset;
     }
 
@@ -1297,23 +1297,23 @@ export class HcShoppingList extends LitElement {
     }
 
     .btn-create-category {
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       border: none;
       color: white;
     }
 
     .btn-create-category:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .btn-cancel-category {
-      background: #e2e8f0;
+      background: var(--color-border, #ede4dd);
       border: none;
       color: #334155;
     }
 
     .btn-cancel-category:hover {
-      background: #cbd5e1;
+      background: var(--color-border-dark, #ddd1c9);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -1384,14 +1384,14 @@ export class HcShoppingList extends LitElement {
 
     .checklist-option label {
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       cursor: pointer;
     }
 
     /* Formulario de subelementos */
     .checklist-builder {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
+      background: var(--color-bg-secondary, #fff5ee);
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       padding: 0.75rem;
       margin-top: 0.5rem;
@@ -1400,7 +1400,7 @@ export class HcShoppingList extends LitElement {
 
     .checklist-builder-title {
       font-size: 0.75rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       margin-bottom: 0.5rem;
       font-weight: 500;
     }
@@ -1417,10 +1417,10 @@ export class HcShoppingList extends LitElement {
       align-items: center;
       gap: 0.5rem;
       padding: 0.25rem 0.5rem;
-      background: white;
+      background: var(--color-bg, #fffbf8);
       border-radius: 0.25rem;
       font-size: 0.875rem;
-      color: #1e293b;
+      color: var(--color-text, #3a302c);
     }
 
     .checklist-builder-item span {
@@ -1433,7 +1433,7 @@ export class HcShoppingList extends LitElement {
       border: none;
       background: transparent;
       cursor: pointer;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
       border-radius: 3px;
       display: flex;
       align-items: center;
@@ -1443,7 +1443,7 @@ export class HcShoppingList extends LitElement {
 
     .checklist-builder-item button:hover {
       background: #fef2f2;
-      color: #dc2626;
+      color: var(--color-danger, #d96b6b);
     }
 
     .checklist-builder-add {
@@ -1454,11 +1454,11 @@ export class HcShoppingList extends LitElement {
     .checklist-builder-add input,
     .checklist-builder-add select {
       padding: 0.375rem 0.5rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.25rem;
       font-size: 0.875rem;
-      background: white;
-      color: #1e293b;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
     }
 
     .checklist-builder-add .checklist-builder-text {
@@ -1476,17 +1476,17 @@ export class HcShoppingList extends LitElement {
     }
 
     .checklist-builder-add input::placeholder {
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     .checklist-builder-add input:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .checklist-builder-add button {
       padding: 0.375rem 0.75rem;
-      background: #e2e8f0;
+      background: var(--color-border, #ede4dd);
       border: none;
       border-radius: 0.25rem;
       font-size: 0.75rem;
@@ -1495,7 +1495,7 @@ export class HcShoppingList extends LitElement {
     }
 
     .checklist-builder-add button:hover {
-      background: #cbd5e1;
+      background: var(--color-border-dark, #ddd1c9);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -1556,7 +1556,7 @@ export class HcShoppingList extends LitElement {
     }
 
     .edit-modal {
-      background: white;
+      background: var(--color-bg, #fffbf8);
       border-radius: 0.75rem;
       padding: 1.5rem;
       width: 90%;
@@ -1576,7 +1576,7 @@ export class HcShoppingList extends LitElement {
     .edit-modal label {
       display: block;
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       margin-bottom: 0.25rem;
     }
 
@@ -1585,7 +1585,7 @@ export class HcShoppingList extends LitElement {
     .edit-modal textarea {
       width: 100%;
       padding: 0.5rem 0.75rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.375rem;
       font-size: 1rem;
       box-sizing: border-box;
@@ -1595,7 +1595,7 @@ export class HcShoppingList extends LitElement {
     .edit-modal select:focus,
     .edit-modal textarea:focus {
       outline: none;
-      border-color: #2563eb;
+      border-color: var(--color-primary, #e07b5c);
     }
 
     .edit-modal textarea {
@@ -1621,22 +1621,22 @@ export class HcShoppingList extends LitElement {
 
     .btn-cancel {
       background: transparent;
-      border: 1px solid #e2e8f0;
-      color: #64748b;
+      border: 1px solid var(--color-border, #ede4dd);
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .btn-cancel:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .btn-save {
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       border: none;
       color: white;
     }
 
     .btn-save:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     @media (prefers-color-scheme: dark) {
