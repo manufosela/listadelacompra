@@ -27,6 +27,7 @@ import {
 } from '/js/categories.js';
 import './hc-list-item.js';
 import './hc-ticket-scanner.js';
+import './hc-cost-split.js';
 
 export class HcShoppingList extends LitElement {
   static properties = {
@@ -46,6 +47,7 @@ export class HcShoppingList extends LitElement {
     _expandedItems: { type: Object, state: true }, // Sublistas expandidas {itemId: true}
     _productImageMap: { type: Object, state: true }, // productId -> imageUrl|null
     _productCategoryMap: { type: Object, state: true }, // productId -> categoryId|null
+    splitConfig: { type: Object, state: true },
     loading: { type: Boolean, state: true },
     loadError: { type: String, state: true },
     newItemName: { type: String, state: true },
@@ -1701,6 +1703,7 @@ export class HcShoppingList extends LitElement {
     this._expandedItems = {};
     this._productImageMap = {};
     this._productCategoryMap = {};
+    this.splitConfig = null;
     this.loading = true;
     this.loadError = null;
     this.newItemName = '';
@@ -2081,6 +2084,9 @@ export class HcShoppingList extends LitElement {
       if (snapshot.exists()) {
         const listData = snapshot.data();
         const groupIds = listData.groupIds || [];
+
+        // Cargar configuración de reparto
+        this.splitConfig = listData.splitConfig || null;
 
         // Cargar miembros de todos los grupos
         try {
@@ -3170,6 +3176,20 @@ export class HcShoppingList extends LitElement {
     }
   }
 
+  async _handleSaveSplitConfig(e) {
+    const { percentages } = e.detail;
+    try {
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, {
+        splitConfig: { percentages },
+        updatedAt: serverTimestamp(),
+        updatedBy: getCurrentUser()?.uid
+      });
+    } catch (error) {
+      console.error('Error saving split config:', error);
+    }
+  }
+
   _toggleAllItems() {
     // Si todos están marcados, desmarcar todos; si no, marcar todos
     if (this._checkedCount === this.items.length) {
@@ -3555,6 +3575,14 @@ export class HcShoppingList extends LitElement {
           button-hidden
           @ticket-applied=${this._handleTicketApplied}
         ></hc-ticket-scanner>
+
+        <hc-cost-split
+          list-id="${this.listId}"
+          .items=${this.items}
+          .members=${this.members}
+          .splitConfig=${this.splitConfig}
+          @save-split-config=${this._handleSaveSplitConfig}
+        ></hc-cost-split>
       ` : ''}
 
       <!-- Progress (only in shopping mode) -->
