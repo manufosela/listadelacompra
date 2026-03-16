@@ -3460,15 +3460,17 @@ export class HcShoppingList extends LitElement {
           <td class="table-assign">
             <select
               class="assign-select"
-              .value=${item.assignedTo || ''}
-              @change=${(e) => this._handleAssignItem({
-                detail: { itemId: item.id, assignedTo: e.target.value || null }
-              })}
+              @change=${(e) => {
+                e.stopPropagation();
+                this._handleAssignItem({
+                  detail: { itemId: item.id, assignedTo: e.target.value || null }
+                });
+              }}
               @click=${(e) => e.stopPropagation()}
             >
-              <option value="">—</option>
+              <option value="" .selected=${!item.assignedTo}>—</option>
               ${this.members.map(m => html`
-                <option value="${m.id}" ?selected=${item.assignedTo === m.id}>
+                <option value="${m.id}" .selected=${item.assignedTo === m.id}>
                   ${m.displayName?.split(' ')[0] || m.email}
                 </option>
               `)}
