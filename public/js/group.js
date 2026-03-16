@@ -95,11 +95,16 @@ export async function getUserGroups(forceRefresh = false) {
 
     const groups = await Promise.all(
       groupIds.map(async (id) => {
-        const groupDoc = await getDoc(doc(db, 'groups', id));
-        if (groupDoc.exists()) {
-          return { id: groupDoc.id, ...groupDoc.data() };
+        try {
+          const groupDoc = await getDoc(doc(db, 'groups', id));
+          if (groupDoc.exists()) {
+            return { id: groupDoc.id, ...groupDoc.data() };
+          }
+          return null;
+        } catch {
+          // El usuario ya no es miembro del grupo o el grupo fue eliminado
+          return null;
         }
-        return null;
       })
     );
 
