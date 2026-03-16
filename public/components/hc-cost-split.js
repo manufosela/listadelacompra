@@ -167,7 +167,8 @@ export class HcCostSplit extends LitElement {
   }
 
   _getMemberName(id) {
-    return this.members.find(m => m.id === id)?.displayName?.split(' ')[0] || 'Desconocido';
+    const m = this.members.find(m => m.id === id);
+    return m?.shortName || m?.displayName?.split(' ')[0] || 'Desconocido';
   }
 
   static styles = css`
@@ -537,7 +538,7 @@ export class HcCostSplit extends LitElement {
               ${this._editingPercentages ? html`
                 ${this.members.map(m => html`
                   <div class="pct-row">
-                    <span class="pct-name">${m.displayName?.split(' ')[0]}</span>
+                    <span class="pct-name">${m.shortName || m.displayName?.split(' ')[0]}</span>
                     <input
                       class="pct-input"
                       type="number"
@@ -558,7 +559,7 @@ export class HcCostSplit extends LitElement {
               ` : html`
                 ${this.members.map(m => html`
                   <div class="pct-row">
-                    <span class="pct-name">${m.displayName?.split(' ')[0]}</span>
+                    <span class="pct-name">${m.shortName || m.displayName?.split(' ')[0]}</span>
                     <span class="pct-value">${(percentages[m.id] || 0).toFixed(1)}%</span>
                   </div>
                 `)}
@@ -578,7 +579,7 @@ export class HcCostSplit extends LitElement {
                   <div class="person-row">
                     <div class="person-avatar">${initials}</div>
                     <div class="person-info">
-                      <div class="person-name">${m.displayName?.split(' ')[0]}</div>
+                      <div class="person-name">${m.shortName || m.displayName?.split(' ')[0]}</div>
                       <div class="person-detail">
                         ${items.total} items${items.unmatched > 0 ? ` (${items.unmatched} sin precio)` : ''}
                       </div>

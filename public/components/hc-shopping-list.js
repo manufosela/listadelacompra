@@ -2172,7 +2172,23 @@ export class HcShoppingList extends LitElement {
         }
       }
 
-      this.members = Array.from(allMembers.values());
+      // Desambiguar nombres duplicados
+      const members = Array.from(allMembers.values());
+      const nameCount = {};
+      members.forEach(m => {
+        const name = m.displayName?.split(' ')[0] || m.email;
+        nameCount[name] = (nameCount[name] || 0) + 1;
+      });
+
+      const nameIndex = {};
+      this.members = members.map(m => {
+        const firstName = m.displayName?.split(' ')[0] || m.email;
+        if (nameCount[firstName] > 1) {
+          nameIndex[firstName] = (nameIndex[firstName] || 0) + 1;
+          return { ...m, shortName: `${firstName} (${nameIndex[firstName]})` };
+        }
+        return { ...m, shortName: firstName };
+      });
     } catch (error) {
       console.error('Error loading members:', error);
       this.members = [];
@@ -3471,7 +3487,7 @@ export class HcShoppingList extends LitElement {
               <option value="" .selected=${!item.assignedTo}>—</option>
               ${this.members.map(m => html`
                 <option value="${m.id}" .selected=${item.assignedTo === m.id}>
-                  ${m.displayName?.split(' ')[0] || m.email}
+                  ${m.shortName || m.displayName?.split(' ')[0] || m.email}
                 </option>
               `)}
             </select>
@@ -3690,7 +3706,7 @@ export class HcShoppingList extends LitElement {
               <option value="unassigned">Sin asignar</option>
               ${this.members.map(member => html`
                 <option value="${member.id}">
-                  ${member.displayName?.split(' ')[0] || member.email}
+                  ${member.shortName || member.displayName?.split(' ')[0] || member.email}
                 </option>
               `)}
             </select>
