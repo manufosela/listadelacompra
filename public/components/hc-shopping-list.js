@@ -817,6 +817,26 @@ export class HcShoppingList extends LitElement {
       white-space: nowrap;
     }
 
+    .table-assign {
+      width: 100px;
+    }
+
+    .assign-select {
+      width: 100%;
+      padding: 0.25rem 0.375rem;
+      font-size: 0.75rem;
+      border: 1px solid var(--color-border, #ede4dd);
+      border-radius: 0.375rem;
+      background: var(--color-bg, #fffbf8);
+      color: var(--color-text, #3a302c);
+      cursor: pointer;
+    }
+
+    .assign-select:focus {
+      outline: none;
+      border-color: var(--color-primary, #e07b5c);
+    }
+
     .table-actions {
       width: 80px;
       text-align: right;
@@ -3328,6 +3348,7 @@ export class HcShoppingList extends LitElement {
     if (isShoppingMode) colCount++;
     if (!isAgnostic) colCount++;
     if (!this.groupByCategory) colCount++; // Columna categoría solo sin agrupar
+    if (isShoppingMode && this.members.length > 0) colCount++; // Columna asignar
     if (isEditMode) colCount++;
 
     // Obtener items ordenados
@@ -3347,6 +3368,7 @@ export class HcShoppingList extends LitElement {
                 Categoría ${this._sortColumn === 'category' ? (this._sortDirection === 'asc' ? '↑' : '↓') : ''}
               </th>
             ` : ''}
+            ${isShoppingMode && this.members.length > 0 ? html`<th class="table-assign">Asignado</th>` : ''}
             ${isEditMode ? html`<th class="table-actions"></th>` : ''}
           </tr>
         </thead>
@@ -3432,6 +3454,25 @@ export class HcShoppingList extends LitElement {
         ${showCategory ? html`
           <td>
             ${cat ? html`<span>${cat.icon || ''} ${cat.name}</span>` : '—'}
+          </td>
+        ` : ''}
+        ${isShoppingMode && this.members.length > 0 ? html`
+          <td class="table-assign">
+            <select
+              class="assign-select"
+              .value=${item.assignedTo || ''}
+              @change=${(e) => this._handleAssignItem({
+                detail: { itemId: item.id, assignedTo: e.target.value || null }
+              })}
+              @click=${(e) => e.stopPropagation()}
+            >
+              <option value="">—</option>
+              ${this.members.map(m => html`
+                <option value="${m.id}" ?selected=${item.assignedTo === m.id}>
+                  ${m.displayName?.split(' ')[0] || m.email}
+                </option>
+              `)}
+            </select>
           </td>
         ` : ''}
         ${isEditMode ? html`
