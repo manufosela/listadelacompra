@@ -369,9 +369,9 @@ export class HcCategoriesManager extends LitElement {
       }
 
       .add-category-btn:hover {
-        border-color: #3b82f6;
-        color: #3b82f6;
-        background: rgba(59, 130, 246, 0.1);
+        border-color: var(--color-primary, #e07b5c);
+        color: var(--color-primary, #e07b5c);
+        background: var(--color-primary-bg, rgba(224, 123, 92, 0.1));
       }
 
       .modal {
@@ -397,7 +397,7 @@ export class HcCategoriesManager extends LitElement {
       }
 
       .form-group input:focus {
-        border-color: #3b82f6;
+        border-color: var(--color-primary, #e07b5c);
       }
 
       .preview-section {

@@ -624,7 +624,7 @@ export class HcListItem extends LitElement {
     }
 
     .checklist-add-btn:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .checklist-add-btn:disabled {
@@ -696,7 +696,7 @@ export class HcListItem extends LitElement {
       }
 
       .checkbox-square:hover {
-        border-color: #3b82f6;
+        border-color: var(--color-primary, #e07b5c);
       }
 
       .action-btn {

@@ -290,8 +290,8 @@ export class HcShoppingList extends LitElement {
 
       .control-btn.active {
         background: #1e3a5f;
-        border-color: #3b82f6;
-        color: #3b82f6;
+        border-color: var(--color-primary, #e07b5c);
+        color: var(--color-primary, #e07b5c);
       }
 
       .mode-toggle {
@@ -308,7 +308,7 @@ export class HcShoppingList extends LitElement {
 
       .mode-btn.active {
         background: #1e293b;
-        color: #3b82f6;
+        color: var(--color-primary, #e07b5c);
       }
 
       .filter-select {
@@ -381,7 +381,7 @@ export class HcShoppingList extends LitElement {
       }
 
       .add-item-input:focus {
-        border-color: #3b82f6;
+        border-color: var(--color-primary, #e07b5c);
       }
     }
 
@@ -738,7 +738,7 @@ export class HcShoppingList extends LitElement {
 
       .view-toggle-btn.active {
         background: #1e293b;
-        color: #3b82f6;
+        color: var(--color-primary, #e07b5c);
       }
     }
 
@@ -931,7 +931,7 @@ export class HcShoppingList extends LitElement {
       }
 
       .items-table th.sorted {
-        color: #3b82f6;
+        color: var(--color-primary, #e07b5c);
       }
 
       .items-table .category-row td {
@@ -1025,7 +1025,7 @@ export class HcShoppingList extends LitElement {
       }
 
       .quick-add-input:focus {
-        border-color: #3b82f6;
+        border-color: var(--color-primary, #e07b5c);
       }
     }
 
@@ -1669,7 +1669,7 @@ export class HcShoppingList extends LitElement {
       .edit-modal input:focus,
       .edit-modal select:focus,
       .edit-modal textarea:focus {
-        border-color: #3b82f6;
+        border-color: var(--color-primary, #e07b5c);
       }
 
       .btn-cancel {
