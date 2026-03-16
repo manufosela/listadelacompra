@@ -42,12 +42,12 @@ export class HcUserMenu extends LitElement {
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: #e2e8f0;
+      background: var(--color-border, #ede4dd);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 500;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .dropdown {
@@ -56,7 +56,7 @@ export class HcUserMenu extends LitElement {
       right: 0;
       margin-top: 0.5rem;
       min-width: 200px;
-      background: white;
+      background: var(--color-bg, #fffbf8);
       border-radius: 0.5rem;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
       z-index: 100;
@@ -74,7 +74,7 @@ export class HcUserMenu extends LitElement {
 
     .user-info {
       padding: 1rem;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--color-border, #ede4dd);
     }
 
     .user-name {
@@ -84,7 +84,7 @@ export class HcUserMenu extends LitElement {
 
     .user-email {
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .dropdown-menu {
@@ -106,11 +106,11 @@ export class HcUserMenu extends LitElement {
     }
 
     .dropdown-item:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .dropdown-item.danger {
-      color: #ef4444;
+      color: var(--color-danger, #d96b6b);
     }
   `;
 

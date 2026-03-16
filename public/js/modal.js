@@ -106,28 +106,28 @@ function injectStyles() {
     }
 
     .modal-btn-cancel:hover {
-      background: #f3f4f6;
+      background: var(--color-bg-tertiary, #ffede3);
     }
 
     .modal-btn-confirm {
-      background: #3b82f6;
+      background: var(--color-primary, #e07b5c);
       color: white;
     }
 
     .modal-btn-confirm:hover {
-      background: #2563eb;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .modal-btn-confirm.danger {
-      background: #ef4444;
+      background: var(--color-danger, #d96b6b);
     }
 
     .modal-btn-confirm.danger:hover {
-      background: #dc2626;
+      background: var(--color-danger-dark, #c04f4f);
     }
 
     .modal-btn-confirm.danger:focus {
-      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+      box-shadow: 0 0 0 3px var(--color-danger-bg, rgba(217, 107, 107, 0.12));
     }
 
     @keyframes modal-fade-in {

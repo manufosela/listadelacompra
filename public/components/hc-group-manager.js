@@ -36,7 +36,7 @@ export class HcMemberManager extends LitElement {
       align-items: center;
       gap: 1rem;
       padding: 1rem;
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
       border-radius: 0.5rem;
     }
 
@@ -51,12 +51,12 @@ export class HcMemberManager extends LitElement {
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: #e2e8f0;
+      background: var(--color-border, #ede4dd);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 500;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .member-info {
@@ -80,7 +80,7 @@ export class HcMemberManager extends LitElement {
 
     .member-email {
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .member-role {
@@ -96,7 +96,7 @@ export class HcMemberManager extends LitElement {
     }
 
     .member-role.member {
-      background: #f1f5f9;
+      background: var(--color-bg-tertiary, #ffede3);
       color: #475569;
     }
 
@@ -107,28 +107,28 @@ export class HcMemberManager extends LitElement {
 
     .action-btn {
       padding: 0.375rem 0.75rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.375rem;
-      background: white;
+      background: var(--color-bg, #fffbf8);
       font-size: 0.75rem;
       cursor: pointer;
       transition: all 0.15s ease;
     }
 
     .action-btn:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .action-btn.danger:hover {
       background: #fef2f2;
       border-color: #fecaca;
-      color: #dc2626;
+      color: var(--color-danger, #d96b6b);
     }
 
     .invite-section {
       margin-top: 2rem;
       padding: 1.5rem;
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
       border-radius: 0.5rem;
     }
 
@@ -149,14 +149,14 @@ export class HcMemberManager extends LitElement {
       font-size: 1.5rem;
       letter-spacing: 0.25rem;
       padding: 0.75rem 1.5rem;
-      background: white;
-      border: 2px dashed #cbd5e1;
+      background: var(--color-bg, #fffbf8);
+      border: 2px dashed var(--color-border-dark, #ddd1c9);
       border-radius: 0.5rem;
     }
 
     .copy-btn {
       padding: 0.5rem 1rem;
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       color: white;
       border: none;
       border-radius: 0.375rem;
@@ -165,26 +165,26 @@ export class HcMemberManager extends LitElement {
     }
 
     .copy-btn:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .generate-btn {
       padding: 0.5rem 1rem;
-      background: white;
-      border: 1px solid #e2e8f0;
+      background: var(--color-bg, #fffbf8);
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.375rem;
       cursor: pointer;
       font-size: 0.875rem;
     }
 
     .generate-btn:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .error-message {
       padding: 1rem;
       background: #fef2f2;
-      color: #dc2626;
+      color: var(--color-danger, #d96b6b);
       border-radius: 0.5rem;
       margin-bottom: 1rem;
     }
@@ -192,7 +192,7 @@ export class HcMemberManager extends LitElement {
     .loading {
       padding: 2rem;
       text-align: center;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
   `;
 

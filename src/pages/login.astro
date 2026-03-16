@@ -10,24 +10,24 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="loginLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#3b82f6"/>
-                <stop offset="100%" style="stop-color:#1d4ed8"/>
+                <stop offset="0%" style="stop-color:#e8896c"/>
+                <stop offset="100%" style="stop-color:#c9624a"/>
               </linearGradient>
             </defs>
-            <rect width="64" height="64" rx="14" fill="url(#loginLogoGrad)"/>
+            <rect width="64" height="64" rx="16" fill="url(#loginLogoGrad)"/>
             <g transform="translate(8, 8)">
               <path d="M4 10 L10 10 L13 18" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-              <path d="M24 12 L38 22 L10 22 Z" fill="#fbbf24"/>
+              <path d="M24 12 L38 22 L10 22 Z" fill="#f0c87a"/>
               <path d="M24 8 L42 24 L40 24 L24 11 L8 24 L6 24 Z" fill="#ffffff"/>
               <path d="M10 24 L10 38 L38 38 L38 24 Z" fill="#ffffff"/>
-              <rect x="20" y="28" width="8" height="10" rx="1" fill="#3b82f6"/>
-              <circle cx="26" cy="33" r="1" fill="#1d4ed8"/>
-              <rect x="12" y="26" width="6" height="6" rx="1" fill="#bfdbfe"/>
-              <rect x="30" y="26" width="6" height="6" rx="1" fill="#bfdbfe"/>
+              <rect x="20" y="28" width="8" height="10" rx="1" fill="#e07b5c"/>
+              <circle cx="26" cy="33" r="1" fill="#c9624a"/>
+              <rect x="12" y="26" width="6" height="6" rx="1" fill="#f2a890"/>
+              <rect x="30" y="26" width="6" height="6" rx="1" fill="#f2a890"/>
               <circle cx="16" cy="42" r="4" fill="#ffffff"/>
               <circle cx="32" cy="42" r="4" fill="#ffffff"/>
-              <circle cx="16" cy="42" r="2" fill="#3b82f6"/>
-              <circle cx="32" cy="42" r="2" fill="#3b82f6"/>
+              <circle cx="16" cy="42" r="2" fill="#e07b5c"/>
+              <circle cx="32" cy="42" r="2" fill="#e07b5c"/>
             </g>
           </svg>
         </div>
@@ -208,12 +208,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   .login-card {
     background: var(--color-bg);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
     padding: var(--space-xl);
     width: 100%;
     max-width: 400px;
     text-align: center;
+    border: 1px solid var(--color-border);
   }
 
   .login-logo {
@@ -316,7 +317,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .form-group input:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 3px var(--color-primary-bg);
   }
 
   .email-form .btn-primary {
@@ -342,9 +343,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .error-message {
     margin-top: var(--space-md);
     padding: var(--space-sm) var(--space-md);
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--color-danger-bg);
     color: var(--color-danger);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
   }
 

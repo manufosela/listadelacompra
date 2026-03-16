@@ -32,7 +32,7 @@ export class HcProductSearch extends LitElement {
       width: 100%;
       padding: 0.75rem 1rem;
       padding-left: 2.5rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 1rem;
       transition: all 0.15s ease;
@@ -40,8 +40,8 @@ export class HcProductSearch extends LitElement {
 
     .search-input:focus {
       outline: none;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      border-color: var(--color-primary, #e07b5c);
+      box-shadow: 0 0 0 3px var(--color-primary-bg, rgba(224, 123, 92, 0.1));
     }
 
     .search-icon {
@@ -49,13 +49,13 @@ export class HcProductSearch extends LitElement {
       left: 0.75rem;
       top: 50%;
       transform: translateY(-50%);
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
 
     .quantity-input {
       width: 80px;
       padding: 0.75rem;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       font-size: 1rem;
       text-align: center;
@@ -63,7 +63,7 @@ export class HcProductSearch extends LitElement {
 
     .add-btn {
       padding: 0.75rem 1.5rem;
-      background: #2563eb;
+      background: var(--color-primary, #e07b5c);
       color: white;
       border: none;
       border-radius: 0.5rem;
@@ -74,11 +74,11 @@ export class HcProductSearch extends LitElement {
     }
 
     .add-btn:hover {
-      background: #1d4ed8;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .add-btn:disabled {
-      background: #94a3b8;
+      background: var(--color-text-tertiary, #a89e9a);
       cursor: not-allowed;
     }
 
@@ -88,8 +88,8 @@ export class HcProductSearch extends LitElement {
       left: 0;
       right: 0;
       margin-top: 0.25rem;
-      background: white;
-      border: 1px solid #e2e8f0;
+      background: var(--color-bg, #fffbf8);
+      border: 1px solid var(--color-border, #ede4dd);
       border-radius: 0.5rem;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       max-height: 300px;
@@ -101,10 +101,10 @@ export class HcProductSearch extends LitElement {
       padding: 0.5rem 1rem;
       font-size: 0.75rem;
       font-weight: 600;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       text-transform: uppercase;
-      background: #f8fafc;
-      border-bottom: 1px solid #e2e8f0;
+      background: var(--color-bg-secondary, #fff5ee);
+      border-bottom: 1px solid var(--color-border, #ede4dd);
     }
 
     .suggestion-item {
@@ -117,7 +117,7 @@ export class HcProductSearch extends LitElement {
     }
 
     .suggestion-item:hover {
-      background: #f8fafc;
+      background: var(--color-bg-secondary, #fff5ee);
     }
 
     .suggestion-icon {
@@ -134,16 +134,16 @@ export class HcProductSearch extends LitElement {
 
     .suggestion-meta {
       font-size: 0.75rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .new-product {
-      border-top: 1px solid #e2e8f0;
-      color: #2563eb;
+      border-top: 1px solid var(--color-border, #ede4dd);
+      color: var(--color-primary, #e07b5c);
     }
 
     .new-product .suggestion-name {
-      color: #2563eb;
+      color: var(--color-primary, #e07b5c);
     }
   `;
 

@@ -107,8 +107,8 @@ function injectStyles() {
     }
 
     .cropper-select-area:hover {
-      border-color: var(--color-primary, #3b82f6);
-      background: rgba(59, 130, 246, 0.05);
+      border-color: var(--color-primary, #e07b5c);
+      background: var(--color-primary-bg, rgba(224, 123, 92, 0.1));
     }
 
     .cropper-select-area svg {
@@ -182,7 +182,7 @@ function injectStyles() {
       -webkit-appearance: none;
       width: 16px;
       height: 16px;
-      background: var(--color-primary, #3b82f6);
+      background: var(--color-primary, #e07b5c);
       border-radius: 50%;
       cursor: pointer;
       transition: transform 0.15s;
@@ -195,7 +195,7 @@ function injectStyles() {
     .cropper-slider::-moz-range-thumb {
       width: 16px;
       height: 16px;
-      background: var(--color-primary, #3b82f6);
+      background: var(--color-primary, #e07b5c);
       border: none;
       border-radius: 50%;
       cursor: pointer;
@@ -255,12 +255,12 @@ function injectStyles() {
     }
 
     .cropper-btn-save {
-      background: var(--color-primary, #3b82f6);
+      background: var(--color-primary, #e07b5c);
       color: white;
     }
 
     .cropper-btn-save:hover {
-      background: #2563eb;
+      background: var(--color-primary-dark, #c9624a);
     }
 
     .cropper-btn-save:disabled {

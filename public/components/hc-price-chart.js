@@ -12,7 +12,7 @@ export class HcPriceChart extends LitElement {
     }
 
     .chart-container {
-      background: white;
+      background: var(--color-bg, #fffbf8);
       border-radius: 0.5rem;
     }
 
@@ -20,7 +20,7 @@ export class HcPriceChart extends LitElement {
       font-weight: 600;
       margin-bottom: 1rem;
       font-size: 0.875rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
     }
 
     .chart {
@@ -40,7 +40,7 @@ export class HcPriceChart extends LitElement {
 
     .bar {
       width: 100%;
-      background: linear-gradient(to top, #2563eb, #3b82f6);
+      background: linear-gradient(to top, var(--color-primary, #e07b5c), var(--color-primary-light, #e89a80));
       border-radius: 4px 4px 0 0;
       transition: all 0.3s ease;
       cursor: pointer;
@@ -48,13 +48,13 @@ export class HcPriceChart extends LitElement {
     }
 
     .bar:hover {
-      background: linear-gradient(to top, #1d4ed8, #2563eb);
+      background: linear-gradient(to top, var(--color-primary-dark, #c9624a), var(--color-primary, #e07b5c));
       transform: scaleY(1.02);
     }
 
     .bar-value {
       font-size: 0.625rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #7a6e6a);
       margin-bottom: 0.25rem;
       opacity: 0;
       transition: opacity 0.2s;
@@ -66,7 +66,7 @@ export class HcPriceChart extends LitElement {
 
     .label {
       font-size: 0.625rem;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
       margin-top: 0.5rem;
       text-align: center;
     }
@@ -74,7 +74,7 @@ export class HcPriceChart extends LitElement {
     .no-data {
       text-align: center;
       padding: 2rem;
-      color: #94a3b8;
+      color: var(--color-text-tertiary, #a89e9a);
     }
   `;
 
