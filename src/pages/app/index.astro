@@ -6,13 +6,26 @@ import AppLayout from '../../layouts/AppLayout.astro';
   <div class="home-page">
     <div class="home-content">
       <h1 id="greeting" class="home-greeting">Hola</h1>
-      <p class="welcome">Bienvenido a MyHomeCart</p>
-      <p class="description">
-        Tu aplicación para gestionar listas de la compra de forma colaborativa.
-        Crea listas, compártelas con tu familia o compañeros de piso,
-        escanea tickets para registrar gastos y lleva un control
-        de los productos y precios de tu hogar.
-      </p>
+      <p class="welcome">¿Qué necesitas hoy?</p>
+
+      <div class="quick-actions">
+        <a href="/app/lists" class="quick-action">
+          <span class="quick-icon">🛒</span>
+          <span class="quick-label">Mis listas</span>
+        </a>
+        <a href="/app/lists/new" class="quick-action accent">
+          <span class="quick-icon">✨</span>
+          <span class="quick-label">Nueva lista</span>
+        </a>
+        <a href="/app/products" class="quick-action secondary">
+          <span class="quick-icon">📦</span>
+          <span class="quick-label">Productos</span>
+        </a>
+        <a href="/app/tickets" class="quick-action secondary">
+          <span class="quick-icon">🧾</span>
+          <span class="quick-label">Tickets</span>
+        </a>
+      </div>
     </div>
   </div>
 </AppLayout>
@@ -51,24 +64,71 @@ import AppLayout from '../../layouts/AppLayout.astro';
   .home-content {
     text-align: center;
     max-width: 500px;
+    width: 100%;
   }
 
   .home-greeting {
     font-size: 2rem;
     font-weight: 800;
-    margin-bottom: var(--space-sm);
+    margin-bottom: var(--space-xs);
     color: var(--color-text);
   }
 
   .welcome {
     font-size: var(--font-size-lg);
-    color: var(--color-primary);
+    color: var(--color-text-secondary);
     margin-bottom: var(--space-xl);
-    font-weight: 600;
+    font-weight: 500;
   }
 
-  .description {
-    color: var(--color-text-secondary);
-    line-height: 1.7;
+  .quick-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+    max-width: 360px;
+    margin: 0 auto;
+  }
+
+  .quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-lg) var(--space-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    text-decoration: none;
+    color: var(--color-text);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .quick-action:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .quick-action:active {
+    transform: translateY(0);
+  }
+
+  .quick-action.accent {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+  }
+
+  .quick-action.secondary {
+    background: var(--color-bg-secondary);
+  }
+
+  .quick-icon {
+    font-size: 2rem;
+  }
+
+  .quick-label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
   }
 </style>

@@ -70,25 +70,25 @@ const structuredData = {
       </svg>
     </div>
     <h1>MyHomeCart</h1>
-    <p class="tagline">Tu lista de la compra familiar, sincronizada en tiempo real.</p>
-    <a href="/login" class="btn btn-primary btn-lg">Comenzar</a>
+    <p class="tagline">La compra en familia, organizada y en tiempo real.</p>
+    <a href="/login" class="btn btn-primary btn-lg">Empezar gratis</a>
 
     <!-- Features para SEO -->
     <section class="features" aria-label="Características principales">
       <article class="feature">
-        <span class="feature-icon">🛒</span>
-        <h2>Shared Cart</h2>
-        <p>Comparte listas con tu familia y amigos en tiempo real</p>
+        <span class="feature-icon">👨‍👩‍👧‍👦</span>
+        <h2>Comparte con todos</h2>
+        <p>Añade productos desde cualquier móvil y todos ven los cambios al instante</p>
       </article>
       <article class="feature">
-        <span class="feature-icon">🏠</span>
-        <h2>Home Cart</h2>
-        <p>Gestiona las compras del hogar de forma colaborativa</p>
+        <span class="feature-icon">📸</span>
+        <h2>Escanea tickets</h2>
+        <p>Fotografía el ticket y registra los gastos automáticamente con IA</p>
       </article>
       <article class="feature">
-        <span class="feature-icon">📋</span>
-        <h2>Multiple Lists</h2>
-        <p>Crea tantas listas como necesites para cada ocasión</p>
+        <span class="feature-icon">📊</span>
+        <h2>Controla precios</h2>
+        <p>Historial de precios para saber cuándo y dónde comprar más barato</p>
       </article>
     </section>
 
@@ -215,10 +215,40 @@ const structuredData = {
     border-color: var(--color-border);
   }
 
+  /* Entrada staggered para features */
+  .feature {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: feature-in 0.5s ease forwards;
+  }
+
+  .feature:nth-child(1) { animation-delay: 0.1s; }
+  .feature:nth-child(2) { animation-delay: 0.25s; }
+  .feature:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes feature-in {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .feature {
+      opacity: 1;
+      transform: none;
+      animation: none;
+    }
+  }
+
   @media (max-width: 600px) {
     .features {
       grid-template-columns: 1fr;
       padding: 0 var(--space-md);
+    }
+
+    h1 {
+      font-size: 2.25rem;
     }
   }
 </style>
