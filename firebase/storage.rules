@@ -19,6 +19,14 @@ service firebase.storage {
         && request.resource.size < 10 * 1024 * 1024; // Max 10MB
     }
 
+    // Verifica si el usuario es miembro del grupo consultando Firestore.
+    // Storage rules pueden leer Firestore con firestore.get()/firestore.exists().
+    function isGroupMember(groupId) {
+      return isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/groups/$(groupId))
+        && userId() in firestore.get(/databases/(default)/documents/groups/$(groupId)).data.members;
+    }
+
     // ==================== USER AVATARS ====================
 
     match /users/{userId}/avatar/{fileName} {
@@ -37,18 +45,24 @@ service firebase.storage {
       // Lectura pública (las imágenes se cargan sin token)
       allow read: if true;
 
-      // Usuarios autenticados pueden subir/actualizar iconos
+      // NOTA: la ruta no incluye groupId, por lo que aquí no se puede validar
+      // pertenencia a grupo sin cambiar la estructura de almacenamiento a
+      // "list-icons/{groupId}/{listId}". Pendiente en la fase de arquitectura.
+      // Riesgo actual: un usuario autorizado podría sobrescribir el icono de otra
+      // lista (defacement de bajo impacto en un despliegue privado).
       allow write: if isAuthenticated() && isValidImage();
     }
 
     // ==================== GROUP ICONS ====================
 
     match /group-icons/{fileName} {
-      // Cualquiera autenticado puede ver iconos de grupo
+      // Lectura pública (los iconos se cargan sin token)
       allow read: if true;
 
-      // Usuarios autenticados pueden subir/actualizar iconos (temporalmente permisivo)
-      allow write: if isAuthenticated();
+      // Solo miembros del grupo pueden subir/actualizar su icono, y solo imágenes.
+      // El nombre de fichero es "{groupId}.{ext}"; extraemos el groupId antes del punto.
+      allow write: if isValidImage()
+        && isGroupMember(fileName.split('\\.')[0]);
     }
 
     // ==================== PRODUCT IMAGES ====================
@@ -57,24 +71,24 @@ service firebase.storage {
       // Lectura pública (las imágenes se cargan sin token)
       allow read: if true;
 
-      // Usuarios autenticados pueden subir/actualizar imágenes de productos
-      allow write: if isAuthenticated() && isValidImage();
+      // Solo miembros del grupo pueden subir/actualizar imágenes de productos
+      allow write: if isValidImage() && isGroupMember(groupId);
     }
 
     // ==================== GROUP TICKETS ====================
 
     match /groups/{groupId}/tickets/{ticketId} {
-      // Miembros pueden ver tickets
-      allow read: if isAuthenticated();
+      // Solo miembros del grupo pueden ver los tickets (recibos con datos financieros)
+      allow read: if isGroupMember(groupId);
 
-      // Usuarios autenticados pueden subir tickets
-      allow create: if isAuthenticated() && isValidImage();
+      // Solo miembros del grupo pueden subir tickets, y solo imágenes
+      allow create: if isValidImage() && isGroupMember(groupId);
 
       // No se permite modificar tickets existentes
       allow update: if false;
 
-      // Solo el creador puede eliminar
-      allow delete: if isAuthenticated();
+      // Solo miembros del grupo pueden eliminar
+      allow delete: if isGroupMember(groupId);
     }
   }
 }
