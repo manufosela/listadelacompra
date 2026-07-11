@@ -20,6 +20,8 @@
  *   });
  */
 
+import { escapeHtml } from '/js/escape-html.js';
+
 // Inyectar estilos
 function injectStyles() {
   if (document.getElementById('modal-styles')) return;
@@ -240,12 +242,6 @@ function confirm(options) {
     dialog.showModal();
     dialog.querySelector('.modal-btn-confirm').focus();
   });
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 // API pública

@@ -60,6 +60,7 @@ import AppLayout from '../../layouts/AppLayout.astro';
     // Comprobar invitaciones pendientes
     try {
       const { getPendingInvitations, acceptInvitation } = await import('/js/group.js');
+      const { escapeHtml } = await import('/js/escape-html.js');
       const invitations = await getPendingInvitations();
       const banner = document.getElementById('invitations-banner');
       if (invitations.length > 0 && banner) {
@@ -67,8 +68,8 @@ import AppLayout from '../../layouts/AppLayout.astro';
         banner.innerHTML = invitations.map(inv => `
           <div class="invitation-card">
             <div class="invitation-info">
-              <strong>${inv.groupName}</strong>
-              <span>Invitado por ${inv.invitedByName}</span>
+              <strong>${escapeHtml(inv.groupName)}</strong>
+              <span>Invitado por ${escapeHtml(inv.invitedByName)}</span>
             </div>
             <div class="invitation-actions">
               <button class="inv-accept" data-id="${inv.id}">Aceptar</button>
