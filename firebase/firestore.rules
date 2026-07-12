@@ -40,6 +40,14 @@ service cloud.firestore {
       return request.resource.data.keys().hasAll(fields);
     }
 
+    // ==================== CONFIG (allowlist de acceso) ====================
+    // Configuración privada (p. ej. config/access con la allowlist de emails).
+    // Ningún cliente puede leerla ni escribirla: solo el Admin SDK (Cloud
+    // Functions) y la consola de Firebase. Contiene datos personales (emails).
+    match /config/{docId} {
+      allow read, write: if false;
+    }
+
     // ==================== INVITATIONS ====================
     // Invitaciones por email para unirse a grupos
     match /invitations/{invitationId} {
