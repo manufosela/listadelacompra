@@ -93,6 +93,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { getCategoriesForList } from '/js/categories.js';
   import { uploadProductImage, deleteProductImage } from '/js/storage.js';
   import { UNITS } from '/js/db.js';
+  import { escapeHtml } from '/js/escape-html.js';
 
   let allProducts = [];
   let allCategories = []; // Incluye default + custom
@@ -153,7 +154,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       if (categorySelect) {
         categorySelect.innerHTML = '<option value="">Sin categoría</option>';
         allCategories.forEach(cat => {
-          categorySelect.innerHTML += `<option value="${cat.id}">${cat.icon || '📦'} ${cat.name}</option>`;
+          categorySelect.innerHTML += `<option value="${cat.id}">${cat.icon || '📦'} ${escapeHtml(cat.name)}</option>`;
         });
       }
     } catch (error) {
@@ -176,7 +177,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     const tags = Array.from(new Set(
       products.map(p => p.storeTag).filter(Boolean)
     )).sort((a, b) => a.localeCompare(b));
-    tagList.innerHTML = tags.map(tag => `<option value="${tag}"></option>`).join('');
+    tagList.innerHTML = tags.map(tag => `<option value="${escapeHtml(tag)}"></option>`).join('');
   }
 
   function getCategoryDisplay(categoryId) {
@@ -299,14 +300,14 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                 ${p.imageUrl ? `<img class="product-thumb" src="${p.imageUrl}" alt="">` : '<span class="product-thumb-placeholder">—</span>'}
               </td>
               <td class="product-name">
-                ${p.name}
-                ${p.storeTag ? `<span class="product-store-inline">${p.storeTag}</span>` : ''}
+                ${escapeHtml(p.name)}
+                ${p.storeTag ? `<span class="product-store-inline">${escapeHtml(p.storeTag)}</span>` : ''}
                 <button class="btn btn-sm btn-ghost edit-btn edit-inline" aria-label="Editar producto" title="Editar">
                   ✏️
                 </button>
               </td>
-              <td class="product-category">${getCategoryDisplay(p.category)}</td>
-              <td class="product-store">${p.storeTag || '-'}</td>
+              <td class="product-category">${escapeHtml(getCategoryDisplay(p.category))}</td>
+              <td class="product-store">${escapeHtml(p.storeTag || '-')}</td>
               <td class="product-actions">
                 <button class="btn btn-sm btn-ghost edit-btn" aria-label="Editar producto" title="Editar">
                   ✏️
