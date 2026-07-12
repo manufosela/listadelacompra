@@ -181,6 +181,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { navigateTo } from '/js/navigate.js';
   import { getAllProducts, UNITS } from '/js/db.js';
   import { getCategoriesForList, DEFAULT_SHOPPING_CATEGORIES } from '/js/categories.js';
+  import { escapeHtml } from '/js/escape-html.js';
 
   // Iconos disponibles según tipo de lista
   const SHOPPING_ICONS = [
@@ -429,10 +430,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                 <div class="member-avatar-small">
                   ${member.photoURL
                     ? `<img src="${member.photoURL}" alt="">`
-                    : `<span>${member.name[0].toUpperCase()}</span>`
+                    : `<span>${escapeHtml(member.name[0].toUpperCase())}</span>`
                   }
                 </div>
-                <span class="member-name">${member.name}</span>
+                <span class="member-name">${escapeHtml(member.name)}</span>
               </div>
             </label>
           `).join('')}
@@ -626,7 +627,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
           return `
             <div class="product-category-group">
               <div class="product-category-header">
-                <span>${category.icon || '📦'} ${category.name}</span>
+                <span>${category.icon || '📦'} ${escapeHtml(category.name)}</span>
                 <span class="category-count">${products.length}</span>
               </div>
               <div class="product-items">
@@ -654,9 +655,9 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                           ${product.imageUrl ? `<img class="product-thumb" src="${product.imageUrl}" alt="">` : '<span class="product-thumb-placeholder" aria-hidden="true"></span>'}
                         </td>
                         <td class="product-info-cell">
-                          <div class="product-name">${product.name}</div>
+                          <div class="product-name">${escapeHtml(product.name)}</div>
                           ${isExisting ? '<div class="product-existing-badge">En lista</div>' : ''}
-                          ${product.storeTag ? `<div class="product-store-tag">${product.storeTag}</div>` : ''}
+                          ${product.storeTag ? `<div class="product-store-tag">${escapeHtml(product.storeTag)}</div>` : ''}
                         </td>
                         <td class="product-quantity-cell">
                           <div class="product-quantity ${isSelected ? '' : 'disabled'}">

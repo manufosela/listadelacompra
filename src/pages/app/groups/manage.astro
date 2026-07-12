@@ -27,6 +27,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { uploadGroupIcon } from '/js/storage.js';
   import { navigateTo } from '/js/navigate.js';
   import { openImageCropper } from '/js/image-cropper.js';
+  import { escapeHtml } from '/js/escape-html.js';
 
   let groupId = null;
   let groupData = null;
@@ -93,7 +94,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
             </div>
             <div class="header-info">
               <div class="header-title">
-                <h1 id="group-name-display">${groupData.name}</h1>
+                <h1 id="group-name-display">${escapeHtml(groupData.name)}</h1>
                 ${isAdmin ? `
                   <button id="edit-name-btn" class="btn-icon" title="Editar nombre" aria-label="Editar nombre">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -123,10 +124,10 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                 <div class="member-avatar">
                   ${member.photoURL
                     ? `<img src="${member.photoURL}" alt="" loading="lazy">`
-                    : `<span>${(member.displayName || member.email || '?')[0].toUpperCase()}</span>`
+                    : `<span>${escapeHtml((member.displayName || member.email || '?')[0].toUpperCase())}</span>`
                   }
                 </div>
-                <span class="member-name">${member.displayName || member.email?.split('@')[0]}${uid === currentUser.uid ? ' (tú)' : ''}</span>
+                <span class="member-name">${escapeHtml(member.displayName || member.email?.split('@')[0])}${uid === currentUser.uid ? ' (tú)' : ''}</span>
                 ${isOwner ? '<span class="member-badge owner">Owner</span>' : ''}
                 ${!isOwner && isMemberAdmin ? '<span class="member-badge admin">Admin</span>' : ''}
                 ${isCreator && !isOwner ? `
@@ -167,7 +168,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                 <span class="pending-label">${pendingInvitations.length} pendiente${pendingInvitations.length !== 1 ? 's' : ''}:</span>
                 ${pendingInvitations.map(inv => `
                   <span class="pending-chip">
-                    ${inv.invitedEmail}
+                    ${escapeHtml(inv.invitedEmail)}
                     <button class="chip-remove delete-invitation-btn" data-id="${inv.id}" title="Cancelar" aria-label="Cancelar invitación">
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <path d="M18 6L6 18M6 6l12 12"/>
@@ -198,7 +199,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
                 };
                 return `
                   <div class="history-row">
-                    <span class="history-email">${inv.invitedEmail}</span>
+                    <span class="history-email">${escapeHtml(inv.invitedEmail)}</span>
                     <span class="history-status status-${inv.status}">${statusLabels[inv.status] || inv.status}</span>
                     <button class="btn-icon btn-icon-sm delete-invitation-btn" data-id="${inv.id}" title="Eliminar">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

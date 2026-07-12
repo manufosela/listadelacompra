@@ -23,6 +23,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
   import { modal } from '/js/modal.js';
   import { updateTicket } from '/js/tickets.js';
   import { getDocsWithTimeout } from '/js/firestore-utils.js';
+  import { escapeHtml } from '/js/escape-html.js';
   import { collection, query, orderBy, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
   let currentUser = null;
@@ -42,11 +43,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
           <form class="modal-body" id="edit-ticket-form">
             <div class="form-group">
               <label for="edit-store">Tienda</label>
-              <input type="text" id="edit-store" name="store" value="${currentData.store || ''}" required>
+              <input type="text" id="edit-store" name="store" value="${escapeHtml(currentData.store || '')}" required>
             </div>
             <div class="form-group">
               <label for="edit-date">Fecha</label>
-              <input type="date" id="edit-date" name="date" value="${currentData.date || ''}" required>
+              <input type="date" id="edit-date" name="date" value="${escapeHtml(currentData.date || '')}" required>
             </div>
             <div class="form-group">
               <label for="edit-total">Total (€)</label>
@@ -246,13 +247,13 @@ import AppLayout from '../../../layouts/AppLayout.astro';
             <a href="/app/list?id=${t.listId}" class="ticket-content">
               <div class="ticket-header">
                 <div>
-                  <h3>${t.store || 'Tienda desconocida'}</h3>
-                  <span class="ticket-date">${ticketDate}</span>
+                  <h3>${escapeHtml(t.store || 'Tienda desconocida')}</h3>
+                  <span class="ticket-date">${escapeHtml(ticketDate)}</span>
                 </div>
                 <span class="ticket-total">${(t.total || 0).toFixed(2)}€</span>
               </div>
               <div class="ticket-meta">
-                <span class="list-badge">${t.listIcon} ${t.listName}</span>
+                <span class="list-badge">${t.listIcon} ${escapeHtml(t.listName)}</span>
                 <span class="items-badge">${t.itemCount || 0} productos</span>
                 ${t.imageUrl ? '<span class="image-badge">📷</span>' : ''}
               </div>
