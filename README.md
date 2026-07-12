@@ -20,6 +20,31 @@ Aplicación web para gestionar listas de la compra en familia o grupos. Permite 
 
 ---
 
+## 🚀 Monta tu propia instancia
+
+¿Quieres usar HomeCart con tu familia o amigos? La forma recomendada es el
+asistente, que automatiza casi todo:
+
+```bash
+git clone https://github.com/manufosela/listadelacompra.git
+cd listadelacompra
+pnpm install
+./scripts/setup-firebase.sh
+```
+
+**Guía completa y actualizada (fuente de verdad):** [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md)
+· también disponible dentro de la app en `/self-host`.
+
+> **Importante** — para que funcione al 100% necesitas activar en tu proyecto de
+> Firebase: el **plan Blaze** (obligatorio para las Cloud Functions; para uso
+> familiar el coste suele ser 0 €/mes) e **Identity Platform** (para la lista de
+> acceso privado). La guía lo explica paso a paso.
+
+Lo que sigue es un resumen manual; ante cualquier discrepancia, manda
+[`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
+
+---
+
 ## Requisitos Previos
 
 Antes de empezar, necesitas tener instalado:
