@@ -1,0 +1,85 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+// Una sola fuente de verdad: la misma guía que docs/SELF_HOSTING.md.
+import { Content, frontmatter } from '../../docs/SELF_HOSTING.md';
+---
+
+<BaseLayout title={frontmatter.title}>
+  <main class="doc-page">
+    <a class="doc-back" href="/">← Volver</a>
+    <article class="doc-prose">
+      <Content />
+    </article>
+  </main>
+</BaseLayout>
+
+<style>
+  .doc-page {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: var(--space-lg, 1.5rem) var(--space-md, 1rem) var(--space-2xl, 3rem);
+  }
+
+  .doc-back {
+    display: inline-block;
+    margin-bottom: var(--space-md, 1rem);
+    color: var(--color-primary, #c9624a);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .doc-back:hover { text-decoration: underline; }
+
+  /* Estilos de lectura para el markdown renderizado */
+  .doc-prose { line-height: 1.65; color: var(--color-text, #2b2b2b); }
+  .doc-prose :global(h1) { font-size: 2rem; font-weight: 800; margin: 0 0 1rem; }
+  .doc-prose :global(h2) {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 2.2rem 0 0.8rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border, #eadfd9);
+  }
+  .doc-prose :global(h3) { font-size: 1.1rem; font-weight: 700; margin: 1.6rem 0 0.6rem; }
+  .doc-prose :global(p),
+  .doc-prose :global(ul),
+  .doc-prose :global(ol),
+  .doc-prose :global(table) { margin: 0 0 1rem; }
+  .doc-prose :global(ul),
+  .doc-prose :global(ol) { padding-left: 1.4rem; }
+  .doc-prose :global(li) { margin: 0.3rem 0; }
+  .doc-prose :global(a) { color: var(--color-primary, #c9624a); }
+  .doc-prose :global(code) {
+    background: var(--color-bg-secondary, #f5efec);
+    padding: 0.15em 0.4em;
+    border-radius: 6px;
+    font-size: 0.9em;
+  }
+  .doc-prose :global(pre) {
+    background: var(--color-bg-secondary, #f5efec);
+    padding: 1rem;
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+  .doc-prose :global(pre code) { background: none; padding: 0; }
+  .doc-prose :global(blockquote) {
+    border-left: 4px solid var(--color-primary, #c9624a);
+    margin: 1rem 0;
+    padding: 0.2rem 0 0.2rem 1rem;
+    color: var(--color-text-secondary, #6b615c);
+  }
+  .doc-prose :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    display: block;
+    overflow-x: auto;
+  }
+  .doc-prose :global(th),
+  .doc-prose :global(td) {
+    border: 1px solid var(--color-border, #eadfd9);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+  }
+  .doc-prose :global(th) { background: var(--color-bg-secondary, #f5efec); }
+  /* Los h2 ya llevan separador propio; ocultamos los <hr> del markdown */
+  .doc-prose :global(hr) { display: none; }
+</style>
