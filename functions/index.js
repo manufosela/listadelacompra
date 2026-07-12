@@ -4,6 +4,10 @@
  */
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import {
+  beforeUserCreated,
+  HttpsError as IdentityHttpsError,
+} from 'firebase-functions/v2/identity';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
@@ -645,3 +649,37 @@ export const getMyGroups = onCall(
     return { groups: validGroups, cleaned: staleIds.length };
   }
 );
+
+/**
+ * Allowlist de acceso privado (familia/amigos).
+ *
+ * Bloquea el REGISTRO de cualquier email que no esté en la allowlist. Los
+ * usuarios ya existentes no se ven afectados (esto solo se dispara al crear la
+ * cuenta). La lista se gestiona en Firestore en el documento config/access,
+ * campo `emails` (array de strings), para poder añadir/quitar personas sin
+ * redesplegar. Las reglas impiden que ningún cliente lea o escriba config/*;
+ * la lista se edita desde la consola de Firebase.
+ *
+ * Comportamiento fail-closed: si el documento no existe o no tiene emails,
+ * se bloquea el registro. Rellenar config/access ANTES de invitar a nadie.
+ */
+export const enforceAllowlist = beforeUserCreated(async (event) => {
+  const email = (event.data?.email || '').toLowerCase().trim();
+  if (!email) {
+    throw new IdentityHttpsError(
+      'permission-denied',
+      'No se puede verificar el acceso: la cuenta no tiene email.'
+    );
+  }
+
+  const snap = await db.collection('config').doc('access').get();
+  const allowed = snap.exists ? snap.data().emails || [] : [];
+  const normalized = allowed.map((e) => String(e).toLowerCase().trim());
+
+  if (!normalized.includes(email)) {
+    throw new IdentityHttpsError(
+      'permission-denied',
+      'Esta aplicación es privada. Tu cuenta no está autorizada; pide acceso al administrador.'
+    );
+  }
+});
