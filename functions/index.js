@@ -15,6 +15,63 @@ initializeApp();
 const db = getFirestore();
 const storage = getStorage();
 
+// Tamaño máximo de imagen aceptada en processTicket (evita payloads enormes
+// que disparan coste y memoria antes de llamar a OpenAI).
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
+
+// Número máximo de escaneos de ticket por usuario y día (freno de coste OpenAI).
+const DAILY_TICKET_QUOTA = 50;
+
+/**
+ * Estima el tamaño en bytes de una imagen codificada en base64 y lanza si excede
+ * el máximo permitido. Descuenta el prefijo "data:...;base64," si viene incluido.
+ * @param {string} imageBase64 - Contenido base64 (con o sin prefijo data URI).
+ */
+function assertImageWithinLimit(imageBase64) {
+  const base64Payload = imageBase64.includes(',')
+    ? imageBase64.slice(imageBase64.indexOf(',') + 1)
+    : imageBase64;
+  const approxBytes = Math.floor((base64Payload.length * 3) / 4);
+  if (approxBytes > MAX_IMAGE_BYTES) {
+    throw new HttpsError(
+      'invalid-argument',
+      'La imagen es demasiado grande. El máximo es 8 MB.'
+    );
+  }
+}
+
+/**
+ * Comprueba e incrementa de forma atómica la cuota diaria de escaneos de un
+ * usuario. Lanza 'resource-exhausted' si ya alcanzó el límite del día.
+ * El contador vive en users/{uid}/aiUsage/{YYYY-MM-DD} y solo lo toca el
+ * Admin SDK (las reglas de cliente no exponen esta subcolección).
+ * @param {string} uid - UID del usuario que invoca.
+ */
+async function enforceDailyTicketQuota(uid) {
+  const today = new Date().toISOString().slice(0, 10);
+  const quotaRef = db
+    .collection('users')
+    .doc(uid)
+    .collection('aiUsage')
+    .doc(today);
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(quotaRef);
+    const count = snap.exists ? snap.data().count || 0 : 0;
+    if (count >= DAILY_TICKET_QUOTA) {
+      throw new HttpsError(
+        'resource-exhausted',
+        `Has alcanzado el límite diario de ${DAILY_TICKET_QUOTA} escaneos de ticket. Inténtalo de nuevo mañana.`
+      );
+    }
+    tx.set(
+      quotaRef,
+      { count: count + 1, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+  });
+}
+
 /**
  * Analyze ticket image using OpenAI Vision
  * @param {string} imageContent - Base64 image content
@@ -129,6 +186,11 @@ export const processTicket = onCall(
       throw new HttpsError('invalid-argument', 'groupId is required');
     }
 
+    // Rechazar imágenes demasiado grandes antes de gastar recursos
+    if (imageBase64) {
+      assertImageWithinLimit(imageBase64);
+    }
+
     // Verify user is member of group
     const groupDoc = await db.collection('groups').doc(groupId).get();
     if (!groupDoc.exists) {
@@ -139,6 +201,9 @@ export const processTicket = onCall(
     if (!groupData?.members?.[request.auth.uid]) {
       throw new HttpsError('permission-denied', 'User is not a member of this group');
     }
+
+    // Aplicar cuota diaria antes de invocar (y pagar) OpenAI
+    await enforceDailyTicketQuota(request.auth.uid);
 
     try {
       let imageContent;
@@ -159,7 +224,7 @@ export const processTicket = onCall(
       const analysis = await analyzeTicketWithOpenAI(imageContent);
 
       // If listId provided, load list items for matching suggestions
-      const assignedTo = data.assignedTo || null;
+      const assignedTo = request.data.assignedTo || null;
       let listItems = [];
       if (listId && userId) {
         const itemsSnap = await db
