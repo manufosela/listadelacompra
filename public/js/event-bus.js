@@ -68,7 +68,14 @@ class EventBus {
    */
   emit(event, payload = {}) {
     const callbacks = this.listeners.get(event) || [];
-    callbacks.forEach(cb => cb(payload));
+    // Aislamos cada listener: si uno lanza, el resto sigue recibiendo el evento.
+    callbacks.forEach(cb => {
+      try {
+        cb(payload);
+      } catch (error) {
+        console.error(`[eventBus] Error en un listener de "${event}":`, error);
+      }
+    });
   }
 
   /**
