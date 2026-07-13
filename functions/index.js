@@ -180,7 +180,7 @@ export const processTicket = onCall(
       throw new HttpsError('unauthenticated', 'User must be authenticated');
     }
 
-    const { imageUrl, imageBase64, groupId, listId, userId } = request.data;
+    const { imageUrl, imageBase64, groupId, listId } = request.data;
 
     if (!imageUrl && !imageBase64) {
       throw new HttpsError('invalid-argument', 'Either imageUrl or imageBase64 is required');
@@ -227,35 +227,27 @@ export const processTicket = onCall(
       // Analyze with OpenAI
       const analysis = await analyzeTicketWithOpenAI(imageContent);
 
-      // If listId provided, load list items for matching suggestions
-      const assignedTo = request.data.assignedTo || null;
+      // Si se indica una lista, cargar sus items para sugerir coincidencias.
+      // Las listas viven en groups/{groupId}/shoppingLists/{listId}/items y el
+      // nombre del producto está en el campo `productName`.
       let listItems = [];
-      if (listId && userId) {
+      if (listId && groupId) {
         const itemsSnap = await db
-          .collection('users')
-          .doc(userId)
-          .collection('lists')
+          .collection('groups')
+          .doc(groupId)
+          .collection('shoppingLists')
           .doc(listId)
           .collection('items')
           .get();
 
         listItems = itemsSnap.docs.map(doc => ({
           id: doc.id,
-          name: doc.data().name,
-          normalizedName: (doc.data().name || '').toLowerCase().trim(),
+          name: doc.data().productName,
+          normalizedName: (doc.data().productName || '').toLowerCase().trim(),
           checked: doc.data().checked || false,
           quantity: doc.data().quantity,
           unit: doc.data().unit,
-          assignedTo: doc.data().assignedTo || null,
-          ticketId: doc.data().ticketId || null,
         }));
-
-        // Filtrar por assignedTo si se proporciona (solo matchear contra mis items)
-        if (assignedTo) {
-          listItems = listItems.filter(item =>
-            item.assignedTo === assignedTo && !item.ticketId
-          );
-        }
       }
 
       // Try to match ticket items with list items
