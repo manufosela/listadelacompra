@@ -257,6 +257,12 @@ import AppLayout from '../../../layouts/AppLayout.astro';
     });
   }
 
+  // Handler del cambio de grupo: vuelve a suscribir las listas compartidas del
+  // nuevo grupo. Función nombrada para poder removerla y no acumular listeners.
+  function handleGroupChange() {
+    setupSharedListSubscriptions();
+  }
+
   async function initPage(user) {
     // Evitar inicializaciones múltiples
     if (initialized && currentUser?.uid === user?.uid) return;
@@ -278,6 +284,11 @@ import AppLayout from '../../../layouts/AppLayout.astro';
 
     // Cargar listas compartidas en tiempo real
     await setupSharedListSubscriptions();
+
+    // Re-suscribir las listas compartidas cuando se cambia de grupo en el selector.
+    // (Las listas propias no dependen del grupo; solo las compartidas.)
+    window.removeEventListener('group-changed', handleGroupChange);
+    window.addEventListener('group-changed', handleGroupChange);
 
     // Primero mostrar datos cacheados de mis listas
     try {
@@ -320,6 +331,7 @@ import AppLayout from '../../../layouts/AppLayout.astro';
       unsubscribe = null;
     }
     clearSharedSubscriptions();
+    window.removeEventListener('group-changed', handleGroupChange);
     initialized = false;
     tabsInitialized = false;
   });
