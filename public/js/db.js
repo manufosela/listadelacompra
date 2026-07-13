@@ -19,6 +19,7 @@ import {
   serverTimestamp,
   increment
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+import { normalizeProductName, calculateSimilarity } from './product-matching.js';
 
 // ============================================
 // CATEGORÍAS Y UNIDADES
@@ -99,57 +100,9 @@ export const UNITS = [
 // HELPERS DE NORMALIZACIÓN
 // ============================================
 
-/**
- * Normaliza un nombre de producto para búsqueda y comparación
- * - Convierte a minúsculas
- * - Quita acentos y diacríticos
- * - Elimina espacios extra
- */
-export function normalizeProductName(name) {
-  if (!name) return '';
-  return name
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
-    .replace(/\s+/g, ' '); // Espacios múltiples a uno
-}
-
-/**
- * Calcula similitud entre dos strings (0-1)
- * Usa una combinación de: coincidencia de palabras + distancia de edición simplificada
- */
-export function calculateSimilarity(str1, str2) {
-  const a = normalizeProductName(str1);
-  const b = normalizeProductName(str2);
-
-  if (a === b) return 1;
-  if (!a || !b) return 0;
-
-  // Coincidencia exacta de inicio
-  if (b.startsWith(a) || a.startsWith(b)) return 0.9;
-
-  // Todas las palabras del query están en el producto
-  const queryWords = a.split(' ').filter(w => w.length > 1);
-  const productWords = b.split(' ');
-  const allWordsMatch = queryWords.every(qw =>
-    productWords.some(pw => pw.includes(qw) || qw.includes(pw))
-  );
-  if (allWordsMatch && queryWords.length > 0) return 0.8;
-
-  // Una palabra contiene a la otra
-  if (b.includes(a) || a.includes(b)) return 0.7;
-
-  // Coincidencia parcial de palabras
-  const matchingWords = queryWords.filter(qw =>
-    productWords.some(pw => pw.includes(qw) || qw.includes(pw))
-  );
-  if (matchingWords.length > 0) {
-    return 0.5 * (matchingWords.length / queryWords.length);
-  }
-
-  return 0;
-}
+// La lógica pura de normalización y similitud vive en product-matching.js
+// (módulo sin dependencias, testeable). Se reexporta para no romper importadores.
+export { normalizeProductName, calculateSimilarity };
 
 // ============================================
 // PRODUCTOS
