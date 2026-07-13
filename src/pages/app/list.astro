@@ -21,6 +21,19 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
   let unsubscribe = null;
   let currentListId = null;
+  // Indica si la lista abierta es de otra persona (compartida). Las listas
+  // propias son transversales a los grupos; las compartidas pertenecen al
+  // contexto del grupo desde el que se ven.
+  let currentListIsShared = false;
+
+  // Al cambiar de familia en el selector, si estás dentro de una lista
+  // compartida por otra persona (pertenece al grupo anterior), volver al
+  // listado. En una lista propia no se hace nada (no depende del grupo).
+  function handleGroupChange() {
+    if (currentListIsShared) {
+      window.location.href = '/app/lists';
+    }
+  }
 
   function showError(headerEl, message, isNetwork = false) {
     const errorText = isNetwork
@@ -68,6 +81,11 @@ import AppLayout from '../../layouts/AppLayout.astro';
 
     const listRef = doc(db, 'users', ownerId, 'lists', listId);
     const isOwner = ownerId === user.uid;
+    currentListIsShared = !isOwner;
+
+    // Reaccionar al cambio de familia (remove previo para no duplicar listeners)
+    window.removeEventListener('group-changed', handleGroupChange);
+    window.addEventListener('group-changed', handleGroupChange);
 
     // Función para renderizar la lista
     function renderList(list) {
@@ -236,7 +254,9 @@ import AppLayout from '../../layouts/AppLayout.astro';
       unsubscribe();
       unsubscribe = null;
     }
+    window.removeEventListener('group-changed', handleGroupChange);
     currentListId = null;
+    currentListIsShared = false;
   });
 </script>
 
