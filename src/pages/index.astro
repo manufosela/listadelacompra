@@ -1,50 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-
-const structuredData = {
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  "name": "MyHomeCart",
-  "alternateName": ["Home Cart", "Shared Cart", "Family Shopping List"],
-  "url": "https://myhomec.art",
-  "description": "MyHomeCart es la aplicación perfecta para crear y compartir listas de la compra con tu familia. Sincronización en tiempo real, listas compartidas y gestión colaborativa del hogar.",
-  "applicationCategory": "LifestyleApplication",
-  "operatingSystem": "Web, iOS, Android",
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "EUR"
-  },
-  "aggregateRating": {
-    "@type": "AggregateRating",
-    "ratingValue": "4.8",
-    "ratingCount": "150"
-  },
-  "featureList": [
-    "Shared shopping lists",
-    "Real-time sync",
-    "Family collaboration",
-    "Multiple lists support",
-    "Group management"
-  ],
-  "screenshot": "https://myhomec.art/og-image.png",
-  "author": {
-    "@type": "Organization",
-    "name": "MyHomeCart",
-    "url": "https://myhomec.art"
-  }
-};
 ---
 
-<BaseLayout
-  title="Listas de la Compra Compartidas"
-  description="MyHomeCart - Crea y comparte listas de la compra con tu familia. Shared cart, home cart y listas colaborativas sincronizadas en tiempo real."
->
-  <!-- Structured Data JSON-LD -->
-  <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
-
-  <main class="landing">
-    <div class="landing-logo">
+<BaseLayout title="MyHomeCart">
+  <main class="redirect-screen">
+    <div class="redirect-logo" aria-hidden="true">
       <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="landingLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -69,186 +29,56 @@ const structuredData = {
         </g>
       </svg>
     </div>
-    <h1>MyHomeCart</h1>
-    <p class="tagline">La compra en familia, organizada y en tiempo real.</p>
-    <a href="/login" class="btn btn-primary btn-lg">Empezar gratis</a>
-
-    <!-- Features para SEO -->
-    <section class="features" aria-label="Características principales">
-      <article class="feature">
-        <span class="feature-icon">👨‍👩‍👧‍👦</span>
-        <h2>Comparte con todos</h2>
-        <p>Añade productos desde cualquier móvil y todos ven los cambios al instante</p>
-      </article>
-      <article class="feature">
-        <span class="feature-icon">📸</span>
-        <h2>Escanea tickets</h2>
-        <p>Fotografía el ticket y registra los gastos automáticamente con IA</p>
-      </article>
-      <article class="feature">
-        <span class="feature-icon">📊</span>
-        <h2>Controla precios</h2>
-        <p>Historial de precios para saber cuándo y dónde comprar más barato</p>
-      </article>
-    </section>
-
-    <span class="domain-badge">myhomec.art</span>
+    <p class="redirect-text">Cargando…</p>
+    <noscript>
+      <a href="/login" class="btn btn-primary">Iniciar sesión</a>
+    </noscript>
   </main>
 </BaseLayout>
 
+<script type="module">
+  import { onAuthStateChanged } from '/js/auth.js';
+  // App privada: la raíz lleva directamente al login, o a la app si ya hay sesión.
+  onAuthStateChanged((user) => {
+    window.location.replace(user ? '/app' : '/login');
+  });
+</script>
+
 <style>
-  .landing {
+  .redirect-screen {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: var(--space-md);
     text-align: center;
     padding: var(--space-xl);
-    background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-tertiary) 50%, var(--color-bg-secondary) 100%);
   }
 
-  .landing-logo {
-    width: 120px;
-    height: 120px;
-    margin-bottom: var(--space-lg);
-    animation: float 4s ease-in-out infinite;
+  .redirect-logo {
+    width: 88px;
+    height: 88px;
+    animation: pulse 1.4s ease-in-out infinite;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .landing-logo {
-      animation: none;
-    }
-  }
-
-  .landing-logo svg {
+  .redirect-logo svg {
     width: 100%;
     height: 100%;
     filter: drop-shadow(0 10px 30px rgba(224, 123, 92, 0.25));
   }
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-  }
-
-  h1 {
-    font-size: 3rem;
-    font-weight: 800;
-    margin-bottom: var(--space-sm);
-    color: var(--color-primary-dark);
-  }
-
-  .tagline {
-    font-size: 1.25rem;
+  .redirect-text {
     color: var(--color-text-secondary);
-    margin-bottom: var(--space-xl);
-    max-width: 400px;
-  }
-
-  .btn-lg {
-    padding: var(--space-md) var(--space-2xl);
-    font-size: var(--font-size-lg);
-    border-radius: var(--radius-full);
-  }
-
-  /* Features Section */
-  .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--space-lg);
-    margin-top: var(--space-2xl);
-    max-width: 800px;
-    width: 100%;
-  }
-
-  .feature {
-    background: var(--color-bg);
-    padding: var(--space-lg);
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-sm);
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-  }
-
-  .feature:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .feature-icon {
-    font-size: 2.5rem;
-    display: block;
-    margin-bottom: var(--space-sm);
-  }
-
-  .feature h2 {
-    font-size: var(--font-size-lg);
-    font-weight: 700;
-    margin-bottom: var(--space-xs);
-    color: var(--color-text);
-  }
-
-  .feature p {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    margin: 0;
-    line-height: 1.5;
   }
 
-  .domain-badge {
-    margin-top: var(--space-2xl);
-    padding: var(--space-xs) var(--space-md);
-    background: var(--color-primary-bg);
-    color: var(--color-primary);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-  }
-
-  :root.dark .landing {
-    background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-tertiary) 50%, var(--color-bg) 100%);
-  }
-
-  :root.dark .feature {
-    background: var(--color-bg-secondary);
-    border-color: var(--color-border);
-  }
-
-  /* Entrada staggered para features */
-  .feature {
-    opacity: 0;
-    transform: translateY(20px);
-    animation: feature-in 0.5s ease forwards;
-  }
-
-  .feature:nth-child(1) { animation-delay: 0.1s; }
-  .feature:nth-child(2) { animation-delay: 0.25s; }
-  .feature:nth-child(3) { animation-delay: 0.4s; }
-
-  @keyframes feature-in {
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.6; transform: scale(0.98); }
+    50% { opacity: 1; transform: scale(1); }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .feature {
-      opacity: 1;
-      transform: none;
-      animation: none;
-    }
-  }
-
-  @media (max-width: 600px) {
-    .features {
-      grid-template-columns: 1fr;
-      padding: 0 var(--space-md);
-    }
-
-    h1 {
-      font-size: 2.25rem;
-    }
+    .redirect-logo { animation: none; }
   }
 </style>
