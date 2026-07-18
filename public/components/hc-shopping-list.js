@@ -3268,7 +3268,7 @@ export class HcShoppingList extends LitElement {
         }
       }
 
-      await addDoc(itemsRef, itemData);
+      const itemDocRef = await addDoc(itemsRef, itemData);
 
       // Actualizar contador de la lista
       const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
@@ -3277,10 +3277,38 @@ export class HcShoppingList extends LitElement {
         updatedAt: serverTimestamp()
       });
 
+      // Autoclasificar en segundo plano (no bloquea la UI). Solo listas de compra.
+      if (!isAgnostic) {
+        this._autoClassifyItem(itemDocRef, name);
+      }
+
       this._quickAddValue = '';
       this._duplicateWarnings = [];
     } catch (error) {
       console.error('Error adding quick item:', error);
+    }
+  }
+
+  /**
+   * Asigna una categoría a un item recién creado, en segundo plano.
+   * Reutiliza el catálogo del grupo o pide a la IA (gpt-5-nano) que lo clasifique.
+   * No bloquea la interfaz: si falla, el item se queda como estaba.
+   */
+  async _autoClassifyItem(itemRef, name) {
+    try {
+      const groupId = getCurrentGroupId();
+      if (!groupId || !Array.isArray(this._categories) || this._categories.length === 0) {
+        return;
+      }
+      const { classifyProduct } = await import('/js/product-classifier.js');
+      const categories = this._categories.map((c) => ({ id: c.id, name: c.name }));
+      const result = await classifyProduct(groupId, name, categories);
+      const category = result?.category;
+      if (category && category !== 'otros') {
+        await updateDoc(itemRef, { category });
+      }
+    } catch (error) {
+      console.warn('Auto-clasificación de producto falló:', error);
     }
   }
 
