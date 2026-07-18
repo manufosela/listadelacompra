@@ -5,14 +5,14 @@
 
 import { LitElement, html, css } from '/js/vendor/lit.bundle.js';
 import {
-  DEFAULT_SHOPPING_CATEGORIES,
   CATEGORY_COLORS,
   getGroupCategories,
   createGroupCategory,
   updateGroupCategory,
   deleteGroupCategory,
   getNextAvailableColor,
-  removeCategoryFromItems
+  removeCategoryFromItems,
+  seedGroupShoppingCategories
 } from '/js/categories.js';
 import { getUserLists } from '/js/lists.js';
 
@@ -456,8 +456,18 @@ export class HcCategoriesManager extends LitElement {
     this._error = null;
 
     try {
-      const customCategories = await getGroupCategories(this.groupId, this.listType);
-      this._categories = customCategories;
+      // Para listas de compra, asegurar que las categorías por defecto existen
+      // como documentos editables del grupo (idempotente). Así, grupos creados
+      // antes de esta función también las tienen y se pueden editar.
+      if (this.listType === 'shopping') {
+        try {
+          await seedGroupShoppingCategories(this.groupId, this.userId);
+        } catch (seedError) {
+          console.warn('No se pudieron sembrar las categorías por defecto:', seedError);
+        }
+      }
+      const groupCategories = await getGroupCategories(this.groupId, this.listType);
+      this._categories = groupCategories;
     } catch (error) {
       console.error('Error loading categories:', error);
       this._error = 'Error al cargar las categorías';
@@ -714,24 +724,12 @@ export class HcCategoriesManager extends LitElement {
       return html`<div class="loading">Cargando categorías...</div>`;
     }
 
-    const isShopping = this.listType === 'shopping';
-    const defaultCategories = isShopping ? DEFAULT_SHOPPING_CATEGORIES : [];
-
     return html`
       ${this._error && !this._showModal ? html`<div class="error-message">${this._error}</div>` : ''}
 
-      ${isShopping ? html`
-        <div class="section-title">Categorías por defecto</div>
-        <div class="categories-list">
-          ${defaultCategories.map(cat => this._renderCategoryItem(cat, true))}
-        </div>
-      ` : ''}
-
-      ${isShopping ? html`<div class="section-title">Categorías personalizadas</div>` : ''}
-
-      ${this._categories.length === 0 && !isShopping ? html`
+      ${this._categories.length === 0 ? html`
         <div class="empty-state">
-          <p>No hay categorías personalizadas</p>
+          <p>No hay categorías todavía</p>
           <p>Crea una para organizar tus listas</p>
         </div>
       ` : html`
