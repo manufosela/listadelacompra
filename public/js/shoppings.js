@@ -23,12 +23,13 @@ import {
   onSnapshot,
   query,
   orderBy,
+  writeBatch,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
-import { getTodayShoppingId, getShoppingName } from './shoppings-utils.js';
+import { getTodayShoppingId, getShoppingName, selectItemsToMigrate } from './shoppings-utils.js';
 
 // Helpers puros (definidos en shoppings-utils.js para poder testearlos).
-export { getTodayShoppingId, getShoppingName };
+export { getTodayShoppingId, getShoppingName, selectItemsToMigrate };
 
 // ============================================
 // CRUD DE COMPRAS
@@ -116,6 +117,39 @@ export function subscribeToShoppingItems(ownerId, masterListId, shoppingId, call
       callback([], error);
     }
   );
+}
+
+/**
+ * Migración inicial: crea la compra de hoy (si no existe) y le añade los
+ * productos de la maestra que están SIN marcar (lo que el usuario iba a comprar).
+ * No modifica la lista maestra. Idempotente por producto (id = id del item).
+ * @param {string} ownerId
+ * @param {string} masterListId
+ * @param {string} masterName
+ * @param {Array} masterItems - items actuales de la maestra
+ * @param {string|null} createdBy
+ * @returns {Promise<{shoppingId: string, added: number}>}
+ */
+export async function migrateUncheckedToTodayShopping(ownerId, masterListId, masterName, masterItems, createdBy = null) {
+  const shoppingId = await createOrGetTodayShopping(ownerId, masterListId, masterName, createdBy);
+  const toAdd = selectItemsToMigrate(masterItems);
+  if (toAdd.length === 0) return { shoppingId, added: 0 };
+
+  const itemsRef = shoppingItemsRef(ownerId, masterListId, shoppingId);
+  const batch = writeBatch(db);
+  for (const item of toAdd) {
+    batch.set(doc(itemsRef, item.id), {
+      name: item.name || '',
+      category: item.category || null,
+      quantity: item.quantity ?? 1,
+      unit: item.unit || 'unidad',
+      productId: item.productId || null,
+      status: 'pending',
+      addedAt: serverTimestamp()
+    });
+  }
+  await batch.commit();
+  return { shoppingId, added: toAdd.length };
 }
 
 /**
