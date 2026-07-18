@@ -124,6 +124,19 @@ export class HcShoppingList extends LitElement {
       transition: all 0.15s ease;
     }
 
+    /* Botón de ACCIÓN (marcar/desmarcar todos): se distingue de los filtros
+       con un borde de acento y algo de separación, para no confundirlo. */
+    .control-btn-action {
+      margin-left: auto;
+      border-color: var(--color-primary, #e07b5c);
+      color: var(--color-primary, #e07b5c);
+      font-weight: 600;
+    }
+
+    .control-btn-action:hover {
+      background: var(--color-primary-bg, #fbeae4);
+    }
+
     .control-btn:hover {
       background: var(--color-bg-secondary, #fff5ee);
     }
@@ -3276,9 +3289,22 @@ export class HcShoppingList extends LitElement {
     }
   }
 
-  _toggleAllItems() {
-    // Si todos están marcados, desmarcar todos; si no, marcar todos
-    if (this._checkedCount === this.items.length) {
+  async _toggleAllItems() {
+    // Acción destructiva sobre TODA la lista: siempre confirmar antes.
+    const allChecked = this._checkedCount === this.items.length;
+    const { modal } = await import('/js/modal.js');
+    const confirmed = await modal.confirm({
+      title: allChecked ? 'Desmarcar todos' : 'Marcar todos',
+      message: allChecked
+        ? '¿Seguro que quieres desmarcar TODOS los productos de la lista?'
+        : '¿Seguro que quieres marcar TODOS los productos como completados? Perderás la selección actual de lo pendiente.',
+      confirmText: allChecked ? 'Sí, desmarcar todos' : 'Sí, marcar todos',
+      cancelText: 'Cancelar',
+      danger: true
+    });
+    if (!confirmed) return;
+
+    if (allChecked) {
       this._unmarkAllItems();
     } else {
       this._markAllItems();
@@ -3771,18 +3797,19 @@ export class HcShoppingList extends LitElement {
         </button>
         ${this.mode === 'shopping' ? html`
           <button
-            class="control-btn ${this.showCompleted ? 'active' : ''}"
+            class="control-btn ${!this.showCompleted ? 'active' : ''}"
             @click=${() => this.showCompleted = !this.showCompleted}
+            title="${this.showCompleted ? 'Ocultar los productos ya marcados' : 'Volver a mostrar todos'}"
           >
-            ✓ Completados
+            ${this.showCompleted ? '🙈 Ocultar marcados' : '👁 Ver todos'}
           </button>
           ${this.items.length > 0 ? html`
             <button
-              class="control-btn ${this._checkedCount === this.items.length ? 'active' : ''}"
+              class="control-btn control-btn-action"
               @click=${this._toggleAllItems}
-              title="${this._checkedCount === this.items.length ? 'Desmarcar todos' : 'Marcar todos'}"
+              title="${this._checkedCount === this.items.length ? 'Desmarcar toda la lista' : 'Marcar toda la lista'}"
             >
-              ${this._checkedCount === this.items.length ? '↺' : '✓'} Todos
+              ${this._checkedCount === this.items.length ? '↺ Desmarcar todos' : '✓ Marcar todos'}
             </button>
           ` : ''}
           ${this.members.length > 0 ? html`
