@@ -38,7 +38,8 @@ export class HcShoppingList extends LitElement {
     items: { type: Array, state: true },
     members: { type: Array, state: true },
     groupByCategory: { type: Boolean, state: true },
-    showCompleted: { type: Boolean, state: true },
+    showChecked: { type: Boolean, state: true },
+    showUnchecked: { type: Boolean, state: true },
     filterByAssignee: { type: String, state: true },
     viewMode: { type: String, state: true }, // 'list' or 'table'
     _collapsedCategories: { type: Object, state: true }, // Categorías colapsadas {categoryId: true}
@@ -1777,7 +1778,8 @@ export class HcShoppingList extends LitElement {
     this.listType = 'shopping';
     this.readonly = false;
     this.groupByCategory = true;
-    this.showCompleted = true;
+    this.showChecked = true;
+    this.showUnchecked = true;
     this.filterByAssignee = '';
     this.viewMode = 'table'; // 'table' por defecto
     this._collapsedCategories = {}; // Estado de categorías colapsadas
@@ -1861,7 +1863,7 @@ export class HcShoppingList extends LitElement {
       this._loadCategories();
     }
     // Guardar preferencias cuando cambien (no durante la carga inicial)
-    const prefProps = ['showCompleted', 'groupByCategory', 'viewMode', 'filterByAssignee'];
+    const prefProps = ['showChecked', 'showUnchecked', 'groupByCategory', 'viewMode', 'filterByAssignee'];
     const prefChanged = prefProps.some(prop => changedProperties.has(prop));
     const isInitialLoad = changedProperties.has('listId') || changedProperties.has('userId');
     if (prefChanged && this.listId && !isInitialLoad) {
@@ -1879,7 +1881,8 @@ export class HcShoppingList extends LitElement {
       if (stored) {
         const prefs = JSON.parse(stored);
         // Solo aplicar si existen en el objeto guardado
-        if (typeof prefs.showCompleted === 'boolean') this.showCompleted = prefs.showCompleted;
+        if (typeof prefs.showChecked === 'boolean') this.showChecked = prefs.showChecked;
+        if (typeof prefs.showUnchecked === 'boolean') this.showUnchecked = prefs.showUnchecked;
         if (typeof prefs.groupByCategory === 'boolean') this.groupByCategory = prefs.groupByCategory;
         if (prefs.viewMode) this.viewMode = prefs.viewMode;
         if (typeof prefs.filterByAssignee === 'string') this.filterByAssignee = prefs.filterByAssignee;
@@ -1901,7 +1904,8 @@ export class HcShoppingList extends LitElement {
   _savePreferences() {
     if (!this.listId) return;
     const prefs = {
-      showCompleted: this.showCompleted,
+      showChecked: this.showChecked,
+      showUnchecked: this.showUnchecked,
       groupByCategory: this.groupByCategory,
       viewMode: this.viewMode,
       filterByAssignee: this.filterByAssignee,
@@ -2354,9 +2358,9 @@ export class HcShoppingList extends LitElement {
   get _filteredItems() {
     let filtered = this.items;
 
-    if (!this.showCompleted) {
-      filtered = filtered.filter(i => !i.checked);
-    }
+    // Dos toggles independientes: mostrar marcados y/o sin marcar.
+    // Con ambos activos se ven todos; con ninguno, ninguno.
+    filtered = filtered.filter(i => (i.checked ? this.showChecked : this.showUnchecked));
 
     if (this.filterByAssignee) {
       if (this.filterByAssignee === 'unassigned') {
@@ -3797,11 +3801,18 @@ export class HcShoppingList extends LitElement {
         </button>
         ${this.mode === 'shopping' ? html`
           <button
-            class="control-btn ${!this.showCompleted ? 'active' : ''}"
-            @click=${() => this.showCompleted = !this.showCompleted}
-            title="${this.showCompleted ? 'Ocultar los productos ya marcados' : 'Volver a mostrar todos'}"
+            class="control-btn ${this.showUnchecked ? 'active' : ''}"
+            @click=${() => this.showUnchecked = !this.showUnchecked}
+            title="Mostrar u ocultar los productos sin marcar"
           >
-            ${this.showCompleted ? '🙈 Ocultar marcados' : '👁 Ver todos'}
+            ○ Sin marcar
+          </button>
+          <button
+            class="control-btn ${this.showChecked ? 'active' : ''}"
+            @click=${() => this.showChecked = !this.showChecked}
+            title="Mostrar u ocultar los productos marcados"
+          >
+            ✓ Marcados
           </button>
           ${this.items.length > 0 ? html`
             <button
