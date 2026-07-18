@@ -683,3 +683,107 @@ export const enforceAllowlist = beforeUserCreated(async (event) => {
     );
   }
 });
+
+/**
+ * Normaliza un nombre de producto igual que el cliente (public/js/product-matching.js)
+ * para poder cruzar con el catálogo del grupo (campo normalizedName).
+ * @param {string} name
+ * @returns {string}
+ */
+function normalizeName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Clasifica un producto en una de las categorías del grupo.
+ *
+ * Estrategia (barata primero):
+ *  1. Si el producto ya está en el catálogo del grupo con una categoría útil,
+ *     se reutiliza (sin llamar a la IA).
+ *  2. Si no, se pide a gpt-5-nano que elija una categoría de las disponibles.
+ * Devuelve siempre un id de categoría válido, o 'otros' si nada encaja.
+ */
+export const classifyProduct = onCall(
+  {
+    region: 'europe-west1',
+    memory: '256MiB',
+    timeoutSeconds: 20,
+    cors: true,
+    secrets: ['OPENAI_API_KEY'],
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const { groupId, productName, categories } = request.data;
+    if (!groupId || !productName) {
+      throw new HttpsError('invalid-argument', 'groupId and productName are required');
+    }
+    if (!Array.isArray(categories) || categories.length === 0) {
+      throw new HttpsError('invalid-argument', 'categories must be a non-empty array');
+    }
+
+    // Verificar pertenencia al grupo
+    const groupDoc = await db.collection('groups').doc(groupId).get();
+    if (!groupDoc.exists || !groupDoc.data()?.members?.[request.auth.uid]) {
+      throw new HttpsError('permission-denied', 'User is not a member of this group');
+    }
+
+    const validIds = new Set(categories.map((c) => c.id));
+
+    // 1. Reutilizar la categoría del catálogo si el producto ya existe
+    try {
+      const normalized = normalizeName(productName);
+      const snap = await db
+        .collection('groups')
+        .doc(groupId)
+        .collection('products')
+        .where('normalizedName', '==', normalized)
+        .limit(1)
+        .get();
+      if (!snap.empty) {
+        const cat = snap.docs[0].data().category;
+        if (cat && cat !== 'otros' && validIds.has(cat)) {
+          return { category: cat, source: 'catalog' };
+        }
+      }
+    } catch (error) {
+      console.warn('classifyProduct: fallo consultando catálogo:', error);
+    }
+
+    // 2. Clasificar con gpt-5-nano
+    try {
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const listado = categories.map((c) => `${c.id} (${c.name})`).join(', ');
+      const response = await openai.chat.completions.create({
+        model: 'gpt-5-nano',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Eres un clasificador de productos de supermercado. Devuelves SOLO el id de la ' +
+              'categoría más adecuada, sin ningún texto adicional. Si ninguna encaja, devuelves "otros".',
+          },
+          {
+            role: 'user',
+            content: `Categorías disponibles (id (nombre)): ${listado}.\nProducto: "${productName}".\nid de categoría:`,
+          },
+        ],
+        max_completion_tokens: 30,
+      });
+
+      const raw = (response.choices[0]?.message?.content || '').trim().toLowerCase();
+      const category = validIds.has(raw) ? raw : 'otros';
+      return { category, source: 'ai' };
+    } catch (error) {
+      console.error('classifyProduct: fallo con OpenAI:', error);
+      return { category: 'otros', source: 'fallback' };
+    }
+  }
+);
