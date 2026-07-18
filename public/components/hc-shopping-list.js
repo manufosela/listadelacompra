@@ -798,6 +798,27 @@ export class HcShoppingList extends LitElement {
       text-decoration: line-through;
     }
 
+    /* Producto "no encontrado" en la tabla: atenuado, no cuenta como comprado */
+    .items-table tbody tr.not-found td {
+      opacity: 0.55;
+      text-decoration: line-through dotted;
+    }
+
+    .table-notfound-btn {
+      margin-left: 0.5rem;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.25rem;
+      border-radius: 6px;
+      vertical-align: middle;
+    }
+
+    .table-notfound-btn.active {
+      background: var(--color-warning-bg, #fde7d0);
+    }
+
     .items-table .checkbox-cell {
       width: 40px;
       text-align: center;
@@ -3565,7 +3586,7 @@ export class HcShoppingList extends LitElement {
     const imageUrl = this._getProductImageUrl(item);
     return html`
       <tr
-        class="${item.checked && isShoppingMode ? 'checked' : ''} ${isShoppingMode ? 'clickable' : ''}"
+        class="${item.checked && isShoppingMode ? 'checked' : ''} ${item.notFound && isShoppingMode ? 'not-found' : ''} ${isShoppingMode ? 'clickable' : ''}"
         data-item-id="${item.id}"
       >
         ${isShoppingMode ? html`
@@ -3590,6 +3611,13 @@ export class HcShoppingList extends LitElement {
           ${imageUrl ? html`<img class="product-image-inline" src="${imageUrl}" alt="">` : ''}
           ${item.name}
           ${isChecklist ? html`<span class="sublist-item-qty">(${progress})</span>` : ''}
+          ${isShoppingMode ? html`
+            <button
+              class="table-notfound-btn ${item.notFound ? 'active' : ''}"
+              @click=${(e) => { e.stopPropagation(); this._handleItemNotFound({ detail: { itemId: item.id, notFound: !item.notFound } }); }}
+              title="${item.notFound ? 'Quitar «no encontrado»' : 'Marcar como no encontrado (no lo compro esta vez)'}"
+            >${item.notFound ? '🚫' : '🔎'}</button>
+          ` : ''}
         </td>
         ${!isAgnostic ? html`
           <td class="table-quantity">
