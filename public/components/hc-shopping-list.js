@@ -2465,6 +2465,25 @@ export class HcShoppingList extends LitElement {
    * Sincroniza un item con el catálogo de productos del grupo
    * @returns {string|null} productId del producto encontrado/creado
    */
+  async _handleItemNotFound(e) {
+    const { itemId, notFound } = e.detail;
+    if (!this.userId || !this.listId) return;
+
+    try {
+      const itemRef = doc(db, 'users', this.userId, 'lists', this.listId, 'items', itemId);
+      // "No encontrado" nunca cuenta como comprado (no descuadra el ticket).
+      await updateDoc(itemRef, {
+        notFound,
+        ...(notFound ? { checked: false, checkedBy: null, checkedAt: null } : {})
+      });
+
+      const listRef = doc(db, 'users', this.userId, 'lists', this.listId);
+      await updateDoc(listRef, { updatedAt: serverTimestamp(), updatedBy: getCurrentUser()?.uid });
+    } catch (error) {
+      console.error('Error marcando item como no encontrado:', error);
+    }
+  }
+
   async _syncWithProductCatalog(groupId, name, category, unit) {
     try {
       if (!name?.trim()) return null;
@@ -2544,7 +2563,9 @@ export class HcShoppingList extends LitElement {
       await updateDoc(itemRef, {
         checked,
         checkedBy: checked ? user?.uid : null,
-        checkedAt: checked ? serverTimestamp() : null
+        checkedAt: checked ? serverTimestamp() : null,
+        // Comprar un producto cancela el estado de "no encontrado"
+        ...(checked ? { notFound: false } : {})
       });
 
       // Actualizar timestamp de la lista
@@ -4095,6 +4116,7 @@ export class HcShoppingList extends LitElement {
                   .listType=${this.listType}
                   .card=${true}
                   @toggle=${this._handleToggleItem}
+                  @notfound=${this._handleItemNotFound}
                   @remove=${this._handleRemoveItem}
                   @assign=${this._handleAssignItem}
                   @edit=${this._handleEditItem}
@@ -4117,6 +4139,7 @@ export class HcShoppingList extends LitElement {
                   .listType=${this.listType}
                   .card=${true}
                   @toggle=${this._handleToggleItem}
+                  @notfound=${this._handleItemNotFound}
                   @remove=${this._handleRemoveItem}
                   @assign=${this._handleAssignItem}
                   @edit=${this._handleEditItem}

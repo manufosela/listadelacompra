@@ -42,6 +42,27 @@ export class HcListItem extends LitElement {
       text-decoration: line-through;
     }
 
+    /* Producto marcado como "no encontrado": atenuado y con aviso, sin contar
+       como comprado (no descuadra el ticket). */
+    .item.not-found {
+      opacity: 0.55;
+    }
+
+    .item.not-found .item-name {
+      text-decoration: line-through dotted;
+    }
+
+    .item.not-found .item-name::after {
+      content: ' · no encontrado';
+      font-size: 0.75em;
+      font-style: italic;
+      opacity: 0.8;
+    }
+
+    .action-btn.not-found-active {
+      background: var(--color-warning-bg, #fde7d0);
+    }
+
     .item.clickable {
       cursor: pointer;
     }
@@ -872,6 +893,18 @@ export class HcListItem extends LitElement {
     }));
   }
 
+  _handleNotFound(e) {
+    e?.stopPropagation();
+    this.dispatchEvent(new CustomEvent('notfound', {
+      detail: {
+        itemId: this.item.id,
+        notFound: !this.item.notFound
+      },
+      bubbles: true,
+      composed: true
+    }));
+  }
+
   _handleItemClick(e) {
     // Usar composedPath para Shadow DOM - buscar en toda la ruta del evento
     const path = e.composedPath();
@@ -1213,7 +1246,7 @@ export class HcListItem extends LitElement {
     if (isAgnosticList) {
       return html`
         <div
-          class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${priorityClass} ${this.card ? 'card' : ''}"
+          class="item ${item.checked && isShoppingMode ? 'checked' : ''} ${item.notFound && isShoppingMode ? 'not-found' : ''} ${priorityClass} ${this.card ? 'card' : ''}"
           style="${this.card ? 'position: relative;' : ''}"
         >
           <!-- Checkbox solo en modo usar, no en modo edición -->
@@ -1255,7 +1288,17 @@ export class HcListItem extends LitElement {
             ` : ''}
           </div>
 
-          <div class="item-actions" style="${isEditMode || (hasMembers && isShoppingMode) ? 'opacity: 1;' : ''}">
+          <div class="item-actions" style="${isEditMode || isShoppingMode ? 'opacity: 1;' : ''}">
+            <!-- Botón "no encontrado" en modo compra -->
+            ${isShoppingMode ? html`
+              <button
+                class="action-btn ${item.notFound ? 'not-found-active' : ''}"
+                @click=${this._handleNotFound}
+                title="${item.notFound ? 'Quitar "no encontrado"' : 'Marcar como no encontrado (no lo compro esta vez)'}"
+              >
+                ${item.notFound ? '🚫' : '🔎'}
+              </button>
+            ` : ''}
             <!-- Botón asignar en modo usar si hay miembros -->
             ${hasMembers && isShoppingMode ? html`
               <div class="assign-wrapper">
