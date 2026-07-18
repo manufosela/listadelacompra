@@ -1083,6 +1083,56 @@ export class HcShoppingList extends LitElement {
       font-size: 0.6875rem;
     }
 
+    /* Coincidencias del añadir rápido: clicables para marcar/desmarcar */
+    .quick-match {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .quick-match-title {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary, #7a6e6a);
+    }
+
+    .quick-match-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .quick-match-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+      min-height: 44px;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--color-border, #eadfd9);
+      border-radius: 0.5rem;
+      background: var(--color-bg, #fff);
+      color: var(--color-text, #2b2b2b);
+      font-size: 0.95rem;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .quick-match-item:hover {
+      background: var(--color-bg-secondary, #f5efec);
+    }
+
+    .quick-match-box {
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .quick-match-item.is-checked .quick-match-name {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
     @media (prefers-color-scheme: dark) {
       .duplicate-warning {
         background: #451a03;
@@ -3640,12 +3690,23 @@ export class HcShoppingList extends LitElement {
             </button>
           </form>
           ${this._duplicateWarnings.length > 0 ? html`
-            <div class="duplicate-warning">
-              <div class="duplicate-warning-title">⚠️ Ya existe en la lista:</div>
-              <div class="duplicate-warning-items">
-                ${this._duplicateWarnings.map(item => html`
-                  <span class="duplicate-warning-item">${item.name}</span>
-                `)}
+            <div class="quick-match">
+              <div class="quick-match-title">Ya en la lista · toca para marcar/desmarcar:</div>
+              <div class="quick-match-items">
+                ${this._duplicateWarnings.map((warn) => {
+                  // Resolver el estado actual desde la lista viva (para reflejar el toggle al instante).
+                  const item = this.items.find((i) => i.id === warn.id) || warn;
+                  return html`
+                    <button
+                      type="button"
+                      class="quick-match-item ${item.checked ? 'is-checked' : ''}"
+                      @click=${() => this._handleToggleItem({ detail: { itemId: item.id, checked: !item.checked } })}
+                    >
+                      <span class="quick-match-box">${item.checked ? '☑' : '☐'}</span>
+                      <span class="quick-match-name">${item.name}</span>
+                    </button>
+                  `;
+                })}
               </div>
             </div>
           ` : ''}
