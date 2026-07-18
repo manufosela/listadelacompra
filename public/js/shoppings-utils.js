@@ -26,3 +26,15 @@ export function getShoppingName(masterName, dateId) {
   const pretty = `${dateId.slice(0, 4)}-${dateId.slice(4, 6)}-${dateId.slice(6, 8)}`;
   return `${masterName || 'Compra'} · ${pretty}`;
 }
+
+/**
+ * Selecciona los items de la lista maestra que deben migrar a la primera compra:
+ * los que están SIN marcar (checked !== true) y no son sublistas/checklists.
+ * En el uso del usuario, "sin marcar" = lo que iba a comprar.
+ * @param {Array} items
+ * @returns {Array}
+ */
+export function selectItemsToMigrate(items) {
+  if (!Array.isArray(items)) return [];
+  return items.filter((i) => i && i.checked !== true && !i.isChecklist);
+}
