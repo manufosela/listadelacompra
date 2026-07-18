@@ -24,6 +24,7 @@ import {
 import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js';
 import { functions } from './firebase-config.js';
 import { getCachedOrFetch, invalidateCache } from './cache.js';
+import { seedGroupShoppingCategories } from './categories.js';
 
 
 /**
@@ -56,6 +57,14 @@ export async function createGroup(name) {
 
   // Crear grupo
   await setDoc(groupRef, groupData);
+
+  // Sembrar las categorías de compra por defecto como documentos editables del
+  // grupo (no bloquea la creación si fallara).
+  try {
+    await seedGroupShoppingCategories(groupId, user.uid);
+  } catch (error) {
+    console.warn('No se pudieron sembrar las categorías del grupo:', error);
+  }
 
   // Actualizar usuario (merge: true crea el doc si no existe)
   const userRef = doc(db, 'users', user.uid);

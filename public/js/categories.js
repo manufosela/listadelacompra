@@ -112,22 +112,71 @@ export async function getGroupCategories(groupId, listType = null) {
 }
 
 /**
- * Obtiene todas las categorías disponibles según el tipo de lista
+ * Siembra las categorías de compra por defecto como documentos editables del
+ * grupo, conservando sus ids originales ('frutas', 'verduras'...) para que los
+ * productos que ya las usan sigan enganchados. Idempotente: solo crea las que
+ * falten. Cualquier miembro del grupo puede ejecutarla (las reglas permiten
+ * crear categorías a los miembros).
+ *
+ * @param {string} groupId
+ * @param {string|null} createdBy - UID de quien las siembra (opcional)
+ * @returns {Promise<number>} nº de categorías creadas
+ */
+export async function seedGroupShoppingCategories(groupId, createdBy = null) {
+  if (!groupId) return 0;
+
+  const categoriesRef = collection(db, 'groups', groupId, 'categories');
+  const snapshot = await getDocs(categoriesRef);
+  const existingIds = new Set(snapshot.docs.map(d => d.id));
+
+  const missing = DEFAULT_SHOPPING_CATEGORIES.filter(c => !existingIds.has(c.id));
+  if (missing.length === 0) return 0;
+
+  const batch = writeBatch(db);
+  for (const cat of missing) {
+    batch.set(doc(categoriesRef, cat.id), {
+      name: cat.name,
+      icon: cat.icon,
+      bgColor: cat.bgColor,
+      textColor: cat.textColor,
+      order: cat.order,
+      listType: 'shopping',
+      createdAt: serverTimestamp(),
+      createdBy: createdBy || null
+    });
+  }
+  await batch.commit();
+  return missing.length;
+}
+
+/**
+ * Obtiene todas las categorías disponibles según el tipo de lista.
+ * Para listas de compra, si las categorías por defecto ya están sembradas como
+ * documentos del grupo (editables) se usan esas; si aún no, se devuelven las
+ * grabadas como respaldo (hasta que alguien abra el gestor y se siembren).
  * @param {string} groupId
  * @param {string} listType - 'shopping' | 'agnostic'
  * @returns {Promise<Array>}
  */
 export async function getCategoriesForList(groupId, listType) {
-  const customCategories = await getGroupCategories(groupId, listType);
+  const groupCategories = await getGroupCategories(groupId, listType);
 
   if (listType === 'shopping') {
-    // Listas de compra: categorías por defecto + custom
+    const defaultIds = new Set(DEFAULT_SHOPPING_CATEGORIES.map(c => c.id));
+    const hasSeededDefaults = groupCategories.some(c => defaultIds.has(c.id));
+
+    // Ya sembradas como documentos → usarlas (evita duplicar con las grabadas)
+    if (hasSeededDefaults) {
+      return groupCategories;
+    }
+
+    // Aún no sembradas: respaldo con las grabadas + las custom que hubiera
     const defaultCats = DEFAULT_SHOPPING_CATEGORIES.map(c => ({ ...c, isDefault: true }));
-    return [...defaultCats, ...customCategories];
+    return [...defaultCats, ...groupCategories];
   }
 
   // Listas generales: solo categorías custom
-  return customCategories;
+  return groupCategories;
 }
 
 /**
@@ -137,18 +186,18 @@ export async function getCategoriesForList(groupId, listType) {
  * @returns {Promise<Object|null>}
  */
 export async function getCategoryById(groupId, categoryId) {
-  // Primero buscar en categorías por defecto
-  const defaultCat = getDefaultCategory(categoryId);
-  if (defaultCat) {
-    return { ...defaultCat, isDefault: true };
-  }
-
-  // Luego buscar en categorías custom del grupo
+  // Primero el documento del grupo (puede tener el nombre/icono editados)
   const categoryRef = doc(db, 'groups', groupId, 'categories', categoryId);
   const categorySnap = await getDoc(categoryRef);
 
   if (categorySnap.exists()) {
     return { id: categorySnap.id, ...categorySnap.data(), isDefault: false };
+  }
+
+  // Respaldo: categoría por defecto grabada (grupo aún no sembrado)
+  const defaultCat = getDefaultCategory(categoryId);
+  if (defaultCat) {
+    return { ...defaultCat, isDefault: true };
   }
 
   return null;
@@ -189,11 +238,8 @@ export async function createGroupCategory(groupId, categoryData, createdBy) {
  * @param {Object} updates
  */
 export async function updateGroupCategory(groupId, categoryId, updates) {
-  // No permitir actualizar categorías por defecto
-  if (isDefaultCategory(categoryId)) {
-    throw new Error('No se pueden editar categorías por defecto');
-  }
-
+  // Las categorías (incluidas las que vienen por defecto) son documentos del
+  // grupo y cualquier miembro puede editarlas.
   const categoryRef = doc(db, 'groups', groupId, 'categories', categoryId);
 
   const cleanUpdates = { ...updates };
@@ -211,9 +257,10 @@ export async function updateGroupCategory(groupId, categoryId, updates) {
  * @param {string} ownerIds - Array de UIDs cuyos items deben actualizarse
  */
 export async function deleteGroupCategory(groupId, categoryId) {
-  // No permitir eliminar categorías por defecto
-  if (isDefaultCategory(categoryId)) {
-    throw new Error('No se pueden eliminar categorías por defecto');
+  // 'Otros' es la categoría comodín (destino de los productos sin categoría):
+  // no se puede eliminar. El resto, incluidas las que vienen por defecto, sí.
+  if (categoryId === 'otros') {
+    throw new Error('La categoría "Otros" no se puede eliminar');
   }
 
   const categoryRef = doc(db, 'groups', groupId, 'categories', categoryId);
