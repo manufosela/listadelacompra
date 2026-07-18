@@ -123,6 +123,20 @@ service cloud.firestore {
                 || request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/lists/$(listId)).data.members);
         }
 
+        // Compras (sublistas) derivadas de la lista: heredan el acceso de la
+        // lista maestra (propietario o miembro).
+        match /shoppings/{shoppingId} {
+          allow read, create, update, delete: if isAuthenticated()
+            && (uid == request.auth.uid
+                || request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/lists/$(listId)).data.members);
+
+          match /items/{itemId} {
+            allow read, create, update, delete: if isAuthenticated()
+              && (uid == request.auth.uid
+                  || request.auth.uid in get(/databases/$(database)/documents/users/$(uid)/lists/$(listId)).data.members);
+          }
+        }
+
         // Tickets procesados de la lista del usuario
         match /tickets/{ticketId} {
           // Propietario o miembro de la lista puede acceder
