@@ -25,6 +25,15 @@ import {
   createGroupCategory,
   getNextAvailableColor
 } from '/js/categories.js';
+import {
+  createOrGetTodayShopping,
+  subscribeToShoppingItems,
+  setShoppingItemStatus,
+  removeProductFromShopping,
+  migrateUncheckedToTodayShopping,
+  getShoppingName,
+  getTodayShoppingId
+} from '/js/shoppings.js';
 import './hc-list-item.js';
 import './hc-ticket-scanner.js';
 import './hc-cost-split.js';
@@ -34,6 +43,11 @@ export class HcShoppingList extends LitElement {
     listId: { type: String, attribute: 'list-id' },
     userId: { type: String, attribute: 'user-id' },
     listType: { type: String, attribute: 'list-type' }, // 'shopping' or 'agnostic'
+    // Vista "compra de hoy" (sublista)
+    _shoppingView: { type: Boolean, state: true },
+    _shoppingItems: { type: Array, state: true },
+    _shoppingLoading: { type: Boolean, state: true },
+    _listName: { type: String, state: true },
     readonly: { type: Boolean, attribute: 'readonly' }, // Lista cerrada = solo lectura
     items: { type: Array, state: true },
     members: { type: Array, state: true },
@@ -160,6 +174,71 @@ export class HcShoppingList extends LitElement {
       padding: 0.25rem;
       margin-bottom: 1rem;
     }
+
+    /* Vista "compra de hoy" */
+    .shopping-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .shopping-title {
+      font-weight: 700;
+      color: var(--color-text, #2b2b2b);
+    }
+
+    .shopping-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+
+    .shopping-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--color-border, #eadfd9);
+      border-radius: 0.5rem;
+      background: var(--color-bg, #fffbf8);
+    }
+
+    .shopping-item.status-bought .shopping-item-name {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
+    .shopping-item.status-not_found {
+      opacity: 0.6;
+    }
+
+    .shopping-item.status-not_found .shopping-item-name {
+      text-decoration: line-through dotted;
+    }
+
+    .shopping-item-name { flex: 1; }
+    .shopping-item-qty { color: var(--color-text-secondary, #7a6e6a); font-size: 0.85rem; }
+
+    .shopping-item-actions { display: flex; gap: 0.25rem; }
+
+    .s-btn {
+      min-width: 36px;
+      min-height: 36px;
+      border: 1px solid var(--color-border, #eadfd9);
+      border-radius: 8px;
+      background: var(--color-bg, #fffbf8);
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    .s-btn.active {
+      background: var(--color-primary-bg, #fbeae4);
+      border-color: var(--color-primary, #e07b5c);
+    }
+
+    .s-btn.danger:hover { background: #fde2e0; }
 
     .mode-btn {
       flex: 1;
@@ -1826,6 +1905,12 @@ export class HcShoppingList extends LitElement {
     this.showSuggestions = false;
     this.selectedSuggestionIndex = -1;
     this.mode = 'shopping'; // Default to shopping mode
+    this._shoppingView = false;
+    this._shoppingItems = [];
+    this._shoppingLoading = false;
+    this._shoppingId = null;
+    this._shoppingUnsub = null;
+    this._listName = '';
     this._searchTimeout = null;
     this._unsubscribers = [];
     this._subscribedPath = null; // Para evitar suscripciones duplicadas
@@ -2146,6 +2231,7 @@ export class HcShoppingList extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this._unsubscribers.forEach(unsub => unsub());
+    if (this._shoppingUnsub) { this._shoppingUnsub(); this._shoppingUnsub = null; }
     this._subscribedPath = null;
     eventBus.unregisterComponent(this._componentId);
     if (this._handleOpenScanner) {
@@ -2192,6 +2278,9 @@ export class HcShoppingList extends LitElement {
       if (snapshot.exists()) {
         const listData = snapshot.data();
         const groupIds = listData.groupIds || [];
+
+        // Nombre de la lista (para nombrar la compra de hoy)
+        this._listName = listData.name || '';
 
         // Cargar configuración de reparto
         this.splitConfig = listData.splitConfig || null;
@@ -3713,9 +3802,126 @@ export class HcShoppingList extends LitElement {
     });
   }
 
+  // ============================================
+  // COMPRA DE HOY (sublista)
+  // ============================================
+
+  async _openShopping() {
+    if (!this.userId || !this.listId) return;
+    this._shoppingLoading = true;
+    this._shoppingView = true;
+    try {
+      const uid = getCurrentUser()?.uid || null;
+      this._shoppingId = await createOrGetTodayShopping(this.userId, this.listId, this._listName, uid);
+      if (this._shoppingUnsub) this._shoppingUnsub();
+      this._shoppingUnsub = subscribeToShoppingItems(
+        this.userId, this.listId, this._shoppingId,
+        (items) => { this._shoppingItems = items; this._shoppingLoading = false; }
+      );
+    } catch (error) {
+      console.error('Error abriendo la compra de hoy:', error);
+      this._shoppingLoading = false;
+    }
+  }
+
+  _closeShopping() {
+    if (this._shoppingUnsub) { this._shoppingUnsub(); this._shoppingUnsub = null; }
+    this._shoppingView = false;
+  }
+
+  async _migrateNoMarked() {
+    const pendientes = this.items.filter(i => i.checked !== true && !i.isChecklist).length;
+    if (pendientes === 0) {
+      const { toast } = await import('/js/toast.js');
+      toast.info('No tienes productos sin marcar en la lista');
+      return;
+    }
+    const { modal } = await import('/js/modal.js');
+    const ok = await modal.confirm({
+      title: 'Añadir mis pendientes',
+      message: `Se añadirán a la compra de hoy los ${pendientes} productos que tienes sin marcar en la lista. Tu lista no se modifica.`,
+      confirmText: 'Añadir',
+      cancelText: 'Cancelar'
+    });
+    if (!ok) return;
+    try {
+      const uid = getCurrentUser()?.uid || null;
+      const res = await migrateUncheckedToTodayShopping(this.userId, this.listId, this._listName, this.items, uid);
+      this._shoppingId = res.shoppingId;
+      const { toast } = await import('/js/toast.js');
+      toast.success(`Añadidos ${res.added} productos a la compra de hoy`);
+    } catch (error) {
+      console.error('Error añadiendo pendientes:', error);
+    }
+  }
+
+  async _setShoppingStatus(itemId, status) {
+    if (!this._shoppingId) return;
+    try {
+      await setShoppingItemStatus(this.userId, this.listId, this._shoppingId, itemId, status);
+    } catch (error) {
+      console.error('Error cambiando estado de la compra:', error);
+    }
+  }
+
+  async _removeFromShopping(itemId) {
+    if (!this._shoppingId) return;
+    try {
+      await removeProductFromShopping(this.userId, this.listId, this._shoppingId, itemId);
+    } catch (error) {
+      console.error('Error quitando de la compra:', error);
+    }
+  }
+
+  _renderShoppingView() {
+    const name = this._shoppingId
+      ? getShoppingName(this._listName, this._shoppingId)
+      : getShoppingName(this._listName, getTodayShoppingId());
+    const items = this._shoppingItems || [];
+    return html`
+      <div class="shopping-view">
+        <div class="shopping-header">
+          <button class="control-btn" @click=${this._closeShopping}>← Lista</button>
+          <span class="shopping-title">🛒 ${name}</span>
+        </div>
+        <button class="control-btn control-btn-action" @click=${this._migrateNoMarked}>
+          + Añadir mis pendientes de la lista
+        </button>
+        ${this._shoppingLoading ? html`<div class="loading">Cargando…</div>`
+          : items.length === 0 ? html`
+            <div class="empty-state">
+              <p>La compra de hoy está vacía.</p>
+              <p>Añade tus pendientes con el botón de arriba.</p>
+            </div>`
+          : html`
+            <div class="shopping-items">
+              ${items.map(item => html`
+                <div class="shopping-item status-${item.status || 'pending'}">
+                  <span class="shopping-item-name">${item.name}</span>
+                  <span class="shopping-item-qty">${item.quantity} ${item.unit}</span>
+                  <div class="shopping-item-actions">
+                    <button class="s-btn ${item.status === 'bought' ? 'active' : ''}" title="Comprado"
+                      @click=${() => this._setShoppingStatus(item.id, item.status === 'bought' ? 'pending' : 'bought')}>✓</button>
+                    <button class="s-btn ${item.status === 'not_found' ? 'active' : ''}" title="No había"
+                      @click=${() => this._setShoppingStatus(item.id, item.status === 'not_found' ? 'pending' : 'not_found')}>🚫</button>
+                    <button class="s-btn danger" title="Quitar de la compra"
+                      @click=${() => this._removeFromShopping(item.id)}>✕</button>
+                  </div>
+                </div>
+              `)}
+            </div>`}
+      </div>
+    `;
+  }
+
   render() {
     if (this.loading) {
       return html`<div class="loading">Cargando items...</div>`;
+    }
+
+    // Vista aislada de la "compra de hoy"
+    if (this._shoppingView) {
+      return this._renderShoppingView();
     }
 
     if (this.loadError) {
@@ -3749,6 +3955,11 @@ export class HcShoppingList extends LitElement {
             @click=${() => this._setMode('edit')}
           >
             ✏️ Editar
+          </button>
+        ` : ''}
+        ${!isAgnostic ? html`
+          <button class="mode-btn shopping-open-btn" @click=${this._openShopping}>
+            🛒 Compra de hoy
           </button>
         ` : ''}
       </div>
