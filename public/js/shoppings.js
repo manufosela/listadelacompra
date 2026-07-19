@@ -20,13 +20,22 @@ import {
   getDocs,
   setDoc,
   deleteDoc,
+  updateDoc,
   onSnapshot,
   query,
   orderBy,
   writeBatch,
+  runTransaction,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
-import { getTodayShoppingId, getShoppingName, selectItemsToMigrate } from './shoppings-utils.js';
+import {
+  getTodayShoppingId,
+  getShoppingName,
+  selectItemsToMigrate,
+  buildActiveShoppingDoc,
+  defaultShoppingName,
+  normalizeShoppingItemEdit
+} from './shoppings-utils.js';
 
 // Helpers puros (definidos en shoppings-utils.js para poder testearlos).
 export { getTodayShoppingId, getShoppingName, selectItemsToMigrate };
@@ -41,6 +50,91 @@ function shoppingDocRef(ownerId, masterListId, shoppingId) {
 
 function shoppingItemsRef(ownerId, masterListId, shoppingId) {
   return collection(db, 'users', ownerId, 'lists', masterListId, 'shoppings', shoppingId, 'items');
+}
+
+function listDocRef(ownerId, masterListId) {
+  return doc(db, 'users', ownerId, 'lists', masterListId);
+}
+
+function shoppingsColRef(ownerId, masterListId) {
+  return collection(db, 'users', ownerId, 'lists', masterListId, 'shoppings');
+}
+
+// ============================================
+// COMPRA ACTIVA (modelo v2)
+// La lista maestra guarda un puntero `activeShoppingId`. Las compras se crean a
+// demanda (id autogenerado) con status 'active' | 'archived'.
+// ============================================
+
+/**
+ * Devuelve el id de la compra activa; si no hay, crea una vacía y fija el puntero
+ * en la lista maestra. Atómico (runTransaction) para resolver la carrera de
+ * listas compartidas (dos miembros pulsando + a la vez).
+ * @returns {Promise<string>} shoppingId activo
+ */
+export async function ensureActiveShopping(ownerId, masterListId, masterName, createdBy = null) {
+  const listRef = listDocRef(ownerId, masterListId);
+  return runTransaction(db, async (tx) => {
+    const listSnap = await tx.get(listRef);
+    const current = listSnap.exists() ? listSnap.data().activeShoppingId : null;
+    if (current) return current;
+    const newRef = doc(shoppingsColRef(ownerId, masterListId));
+    tx.set(newRef, {
+      ...buildActiveShoppingDoc({ name: defaultShoppingName(masterName), createdBy }),
+      createdAt: serverTimestamp()
+    });
+    tx.update(listRef, { activeShoppingId: newRef.id, updatedAt: serverTimestamp() });
+    return newRef.id;
+  });
+}
+
+/**
+ * "Nueva compra": archiva la compra activa (si la hay) y crea otra vacía,
+ * actualizando el puntero. Atómico. Devuelve el id de la nueva compra.
+ * @returns {Promise<string>}
+ */
+export async function startNewShopping(ownerId, masterListId, masterName, createdBy = null) {
+  const listRef = listDocRef(ownerId, masterListId);
+  return runTransaction(db, async (tx) => {
+    const listSnap = await tx.get(listRef);
+    const current = listSnap.exists() ? listSnap.data().activeShoppingId : null;
+    if (current) {
+      const currentRef = shoppingDocRef(ownerId, masterListId, current);
+      tx.update(currentRef, {
+        status: 'archived',
+        archivedAt: serverTimestamp(),
+        archivedBy: createdBy || null
+      });
+    }
+    const newRef = doc(shoppingsColRef(ownerId, masterListId));
+    tx.set(newRef, {
+      ...buildActiveShoppingDoc({ name: defaultShoppingName(masterName), createdBy }),
+      createdAt: serverTimestamp()
+    });
+    tx.update(listRef, { activeShoppingId: newRef.id, updatedAt: serverTimestamp() });
+    return newRef.id;
+  });
+}
+
+/**
+ * Lee la compra activa (según el puntero de la lista), o null si no hay.
+ * @returns {Promise<Object|null>}
+ */
+export async function getActiveShopping(ownerId, masterListId) {
+  const listSnap = await getDoc(listDocRef(ownerId, masterListId));
+  const activeId = listSnap.exists() ? listSnap.data().activeShoppingId : null;
+  if (!activeId) return null;
+  const snap = await getDoc(shoppingDocRef(ownerId, masterListId, activeId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/**
+ * Edita cantidad y/o unidad de un item de una compra (normalizadas).
+ */
+export async function updateShoppingItem(ownerId, masterListId, shoppingId, itemId, { quantity, unit }) {
+  const ref = doc(shoppingItemsRef(ownerId, masterListId, shoppingId), itemId);
+  const normalized = normalizeShoppingItemEdit({ quantity, unit });
+  await updateDoc(ref, { ...normalized, updatedAt: serverTimestamp() });
 }
 
 /**
@@ -157,7 +251,6 @@ export async function migrateUncheckedToTodayShopping(ownerId, masterListId, mas
  * @returns {Promise<Array>}
  */
 export async function getShoppings(ownerId, masterListId) {
-  const ref = collection(db, 'users', ownerId, 'lists', masterListId, 'shoppings');
-  const snapshot = await getDocs(query(ref, orderBy('date', 'desc')));
+  const snapshot = await getDocs(query(shoppingsColRef(ownerId, masterListId), orderBy('createdAt', 'desc')));
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
