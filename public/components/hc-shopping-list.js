@@ -26,15 +26,16 @@ import {
   getNextAvailableColor
 } from '/js/categories.js';
 import {
-  createOrGetTodayShopping,
+  ensureActiveShopping,
+  startNewShopping,
   addProductToShopping,
   subscribeToShoppingItems,
   setShoppingItemStatus,
   removeProductFromShopping,
-  migrateUncheckedToTodayShopping,
-  getShoppingName,
-  getTodayShoppingId
+  updateShoppingItem
 } from '/js/shoppings.js';
+import { computeShoppingCounts } from '/js/shoppings-utils.js';
+import { updateList } from '/js/lists.js';
 import './hc-list-item.js';
 import './hc-ticket-scanner.js';
 import './hc-cost-split.js';
@@ -49,6 +50,8 @@ export class HcShoppingList extends LitElement {
     _shoppingItems: { type: Array, state: true },
     _shoppingLoading: { type: Boolean, state: true },
     _listName: { type: String, state: true },
+    _isRecurring: { type: Boolean, state: true },
+    _activeShoppingId: { type: String, state: true },
     readonly: { type: Boolean, attribute: 'readonly' }, // Lista cerrada = solo lectura
     items: { type: Array, state: true },
     members: { type: Array, state: true },
@@ -221,6 +224,35 @@ export class HcShoppingList extends LitElement {
 
     .shopping-item-name { flex: 1; }
     .shopping-item-qty { color: var(--color-text-secondary, #7a6e6a); font-size: 0.85rem; }
+
+    .shopping-summary {
+      margin: 0.25rem 0 0.75rem;
+      color: var(--color-text-secondary, #7a6e6a);
+      font-size: 0.85rem;
+    }
+
+    .shopping-item-qty-edit {
+      display: flex;
+      gap: 0.25rem;
+      align-items: center;
+    }
+
+    .shopping-item-qty-edit .qty-input {
+      width: 3.2rem;
+      padding: 0.3rem 0.35rem;
+      border: 1px solid var(--color-border, #eadfd9);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      text-align: right;
+    }
+
+    .shopping-item-qty-edit .unit-input {
+      width: 4.5rem;
+      padding: 0.3rem 0.35rem;
+      border: 1px solid var(--color-border, #eadfd9);
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
 
     .shopping-item-actions { display: flex; gap: 0.25rem; }
 
@@ -916,6 +948,37 @@ export class HcShoppingList extends LitElement {
 
     .table-cart-btn.active {
       background: var(--color-primary, #2e7d32);
+      border-color: var(--color-primary, #2e7d32);
+      color: #fff;
+    }
+
+    /* Producto del catálogo que ya está en la compra activa: fill de izq→dcha */
+    .items-table tr.in-shopping td {
+      background: linear-gradient(to right, rgba(46, 125, 50, 0.18), rgba(46, 125, 50, 0) 75%);
+    }
+
+    .items-table tr.in-shopping td:first-child {
+      box-shadow: inset 3px 0 0 var(--color-primary, #2e7d32);
+    }
+
+    /* Toggle de activar/desactivar modo recurrente (catálogo + compras) */
+    .recurring-toggle {
+      display: block;
+      width: 100%;
+      margin: 0 0 1rem;
+      padding: 0.5rem 0.75rem;
+      background: #fff;
+      border: 1.5px dashed var(--color-border, #d0d0d0);
+      color: var(--color-text, #333);
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .recurring-toggle.active {
+      background: var(--color-primary, #2e7d32);
+      border-style: solid;
       border-color: var(--color-primary, #2e7d32);
       color: #fff;
     }
@@ -1928,6 +1991,8 @@ export class HcShoppingList extends LitElement {
     this.selectedSuggestionIndex = -1;
     this.mode = 'shopping'; // Default to shopping mode
     this._shoppingView = false;
+    this._isRecurring = false;
+    this._activeShoppingId = null;
     this._shoppingItems = [];
     this._shoppingLoading = false;
     this._shoppingId = null;
@@ -2275,11 +2340,12 @@ export class HcShoppingList extends LitElement {
     this._unsubscribers = [];
     if (this._shoppingUnsub) { this._shoppingUnsub(); this._shoppingUnsub = null; }
     this._shoppingItems = [];
+    this._activeShoppingId = null;
     this._subscribedPath = newPath;
     this.loadError = null;
 
-    // Suscripción permanente a la compra de hoy (para pintar los +/- en la lista)
-    this._subscribeShoppingToday();
+    // La suscripción a la compra activa se dispara desde el snapshot de la lista
+    // (cuando llega/cambia activeShoppingId), en _resubscribeActiveShopping.
 
     // Cargar categorías del grupo (con timeout)
     try {
@@ -2306,8 +2372,16 @@ export class HcShoppingList extends LitElement {
         const listData = snapshot.data();
         const groupIds = listData.groupIds || [];
 
-        // Nombre de la lista (para nombrar la compra de hoy)
+        // Nombre de la lista (para nombrar la compra)
         this._listName = listData.name || '';
+
+        // Modo recurrente (catálogo + compras) y puntero a la compra activa.
+        this._isRecurring = !!listData.isRecurring;
+        const nextActiveId = listData.activeShoppingId || null;
+        if (nextActiveId !== this._activeShoppingId) {
+          this._activeShoppingId = nextActiveId;
+          this._resubscribeActiveShopping();
+        }
 
         // Cargar configuración de reparto
         this.splitConfig = listData.splitConfig || null;
@@ -3624,10 +3698,11 @@ export class HcShoppingList extends LitElement {
     const isAgnostic = this.listType === 'agnostic';
     const isShoppingMode = this.mode === 'shopping';
     const isEditMode = this.mode === 'edit';
+    const isCatalog = isShoppingMode && this._isRecurring;
 
     // Calcular número de columnas para colspan
     let colCount = 1; // Nombre siempre
-    if (isShoppingMode) colCount++;
+    if (isShoppingMode && !isCatalog) colCount++;
     if (!isAgnostic) colCount++;
     if (!this.groupByCategory) colCount++; // Columna categoría solo sin agrupar
     if (isShoppingMode && this.members.length > 0) colCount++; // Columna asignar
@@ -3640,7 +3715,7 @@ export class HcShoppingList extends LitElement {
       <table class="items-table" @click=${this._handleTableClick}>
         <thead>
           <tr>
-            ${isShoppingMode ? html`<th class="checkbox-cell"></th>` : ''}
+            ${isShoppingMode && !isCatalog ? html`<th class="checkbox-cell"></th>` : ''}
             <th class="sortable ${this._sortColumn === 'name' ? 'sorted' : ''}" data-sort="name">
               Nombre ${this._sortColumn === 'name' ? (this._sortDirection === 'asc' ? '↑' : '↓') : ''}
             </th>
@@ -3695,6 +3770,7 @@ export class HcShoppingList extends LitElement {
   _renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, showCategory, colCount) {
     const cat = this._getCategoryById(this._getItemCategory(item));
     const inShopping = this._shoppingItemIds.has(item.id);
+    const isCatalog = isShoppingMode && this._isRecurring;
     const isChecklist = item.isChecklist && item.checklist && item.checklist.length > 0;
     const isExpanded = !!this._expandedItems[item.id];
     const progress = isChecklist
@@ -3703,10 +3779,10 @@ export class HcShoppingList extends LitElement {
     const imageUrl = this._getProductImageUrl(item);
     return html`
       <tr
-        class="${item.checked && isShoppingMode ? 'checked' : ''} ${item.notFound && isShoppingMode ? 'not-found' : ''} ${isShoppingMode ? 'clickable' : ''}"
+        class="${item.checked && isShoppingMode && !isCatalog ? 'checked' : ''} ${item.notFound && isShoppingMode && !isCatalog ? 'not-found' : ''} ${isCatalog && inShopping ? 'in-shopping' : ''} ${isShoppingMode && !isCatalog ? 'clickable' : ''}"
         data-item-id="${item.id}"
       >
-        ${isShoppingMode ? html`
+        ${isShoppingMode && !isCatalog ? html`
           <td class="checkbox-cell">
             <div class="table-checkbox ${item.checked ? 'checked' : ''}">
               ${item.checked ? '✓' : ''}
@@ -3728,18 +3804,18 @@ export class HcShoppingList extends LitElement {
           ${imageUrl ? html`<img class="product-image-inline" src="${imageUrl}" alt="">` : ''}
           ${item.name}
           ${isChecklist ? html`<span class="sublist-item-qty">(${progress})</span>` : ''}
-          ${isShoppingMode ? html`
+          ${isShoppingMode && !isCatalog ? html`
             <button
               class="table-notfound-btn ${item.notFound ? 'active' : ''}"
               @click=${(e) => { e.stopPropagation(); this._handleItemNotFound({ detail: { itemId: item.id, notFound: !item.notFound } }); }}
               title="${item.notFound ? 'Quitar «no encontrado»' : 'Marcar como no encontrado (no lo compro esta vez)'}"
             >${item.notFound ? '🚫' : '🔎'}</button>
           ` : ''}
-          ${isShoppingMode && !isChecklist ? html`
+          ${isCatalog && !isChecklist ? html`
             <button
               class="table-cart-btn ${inShopping ? 'active' : ''}"
               @click=${(e) => { e.stopPropagation(); this._toggleInShopping(item); }}
-              title="${inShopping ? 'Quitar de la compra de hoy' : 'Añadir a la compra de hoy'}"
+              title="${inShopping ? 'Quitar de la compra' : 'Añadir a la compra'}"
             >${inShopping ? '−' : '+'}</button>
           ` : ''}
         </td>
@@ -3845,29 +3921,53 @@ export class HcShoppingList extends LitElement {
     return new Set((this._shoppingItems || []).map(i => i.id));
   }
 
-  // Suscripción permanente a la compra de hoy: mantiene _shoppingItems al día
-  // para pintar los +/- de la lista y la vista de compra. La subcolección puede
-  // no existir todavía (devuelve []). No se cancela al cerrar la vista.
-  _subscribeShoppingToday() {
+  // Suscribe a los items de la compra ACTIVA (según el puntero activeShoppingId
+  // de la lista). Mantiene _shoppingItems al día para pintar los +/- del catálogo
+  // y la vista de compra. Se re-dispara cuando cambia activeShoppingId (nueva
+  // compra, otro miembro). Si no hay compra activa, deja la lista vacía.
+  _resubscribeActiveShopping() {
+    if (this._shoppingUnsub) { this._shoppingUnsub(); this._shoppingUnsub = null; }
+    this._shoppingItems = [];
+    this._shoppingId = this._activeShoppingId;
     if (this.listType === 'agnostic') return;
-    if (!this.userId || !this.listId) return;
-    this._shoppingId = getTodayShoppingId();
-    if (this._shoppingUnsub) this._shoppingUnsub();
+    if (!this.userId || !this.listId || !this._activeShoppingId) return;
     this._shoppingUnsub = subscribeToShoppingItems(
-      this.userId, this.listId, this._shoppingId,
+      this.userId, this.listId, this._activeShoppingId,
       (items) => { this._shoppingItems = items; this._shoppingLoading = false; }
     );
+  }
+
+  // Activa/desactiva el modo recurrente (catálogo + compras) de la lista.
+  async _toggleRecurring() {
+    if (!this.userId || !this.listId) return;
+    if (this._isRecurring) {
+      const { modal } = await import('/js/modal.js');
+      const ok = await modal.confirm({
+        title: 'Desactivar compras recurrentes',
+        message: 'La lista vuelve a funcionar con marcas de comprado. No se borra el historial de compras ni la compra activa; puedes reactivarlo cuando quieras.',
+        confirmText: 'Desactivar',
+        cancelText: 'Cancelar'
+      });
+      if (!ok) return;
+    }
+    try {
+      await updateList(this.listId, { isRecurring: !this._isRecurring });
+    } catch (error) {
+      console.error('Error cambiando el modo recurrente:', error);
+      const { toast } = await import('/js/toast.js');
+      toast.error('No se pudo cambiar el modo de la lista');
+    }
   }
 
   async _openShopping() {
     if (!this.userId || !this.listId) return;
     this._shoppingView = true;
-    // Asegurar el doc de la compra (para el historial y los cambios de estado).
+    // Asegurar que hay una compra activa (crea una vacía la primera vez).
     try {
       const uid = getCurrentUser()?.uid || null;
-      this._shoppingId = await createOrGetTodayShopping(this.userId, this.listId, this._listName, uid);
+      await ensureActiveShopping(this.userId, this.listId, this._listName, uid);
     } catch (error) {
-      console.error('Error abriendo la compra de hoy:', error);
+      console.error('Error abriendo la compra:', error);
     }
   }
 
@@ -3875,46 +3975,56 @@ export class HcShoppingList extends LitElement {
     this._shoppingView = false;
   }
 
-  // Añade o quita un producto de la maestra a la compra de hoy (botón +/-).
+  // Añade o quita un producto del catálogo a la compra activa (botón +/-).
   async _toggleInShopping(item) {
     if (!this.userId || !this.listId || !item?.id) return;
-    const shoppingId = this._shoppingId || getTodayShoppingId();
     try {
       if (this._shoppingItemIds.has(item.id)) {
-        await removeProductFromShopping(this.userId, this.listId, shoppingId, item.id);
+        const shoppingId = this._activeShoppingId;
+        if (shoppingId) await removeProductFromShopping(this.userId, this.listId, shoppingId, item.id);
       } else {
         const uid = getCurrentUser()?.uid || null;
-        await createOrGetTodayShopping(this.userId, this.listId, this._listName, uid);
+        const shoppingId = await ensureActiveShopping(this.userId, this.listId, this._listName, uid);
         await addProductToShopping(this.userId, this.listId, shoppingId, item);
       }
     } catch (error) {
-      console.error('Error actualizando la compra de hoy:', error);
+      console.error('Error actualizando la compra:', error);
     }
   }
 
-  async _migrateNoMarked() {
-    const pendientes = this.items.filter(i => i.checked !== true && !i.isChecklist).length;
-    if (pendientes === 0) {
-      const { toast } = await import('/js/toast.js');
-      toast.info('No tienes productos sin marcar en la lista');
-      return;
-    }
+  // Archiva la compra activa al historial y arranca una nueva vacía.
+  async _startNewShopping() {
+    if (!this.userId || !this.listId) return;
     const { modal } = await import('/js/modal.js');
+    const count = this._shoppingItems.length;
     const ok = await modal.confirm({
-      title: 'Añadir mis pendientes',
-      message: `Se añadirán a la compra de hoy los ${pendientes} productos que tienes sin marcar en la lista. Tu lista no se modifica.`,
-      confirmText: 'Añadir',
+      title: 'Nueva compra',
+      message: count > 0
+        ? `La compra actual (${count} productos) pasa al historial y empiezas una nueva vacía.`
+        : 'Empiezas una compra nueva vacía.',
+      confirmText: 'Nueva compra',
       cancelText: 'Cancelar'
     });
     if (!ok) return;
     try {
       const uid = getCurrentUser()?.uid || null;
-      const res = await migrateUncheckedToTodayShopping(this.userId, this.listId, this._listName, this.items, uid);
-      this._shoppingId = res.shoppingId;
+      await startNewShopping(this.userId, this.listId, this._listName, uid);
       const { toast } = await import('/js/toast.js');
-      toast.success(`Añadidos ${res.added} productos a la compra de hoy`);
+      toast.success('Nueva compra iniciada');
     } catch (error) {
-      console.error('Error añadiendo pendientes:', error);
+      console.error('Error iniciando nueva compra:', error);
+      const { toast } = await import('/js/toast.js');
+      toast.error('No se pudo iniciar la nueva compra');
+    }
+  }
+
+  // Edita cantidad/unidad de un producto de la compra activa.
+  async _updateShoppingItemQty(itemId, quantity, unit) {
+    if (!this._activeShoppingId) return;
+    try {
+      await updateShoppingItem(this.userId, this.listId, this._activeShoppingId, itemId, { quantity, unit });
+    } catch (error) {
+      console.error('Error editando cantidad de la compra:', error);
     }
   }
 
@@ -3937,31 +4047,41 @@ export class HcShoppingList extends LitElement {
   }
 
   _renderShoppingView() {
-    const name = this._shoppingId
-      ? getShoppingName(this._listName, this._shoppingId)
-      : getShoppingName(this._listName, getTodayShoppingId());
     const items = this._shoppingItems || [];
+    const counts = computeShoppingCounts(items);
     return html`
       <div class="shopping-view">
         <div class="shopping-header">
-          <button class="control-btn" @click=${this._closeShopping}>← Lista</button>
-          <span class="shopping-title">🛒 ${name}</span>
+          <button class="control-btn" @click=${this._closeShopping}>← Catálogo</button>
+          <span class="shopping-title">🛒 Compra</span>
         </div>
-        <button class="control-btn control-btn-action" @click=${this._migrateNoMarked}>
-          + Añadir mis pendientes de la lista
+        <div class="shopping-summary">
+          ${counts.total} productos · ${counts.bought} comprados${counts.notFound ? ` · ${counts.notFound} no había` : ''}
+        </div>
+        <button class="control-btn control-btn-action" @click=${this._startNewShopping}>
+          🆕 Nueva compra
         </button>
         ${this._shoppingLoading ? html`<div class="loading">Cargando…</div>`
           : items.length === 0 ? html`
             <div class="empty-state">
-              <p>La compra de hoy está vacía.</p>
-              <p>Añade tus pendientes con el botón de arriba.</p>
+              <p>La compra está vacía.</p>
+              <p>Vuelve al catálogo y añade productos con el botón +.</p>
             </div>`
           : html`
             <div class="shopping-items">
               ${items.map(item => html`
                 <div class="shopping-item status-${item.status || 'pending'}">
                   <span class="shopping-item-name">${item.name}</span>
-                  <span class="shopping-item-qty">${item.quantity} ${item.unit}</span>
+                  <div class="shopping-item-qty-edit">
+                    <input class="qty-input" type="number" min="0" step="0.1" inputmode="decimal"
+                      .value=${String(item.quantity ?? 1)}
+                      @change=${(e) => this._updateShoppingItemQty(item.id, e.target.value, item.unit)}
+                      title="Cantidad">
+                    <input class="unit-input" type="text"
+                      .value=${item.unit || 'unidad'}
+                      @change=${(e) => this._updateShoppingItemQty(item.id, item.quantity, e.target.value)}
+                      title="Unidad">
+                  </div>
                   <div class="shopping-item-actions">
                     <button class="s-btn ${item.status === 'bought' ? 'active' : ''}" title="Comprado"
                       @click=${() => this._setShoppingStatus(item.id, item.status === 'bought' ? 'pending' : 'bought')}>✓</button>
@@ -4010,7 +4130,7 @@ export class HcShoppingList extends LitElement {
           class="mode-btn ${this.mode === 'shopping' ? 'active' : ''}"
           @click=${() => this._setMode('shopping')}
         >
-          ${isAgnostic ? '✅ Usar' : '🛒 Comprar'}
+          ${isAgnostic ? '✅ Usar' : (this._isRecurring ? '📋 Catálogo' : '🛒 Comprar')}
         </button>
         ${!this.readonly ? html`
           <button
@@ -4020,12 +4140,21 @@ export class HcShoppingList extends LitElement {
             ✏️ Editar
           </button>
         ` : ''}
-        ${!isAgnostic ? html`
+        ${!isAgnostic && this._isRecurring ? html`
           <button class="mode-btn shopping-open-btn" @click=${this._openShopping}>
-            🛒 Compra de hoy
+            🛒 Compra${this._shoppingItems.length ? ` (${this._shoppingItems.length})` : ''}
           </button>
         ` : ''}
       </div>
+      ${!isAgnostic && !this.readonly ? html`
+        <button
+          class="recurring-toggle ${this._isRecurring ? 'active' : ''}"
+          @click=${this._toggleRecurring}
+          title="${this._isRecurring ? 'Desactivar compras recurrentes' : 'Convertir en lista recurrente (catálogo + compras)'}"
+        >
+          ${this._isRecurring ? '🔁 Compras recurrentes activadas' : '🔁 Activar compras recurrentes'}
+        </button>
+      ` : ''}
 
       <!-- Quick add in shopping mode (solo si no es readonly) -->
       ${this.mode === 'shopping' && !this.readonly ? html`
@@ -4086,8 +4215,8 @@ export class HcShoppingList extends LitElement {
         ></hc-cost-split>
       ` : ''}
 
-      <!-- Progress (only in shopping mode) -->
-      ${this.mode === 'shopping' ? html`
+      <!-- Progress (solo en modo comprar y NO recurrente: en catálogo el contador vive en la compra) -->
+      ${this.mode === 'shopping' && !this._isRecurring ? html`
         <div class="progress-text">
           ${this._checkedCount} de ${this.items.length} items (${this._progress}%)
         </div>
