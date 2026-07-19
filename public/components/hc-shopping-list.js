@@ -27,6 +27,7 @@ import {
 } from '/js/categories.js';
 import {
   createOrGetTodayShopping,
+  addProductToShopping,
   subscribeToShoppingItems,
   setShoppingItemStatus,
   removeProductFromShopping,
@@ -896,6 +897,27 @@ export class HcShoppingList extends LitElement {
 
     .table-notfound-btn.active {
       background: var(--color-warning-bg, #fde7d0);
+    }
+
+    .table-cart-btn {
+      margin-left: 0.25rem;
+      min-width: 28px;
+      height: 28px;
+      background: transparent;
+      border: 1.5px solid var(--color-border, #d0d0d0);
+      color: var(--color-text, #333);
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+      font-weight: 700;
+      border-radius: 6px;
+      vertical-align: middle;
+    }
+
+    .table-cart-btn.active {
+      background: var(--color-primary, #2e7d32);
+      border-color: var(--color-primary, #2e7d32);
+      color: #fff;
     }
 
     .items-table .checkbox-cell {
@@ -2251,8 +2273,13 @@ export class HcShoppingList extends LitElement {
     // Limpiar suscripciones anteriores y estado de error
     this._unsubscribers.forEach(unsub => unsub());
     this._unsubscribers = [];
+    if (this._shoppingUnsub) { this._shoppingUnsub(); this._shoppingUnsub = null; }
+    this._shoppingItems = [];
     this._subscribedPath = newPath;
     this.loadError = null;
+
+    // Suscripción permanente a la compra de hoy (para pintar los +/- en la lista)
+    this._subscribeShoppingToday();
 
     // Cargar categorías del grupo (con timeout)
     try {
@@ -3667,6 +3694,7 @@ export class HcShoppingList extends LitElement {
 
   _renderTableRow(item, isShoppingMode, isAgnostic, isEditMode, showCategory, colCount) {
     const cat = this._getCategoryById(this._getItemCategory(item));
+    const inShopping = this._shoppingItemIds.has(item.id);
     const isChecklist = item.isChecklist && item.checklist && item.checklist.length > 0;
     const isExpanded = !!this._expandedItems[item.id];
     const progress = isChecklist
@@ -3706,6 +3734,13 @@ export class HcShoppingList extends LitElement {
               @click=${(e) => { e.stopPropagation(); this._handleItemNotFound({ detail: { itemId: item.id, notFound: !item.notFound } }); }}
               title="${item.notFound ? 'Quitar «no encontrado»' : 'Marcar como no encontrado (no lo compro esta vez)'}"
             >${item.notFound ? '🚫' : '🔎'}</button>
+          ` : ''}
+          ${isShoppingMode && !isChecklist ? html`
+            <button
+              class="table-cart-btn ${inShopping ? 'active' : ''}"
+              @click=${(e) => { e.stopPropagation(); this._toggleInShopping(item); }}
+              title="${inShopping ? 'Quitar de la compra de hoy' : 'Añadir a la compra de hoy'}"
+            >${inShopping ? '−' : '+'}</button>
           ` : ''}
         </td>
         ${!isAgnostic ? html`
@@ -3806,27 +3841,55 @@ export class HcShoppingList extends LitElement {
   // COMPRA DE HOY (sublista)
   // ============================================
 
+  get _shoppingItemIds() {
+    return new Set((this._shoppingItems || []).map(i => i.id));
+  }
+
+  // Suscripción permanente a la compra de hoy: mantiene _shoppingItems al día
+  // para pintar los +/- de la lista y la vista de compra. La subcolección puede
+  // no existir todavía (devuelve []). No se cancela al cerrar la vista.
+  _subscribeShoppingToday() {
+    if (this.listType === 'agnostic') return;
+    if (!this.userId || !this.listId) return;
+    this._shoppingId = getTodayShoppingId();
+    if (this._shoppingUnsub) this._shoppingUnsub();
+    this._shoppingUnsub = subscribeToShoppingItems(
+      this.userId, this.listId, this._shoppingId,
+      (items) => { this._shoppingItems = items; this._shoppingLoading = false; }
+    );
+  }
+
   async _openShopping() {
     if (!this.userId || !this.listId) return;
-    this._shoppingLoading = true;
     this._shoppingView = true;
+    // Asegurar el doc de la compra (para el historial y los cambios de estado).
     try {
       const uid = getCurrentUser()?.uid || null;
       this._shoppingId = await createOrGetTodayShopping(this.userId, this.listId, this._listName, uid);
-      if (this._shoppingUnsub) this._shoppingUnsub();
-      this._shoppingUnsub = subscribeToShoppingItems(
-        this.userId, this.listId, this._shoppingId,
-        (items) => { this._shoppingItems = items; this._shoppingLoading = false; }
-      );
     } catch (error) {
       console.error('Error abriendo la compra de hoy:', error);
-      this._shoppingLoading = false;
     }
   }
 
   _closeShopping() {
-    if (this._shoppingUnsub) { this._shoppingUnsub(); this._shoppingUnsub = null; }
     this._shoppingView = false;
+  }
+
+  // Añade o quita un producto de la maestra a la compra de hoy (botón +/-).
+  async _toggleInShopping(item) {
+    if (!this.userId || !this.listId || !item?.id) return;
+    const shoppingId = this._shoppingId || getTodayShoppingId();
+    try {
+      if (this._shoppingItemIds.has(item.id)) {
+        await removeProductFromShopping(this.userId, this.listId, shoppingId, item.id);
+      } else {
+        const uid = getCurrentUser()?.uid || null;
+        await createOrGetTodayShopping(this.userId, this.listId, this._listName, uid);
+        await addProductToShopping(this.userId, this.listId, shoppingId, item);
+      }
+    } catch (error) {
+      console.error('Error actualizando la compra de hoy:', error);
+    }
   }
 
   async _migrateNoMarked() {
