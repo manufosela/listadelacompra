@@ -444,12 +444,6 @@ export class HcShoppingList extends LitElement {
         border-color: #334155;
         color: #f1f5f9;
       }
-
-      .recurring-toggle {
-        background: #1e293b;
-        border-color: #475569;
-        color: #cbd5e1;
-      }
     }
 
     .filter-select:focus {
@@ -973,9 +967,9 @@ export class HcShoppingList extends LitElement {
       width: 100%;
       margin: 0 0 1rem;
       padding: 0.5rem 0.75rem;
-      background: #fff;
-      border: 1.5px dashed var(--color-border, #d0d0d0);
-      color: var(--color-text, #333);
+      background: var(--color-bg-secondary, #fff5ee);
+      border: 1.5px dashed var(--color-border, #ede4dd);
+      color: var(--color-text, #3a302c);
       border-radius: 0.5rem;
       cursor: pointer;
       font-size: 0.875rem;
