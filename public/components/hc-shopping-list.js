@@ -444,6 +444,12 @@ export class HcShoppingList extends LitElement {
         border-color: #334155;
         color: #f1f5f9;
       }
+
+      .recurring-toggle {
+        background: #1e293b;
+        border-color: #475569;
+        color: #cbd5e1;
+      }
     }
 
     .filter-select:focus {
@@ -947,18 +953,18 @@ export class HcShoppingList extends LitElement {
     }
 
     .table-cart-btn.active {
-      background: var(--color-primary, #2e7d32);
-      border-color: var(--color-primary, #2e7d32);
+      background: var(--color-primary, #e07b5c);
+      border-color: var(--color-primary, #e07b5c);
       color: #fff;
     }
 
     /* Producto del catálogo que ya está en la compra activa: fill de izq→dcha */
     .items-table tr.in-shopping td {
-      background: linear-gradient(to right, rgba(46, 125, 50, 0.18), rgba(46, 125, 50, 0) 75%);
+      background: linear-gradient(to right, color-mix(in srgb, var(--color-primary, #e07b5c) 20%, transparent), transparent 75%);
     }
 
     .items-table tr.in-shopping td:first-child {
-      box-shadow: inset 3px 0 0 var(--color-primary, #2e7d32);
+      box-shadow: inset 3px 0 0 var(--color-primary, #e07b5c);
     }
 
     /* Toggle de activar/desactivar modo recurrente (catálogo + compras) */
@@ -977,9 +983,9 @@ export class HcShoppingList extends LitElement {
     }
 
     .recurring-toggle.active {
-      background: var(--color-primary, #2e7d32);
+      background: var(--color-primary, #e07b5c);
       border-style: solid;
-      border-color: var(--color-primary, #2e7d32);
+      border-color: var(--color-primary, #e07b5c);
       color: #fff;
     }
 
